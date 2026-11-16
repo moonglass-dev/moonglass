@@ -56,8 +56,24 @@ EOF
 mkdir -p .claude schemas docs/adr
 cp "$SETTINGS" .claude/settings.json
 cp "$HERE"/../schemas/*.json schemas/
-printf '# ADR 1\n\n- Status: accepted\n\nUses example.com/adr-named and example.com/adr-named-extra.\nRejected: example.com/rejected\n\n## Alternatives rejected\n\n- example.com/rejected-section\n\n## Links\n\n- adr\n' >docs/adr/0001-fake.md
+printf '# ADR 1\n\n- Status: accepted\n\nUses example.com/adr-named and example.com/adr-named-extra.\nRejected: example.com/rejected\n\n## Alternatives rejected\n\n- example.com/rejected-section\n\n### example.com/rejected-sub\n\nMore under the rejected section.\n\n### example.com/sub-heading\n\nBody names example.com/sub-body.\n\n## Links\n\n- adr\n' >docs/adr/0001-fake.md
 printf '# ADR 2\n\n- Status: proposed\n\nMay use example.com/proposed-only.\n' >docs/adr/0002-fake.md
+# The repo's ADRs write the status as "- **Status:** Accepted" (0001-0007) or "- Status: accepted" (0008).
+printf '# ADR 3\n\n- **Status:** Accepted\n\nUses example.com/bold-accepted.\n\n## Alternatives rejected\n\n### example.com/bold-rejected-sub\n\n## Links\n\n### example.com/bold-after-sub\n' >docs/adr/0003-fake.md
+for st in Proposed Rejected Deprecated Superseded Superceded; do
+	l=$(printf '%s' "$st" | tr 'A-Z' 'a-z')
+	printf '# ADR\n\n- **Status:** %s\n\nUses example.com/bold-%s.\n' "$st" "$l" >"docs/adr/01$l-fake.md"
+done
+printf '# ADR\n\n- Status: rejected\n\nUses example.com/plain-rejected.\n' >docs/adr/0200-fake.md
+# Fixtures whose module names do not contain "rejected", so only the status line can decide the result.
+n=0
+for st in Proposed Rejected Deprecated Superseded Superceded; do
+	n=$((n + 1))
+	printf '# ADR\n\n- **Status:** %s\n\nUses example.com/bold-st-%s.\n' "$st" "$n" >"docs/adr/03st$n-fake.md"
+done
+printf '# ADR\n\n- Status: rejected\n\nUses example.com/plain-st.\n' >docs/adr/0300-fake.md
+printf '# ADR\n\n- **Status:** Accepted\n\nUses example.com/bold-st-ok.\n' >docs/adr/0301-fake.md
+printf '# ADR\n\n- Status: accepted\n\nUses example.com/plain-st-ok.\n' >docs/adr/0302-fake.md
 git add -A && git commit -q -m base
 
 fail=0
@@ -304,6 +320,36 @@ check "bare word in an accepted ADR blocks" "$blocked_dep" "$("$TICKET" tests FA
 plan '["example.com/adr-named-extra"]'
 check "full module name in an accepted ADR passes" "$past_plan" "$("$TICKET" tests FAKE-2)"
 
+plan '["example.com/rejected-sub"]'
+check "subheading under Alternatives rejected still blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/sub-heading"]'
+check "subheading line under Alternatives rejected does not name a module" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/sub-body"]'
+check "body under a subheading of Alternatives rejected does not name a module" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/bold-rejected-sub"]'
+check "subheading under Alternatives rejected in a bold-status ADR blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/bold-accepted"]'
+check "module in a '- **Status:** Accepted' ADR passes" "$past_plan" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/bold-after-sub"]'
+check "heading after a rejected section ends the skip" "$past_plan" "$("$TICKET" tests FAKE-2)"
+for l in proposed rejected deprecated superseded superceded; do
+	plan "[\"example.com/bold-$l\"]"
+	check "module in a '- **Status:** $l' ADR blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+done
+plan '["example.com/plain-rejected"]'
+check "module in a '- Status: rejected' ADR blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+# Module names here do not contain "rejected", so only the status line decides.
+for n in 1 2 3 4 5; do
+	plan "[\"example.com/bold-st-$n\"]"
+	check "status line alone blocks bold-status ADR $n" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+done
+plan '["example.com/plain-st"]'
+check "status line alone blocks a '- Status: rejected' ADR" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/bold-st-ok"]'
+check "same style of module under '- **Status:** Accepted' passes" "$past_plan" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/plain-st-ok"]'
+check "same style of module under '- Status: accepted' passes" "$past_plan" "$("$TICKET" tests FAKE-2)"
+
 rm -f "$CLAUDE_FAKE_OUT"
 plan '["example.com/adr-named@v1.2.0", "example.com/listed"]'
 check "dependency named by an accepted ADR or the ticket passes the plan" "$past_plan" "$("$TICKET" tests FAKE-2)"
@@ -359,6 +405,68 @@ done
 for c in '/.claude/**' '/scripts/ticket' '/Makefile' '/docs/adr/**' '**/*.proto' '**/*.pb.go' '/.golangci.yml'; do
 	check "settings still deny Edit($c)" "any(.permissions.deny[]; . == \"Edit($c)\")" "$S"
 done
+
+# 11. Write sessions can commit, and format only through make fmt; the commit denies still hold.
+for c in 'git add *' 'git commit -m *' 'git commit -q -m *' 'git commit -qm *' 'git commit --quiet -m *' 'git commit -am *' 'make fmt' 'make fmt-check'; do
+	check "settings allow Bash($c)" "any(.permissions.allow[]; . == \"Bash($c)\")" "$S"
+done
+for c in 'git commit * -F*' 'git commit * --fil*' 'git commit * --templ*' 'git commit * --no-v*' 'git commit * -n*' 'git commit * -qn*' 'git commit * -qF*' \
+	'git commit * --amend' 'git commit * --am *' 'git commit * --ame' 'git add *--paths*' 'git commit *--paths*' 'git * push *' 'git * reset *' 'git * rebase *' \
+	'git config *' 'git hook *' 'git *--force*'; do
+	check "settings deny Bash($c)" "any(.permissions.deny[]; . == \"Bash($c)\")" "$S"
+done
+# Direct gofmt is not allowed (deny globs match raw text, so quoted or variable paths would escape); no gofmt-specific rules remain.
+check "settings do not allow gofmt or gofmt *" '[.permissions.allow[] | select(test("^Bash\\(gofmt"))] | length == 0' "$S"
+check "settings have no gofmt deny entries" '[.permissions.deny[] | select(test("gofmt"))] | length == 0' "$S"
+# Evaluate the allow and deny globs over sample commands: a command is blocked when a deny glob matches it.
+# bash's * matches any string, as the permission matcher's does; the sampled patterns use nothing else.
+denied() { # command: succeeds when some Bash deny glob matches
+	local p
+	while IFS= read -r p; do
+		p=${p#Bash(}
+		p=${p%)}
+		# shellcheck disable=SC2053
+		[[ $1 == $p ]] && return 0
+	done < <(printf '%s' "$S" | jq -r '.permissions.deny[] | select(startswith("Bash("))')
+	return 1
+}
+allowed() { # command: succeeds when some Bash allow glob matches
+	local p
+	while IFS= read -r p; do
+		p=${p#Bash(}
+		p=${p%)}
+		# shellcheck disable=SC2053
+		[[ $1 == $p ]] && return 0
+	done < <(printf '%s' "$S" | jq -r '.permissions.allow[] | select(startswith("Bash("))')
+	return 1
+}
+for c in 'git commit -m x --amen' 'git commit -q -m x --amend' 'git commit -m x --am' 'git commit -m x --amen --no-edit'; do
+	if allowed "$c" && denied "$c"; then
+		echo "PASS allowed prefix but denied: $c"
+	else
+		echo "FAIL expected a deny to match (and an allow to match first): $c"
+		fail=1
+	fi
+done
+for c in 'make fmt' 'git commit -q -m "W1-1: tests"' 'git commit -am "W1-1: impl"'; do
+	if allowed "$c" && ! denied "$c"; then
+		echo "PASS allowed and not denied: $c"
+	else
+		echo "FAIL expected allow without deny: $c"
+		fail=1
+	fi
+done
+for c in 'gofmt -l .' 'gofmt -w "/abs/x"' "gofmt -w '/tmp/x'" 'gofmt -w $HOME/x'; do
+	if allowed "$c"; then
+		echo "FAIL expected no allow to match: $c"
+		fail=1
+	else
+		echo "PASS not allowed: $c"
+	fi
+done
+check "settings do not deny git add -n" 'any(.permissions.deny[]; test("^Bash\\(git add [^)]*-n")) | not' "$S"
+# An allowed commit starts with one of these prefixes, so -F, -t, -n, --amend and friends cannot lead the command.
+check "git commit allows start only with a safe flag then -m" '[.permissions.allow[] | select(startswith("Bash(git commit "))] | all(test("^Bash\\(git commit (-m|-q -m|-qm|--quiet -m|-a -m|-am|-s -m|-sm|--allow-empty -m) \\*\\)$"))' "$S"
 
 # 7. Dry run needs no Claude and prints one line.
 out=$("$TICKET" run FAKE-1 --dry-run)

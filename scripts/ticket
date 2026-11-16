@@ -615,8 +615,8 @@ cmd_start() {
 # dep_name DEPENDENCY: the module path, without a version ("example.com/m v1.2.3" and "example.com/m@v1.2.3" both give example.com/m).
 dep_name() { printf '%s' "$1" | awk '{print $1}' | sed 's/@.*//'; }
 
-# adr_names DEP: succeeds when an accepted ADR at the base commit names the module DEP in full (not a prefix, not on a
-# line or under a heading that says "rejected"). Only modules with a dot in the first path element can be named.
+# adr_names DEP: succeeds when an accepted ADR at the base commit (status line "- Status: accepted" or "- **Status:** Accepted")
+# names the module DEP in full (not a prefix, not on a line or under a heading that says "rejected", subheadings included). Only modules with a dot in the first path element can be named.
 adr_names() {
 	local d=$1 f re
 	case "${d%%/*}" in *.*) ;; *) return 1 ;; esac
@@ -624,8 +624,11 @@ adr_names() {
 	re="(^|[^A-Za-z0-9._/-])$re(\$|[^A-Za-z0-9_/.-]|\.(\$|[^A-Za-z0-9]))"
 	while IFS= read -r f; do
 		git -C "$WT" show "$BASE:$f" 2>/dev/null | awk '
-			/^- Status: accepted/ { ok = 1 }
-			/^#/ { skip = ($0 ~ /[Rr]ejected/) }
+			/^[-*] +[*_]*Status[*_]*:[*_]* *[Aa]ccepted([^A-Za-z]|$)/ { ok = 1 }
+			/^#/ {
+				n = match($0, /[^#]/); n = n ? n - 1 : length($0)
+				if (!skip || n <= lvl) { skip = ($0 ~ /[Rr]ejected/); lvl = n }
+			}
 			!skip && !/[Rr]ejected/ { body = body $0 "\n" }
 			END { if (ok) printf "%s", body }' | grep -qE -- "$re" && return 0
 	done < <(git -C "$WT" ls-tree --name-only "$BASE" docs/adr/ 2>/dev/null | grep '\.md$')
