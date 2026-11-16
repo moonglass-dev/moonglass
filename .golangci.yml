@@ -24,6 +24,7 @@ linters:
           allow:
             - $gostd
             - moonglass.dev/moonglass
+            - google.golang.org/protobuf
     forbidigo:
       analyze-types: true
       forbid:

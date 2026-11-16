@@ -1,3 +1,12 @@
 moonglass.dev/moonglass/cmd/moonglass TestUsageOnMissingOrUnknownCommand
 moonglass.dev/moonglass/cmd/moonglass TestVersionPrintsVersionCommitAndDate
 moonglass.dev/moonglass/cmd/moonglass TestVersionReportsFailedWrite
+moonglass.dev/moonglass/internal/protocol FuzzEnvelopeDecode
+moonglass.dev/moonglass/internal/protocol TestEnrollRoundTrip
+moonglass.dev/moonglass/internal/protocol TestEnvelopeRejectsMalformed
+moonglass.dev/moonglass/internal/protocol TestEnvelopeRejectsOversized
+moonglass.dev/moonglass/internal/protocol TestEnvelopeRoundTrip
+moonglass.dev/moonglass/internal/protocol TestEnvelopeRoundTripEveryType
+moonglass.dev/moonglass/internal/protocol TestErrorCodes
+moonglass.dev/moonglass/internal/protocol TestHeartbeatRoundTrip
+moonglass.dev/moonglass/internal/protocol TestWrapRejectsTypeMismatch
