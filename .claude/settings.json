@@ -54,7 +54,17 @@
       "Bash(git log --stat *)",
       "Bash(git log -1)",
       "Bash(git log -1 *)",
-      "Bash(git log -n *)"
+      "Bash(git log -n *)",
+      "Bash(git show *)",
+      "Bash(go list *)",
+      "Bash(ls)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(rg *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(head *)",
+      "Bash(wc *)"
     ],
     "deny": [
       "Read(../**)",
@@ -169,7 +179,12 @@
       "Bash(rm -rf *)",
       "Bash(rm -fr *)",
       "Bash(rm -r *)",
-      "Bash(find * -delete *)"
+      "Bash(find *-delete*)",
+      "Bash(find *-exec*)",
+      "Bash(find *-ok*)",
+      "Bash(find *-fprint*)",
+      "Bash(find *-fls*)",
+      "Bash(rg *--pre*)"
     ]
   }
 }

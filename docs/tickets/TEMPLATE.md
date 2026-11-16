@@ -9,6 +9,7 @@ spec: docs/specs/example.md
 reads:
   - docs/adr/0000-example.md
 allow: []
+dependencies: []
 ---
 
 # A verb and an outcome
@@ -41,5 +42,6 @@ Frontmatter fields:
   tests     Acceptance tests, one per line as "./package/path TestName". Each must pass and not be skipped.
   spec      The spec file this ticket implements. It may be edited; no other doc may.
   reads     Extra files the agent must read first.
-  allow     Paths exempt from the protected-path, go.mod and package gates. Empty by default. Name go.mod to add a dependency.
+  allow     Paths exempt from the protected-path, go.mod and package gates, and editable in the ticket's session despite the settings deny list. Empty by default. Name go.mod to add a dependency. .claude/ and scripts/ticket stay denied.
+  dependencies  Modules the ticket adds ("module/path v1.2.3"). Anything else the plan adds must be named by an accepted ADR, or the plan blocks.
 -->

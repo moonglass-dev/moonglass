@@ -3,7 +3,9 @@
 # Builds a throwaway repository and worktree under a temp directory. Needs git, go, jq and perl; no Claude calls.
 set -u -o pipefail
 
-TICKET=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/ticket
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+TICKET=$HERE/ticket
+SETTINGS=$HERE/../.claude/settings.json
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/ticket-test.XXXXXX") || exit 2
 trap 'rm -rf "$TMP"' EXIT
 
@@ -50,6 +52,12 @@ tests:
 
 # Multiply two numbers
 EOF
+# Settings, schemas and ADRs that the session-settings and plan-stage checks read from the worktree.
+mkdir -p .claude schemas docs/adr
+cp "$SETTINGS" .claude/settings.json
+cp "$HERE"/../schemas/*.json schemas/
+printf '# ADR 1\n\n- Status: accepted\n\nUses example.com/adr-named and example.com/adr-named-extra.\nRejected: example.com/rejected\n\n## Alternatives rejected\n\n- example.com/rejected-section\n\n## Links\n\n- adr\n' >docs/adr/0001-fake.md
+printf '# ADR 2\n\n- Status: proposed\n\nMay use example.com/proposed-only.\n' >docs/adr/0002-fake.md
 git add -A && git commit -q -m base
 
 fail=0
@@ -197,6 +205,160 @@ mul_test "$good_test"
 printf '//go:build never\n\npackage calc\n' >"$WT/pkg/calc/extra_test.go"
 commit build-constraint
 expect_fail "added build constraint fails" tests-immutable
+
+# 8. Ticket ids: an optional letter suffix is accepted; anything else is rejected.
+for id in W0-0b W0-0c W0-6 W12-3; do
+	sed "s/^id: FAKE-1/id: $id/" "$TICKET_ROOT/docs/tickets/FAKE-1.md" >"$TICKET_ROOT/docs/tickets/$id.md"
+	out=$("$TICKET" run "$id" --dry-run)
+	check "id $id is accepted" '.state == "dry_run"' "$out"
+done
+for id in W0-0bb W0-b W0-0B w0-6 W0; do
+	out=$("$TICKET" status "$id" 2>/dev/null)
+	check "id $id is rejected" '.state == "error" and (.reason | contains("ticket id must look like"))' "$out"
+done
+
+# 9. Plan stage and write-session settings, with a fake claude that records its --settings file.
+cat >"$TMP/fake-claude" <<'EOF'
+#!/usr/bin/env bash
+# The scrubbed environment passes CLAUDE_* variables only. Plan calls (--tools Read,Grep,Glob) return $CLAUDE_FAKE_PLAN. Write calls save their --settings file and report blocked.
+cat >/dev/null
+settings="" plan=0 review=0
+printf '%s\n' "$@" >"${CLAUDE_FAKE_ARGS:-/dev/null}"
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--settings) settings=$2; shift ;;
+	--tools) [ "$2" = Read,Grep,Glob ] && plan=1; [ "$2" = Read,Grep,Glob,Bash ] && review=1; shift ;;
+	esac
+	shift
+done
+if [ $review = 1 ]; then
+	echo '{"is_error":false,"total_cost_usd":0,"num_turns":1,"structured_output":{"verdict":"pass","checked":["fake"],"findings":[]}}'
+elif [ $plan = 1 ]; then
+	jq -c --slurpfile p "$CLAUDE_FAKE_PLAN" -n '{is_error: false, total_cost_usd: 0, num_turns: 1, structured_output: $p[0]}'
+else
+	cp "$settings" "$CLAUDE_FAKE_OUT"
+	echo '{"is_error":false,"total_cost_usd":0,"num_turns":1,"structured_output":{"status":"blocked","blocked_reason":"fake stop","contract_change_needed":false}}'
+fi
+EOF
+chmod +x "$TMP/fake-claude"
+export CLAUDE_BIN=$TMP/fake-claude CLAUDE_FAKE_PLAN=$TMP/plan.json CLAUDE_FAKE_OUT=$TMP/session-settings.json
+
+fake2() { # allow list lines for the frontmatter, written to the ticket copy and to docs/tickets
+	cat <<EOF
+---
+id: FAKE-2
+level: core
+packages:
+  - pkg/calc
+tests:
+  - ./pkg/calc TestMul
+dependencies:
+  - example.com/listed v1.0.0
+$1
+---
+
+# Multiply with a dependency
+EOF
+}
+ALLOW_ALL='allow:
+  - Makefile
+  - docs/adr
+  - pkg/calc/calc.pb.go
+  - proto/a.proto
+  - .golangci.yml
+  - .claude
+  - .claude/settings.json
+  - scripts/ticket'
+fake2 "$ALLOW_ALL" >"$TICKET_ROOT/docs/tickets/FAKE-2.md"
+out=$("$TICKET" start FAKE-2)
+check "start FAKE-2" '.state == "started"' "$out"
+WT2=$(cd "$TMP/repo.worktrees/FAKE-2" && pwd -P)
+T2=$TICKET_ROOT/.ticket/FAKE-2/ticket.md
+
+plan() { # new_dependencies JSON, contract_change_required, ambiguities JSON
+	jq -nc --argjson d "$1" --argjson c "${2:-false}" --argjson a "${3:-[]}" \
+		'{ticket: "FAKE-2", tests: [], files: [], signatures: [], ambiguities: $a, contract_change_required: $c, new_dependencies: $d}' >"$TMP/plan.json"
+}
+blocked_dep='.state == "plan_blocked" and (.reason | contains("new dependency not in an accepted ADR or the ticket"))'
+past_plan='.state == "plan_blocked" and (.reason | contains("tests stage blocked"))'
+
+plan '["example.com/unlisted"]'
+check "unlisted dependency blocks the plan" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/proposed-only"]'
+check "dependency in a proposed ADR still blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/adr-named v1.2.0", "example.com/unlisted"]'
+check "one unauthorized dependency blocks the plan" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/adr-named"]' true
+check "contract change still blocks" '.state == "plan_blocked" and (.reason | contains("plan needs a decision"))' "$("$TICKET" tests FAKE-2)"
+plan '[]' false '[{"question":"q","blocking":true,"proposed_answer":"a"}]'
+check "blocking ambiguity still blocks" '.state == "plan_blocked" and (.reason | contains("plan needs a decision"))' "$("$TICKET" tests FAKE-2)"
+
+plan '["example.com/rejected"]'
+check "dependency on a Rejected line of an accepted ADR blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/rejected-section"]'
+check "dependency under Alternatives rejected blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/adr"]'
+check "prefix of an ADR-named module blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["adr"]'
+check "bare word in an accepted ADR blocks" "$blocked_dep" "$("$TICKET" tests FAKE-2)"
+plan '["example.com/adr-named-extra"]'
+check "full module name in an accepted ADR passes" "$past_plan" "$("$TICKET" tests FAKE-2)"
+
+rm -f "$CLAUDE_FAKE_OUT"
+plan '["example.com/adr-named@v1.2.0", "example.com/listed"]'
+check "dependency named by an accepted ADR or the ticket passes the plan" "$past_plan" "$("$TICKET" tests FAKE-2)"
+
+# The write session ran with the ticket's allow list applied.
+S=$(cat "$CLAUDE_FAKE_OUT" 2>/dev/null || echo '{}')
+for pat in 'Makefile' 'docs/adr' '[.]pb[.]go' '[.]proto' 'golangci'; do
+	check "allow lifts the $pat deny" "any(.permissions.deny[]; test(\"$pat\")) | not" "$S"
+done
+check "allowed session keeps .claude denied" "any(.permissions.deny[]; . == \"Edit(/$WT2/.claude/**)\")" "$S"
+check "allowed session keeps scripts/ticket denied" "any(.permissions.deny[]; . == \"Edit(/$WT2/scripts/ticket)\")" "$S"
+check "allowed session keeps unrelated denies" 'any(.permissions.deny[]; endswith("/AGENTS.md)")) and any(.permissions.deny[]; . == "Edit(../**)") and any(.permissions.deny[]; . == "Bash(git push *)")' "$S"
+check "session settings root the allow rule at the worktree" "any(.permissions.allow[]; . == \"Edit(/$WT2/**)\")" "$S"
+
+# Without an allow list nothing is lifted.
+fake2 'allow: []' >"$T2"
+rm -f "$CLAUDE_FAKE_OUT"
+"$TICKET" tests FAKE-2 >/dev/null
+S=$(cat "$CLAUDE_FAKE_OUT" 2>/dev/null || echo '{}')
+check "no allow list keeps the Makefile deny" "any(.permissions.deny[]; . == \"Edit(/$WT2/Makefile)\")" "$S"
+check "no allow list keeps the adr and pb.go denies" "any(.permissions.deny[]; . == \"Edit(/$WT2/docs/adr/**)\") and any(.permissions.deny[]; . == \"Edit(**/*.pb.go)\")" "$S"
+
+# A ticket that only allows the guard gets no override for it.
+fake2 'allow:
+  - .claude
+  - scripts/ticket' >"$T2"
+rm -f "$CLAUDE_FAKE_OUT"
+"$TICKET" tests FAKE-2 >/dev/null
+S=$(cat "$CLAUDE_FAKE_OUT" 2>/dev/null || echo '{}')
+check "allowing .claude and scripts/ticket lifts nothing" "any(.permissions.deny[]; . == \"Edit(/$WT2/.claude/**)\") and any(.permissions.deny[]; . == \"Edit(/$WT2/scripts/ticket)\") and (.permissions.deny | length) == ($(jq '.permissions.deny | length' "$SETTINGS"))" "$S"
+
+# The review session has no code to run, so it must not inherit the inspection allows: Read denies do not stop cat.
+mkdir -p "$TMP/bin"
+printf '#!/bin/sh\nexit 1\n' >"$TMP/bin/gh"
+chmod +x "$TMP/bin/gh"
+jq '.state = "pr_open"' "$TICKET_ROOT/.ticket/FAKE-2/state.json" >"$TMP/state.json" && cp "$TMP/state.json" "$TICKET_ROOT/.ticket/FAKE-2/state.json"
+export CLAUDE_FAKE_ARGS=$TMP/review-args.txt
+PATH=$TMP/bin:$PATH "$TICKET" review FAKE-2 >/dev/null
+A=$(jq -Rs 'split("\n")' "$CLAUDE_FAKE_ARGS")
+for c in cat rg grep find head wc ls; do
+	check "review disallows Bash($c)" "any(.[]; . == \"Bash($c:*)\")" "$A"
+done
+unset CLAUDE_BIN CLAUDE_FAKE_PLAN CLAUDE_FAKE_OUT CLAUDE_FAKE_ARGS
+
+# 10. Read-only inspection is allowed, and the dangerous variants stay denied.
+S=$(cat "$SETTINGS")
+for c in 'ls' 'ls *' 'cat *' 'rg *' 'grep *' 'find *' 'head *' 'wc *' 'go list *' 'git show *'; do
+	check "settings allow Bash($c)" "any(.permissions.allow[]; . == \"Bash($c)\")" "$S"
+done
+for c in 'find *-delete*' 'find *-exec*' 'find *-fprint*' 'rg *--pre*' 'go get *' 'git push *'; do
+	check "settings deny Bash($c)" "any(.permissions.deny[]; . == \"Bash($c)\")" "$S"
+done
+for c in '/.claude/**' '/scripts/ticket' '/Makefile' '/docs/adr/**' '**/*.proto' '**/*.pb.go' '/.golangci.yml'; do
+	check "settings still deny Edit($c)" "any(.permissions.deny[]; . == \"Edit($c)\")" "$S"
+done
 
 # 7. Dry run needs no Claude and prints one line.
 out=$("$TICKET" run FAKE-1 --dry-run)

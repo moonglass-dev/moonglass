@@ -103,7 +103,7 @@ fm_list() {
 }
 ticket_title() { awk '/^---$/ { c++; next } c >= 2 && /^# / { sub(/^# /, ""); print; exit }' "$1"; }
 
-T_LEVEL="" T_SPEC="" T_TITLE="" T_PACKAGES="" T_TESTS="" T_READS="" T_ALLOW=""
+T_LEVEL="" T_SPEC="" T_TITLE="" T_PACKAGES="" T_TESTS="" T_READS="" T_ALLOW="" T_DEPS=""
 
 load_ticket() { # file
 	local f=$1
@@ -119,6 +119,7 @@ load_ticket() { # file
 	T_TESTS=$(fm_list "$f" tests)
 	T_READS=$(fm_list "$f" reads)
 	T_ALLOW=$(fm_list "$f" allow)
+	T_DEPS=$(fm_list "$f" dependencies)
 	[ -n "$T_PACKAGES" ] || die "$f: packages must list at least one path"
 	local line
 	while IFS= read -r line; do
@@ -170,6 +171,62 @@ with_timeout() {
 	' "$secs" "$@"
 }
 
+# deny_covers RULE PATH: does the Edit deny rule match the repository-relative path? Only /x and **/x rules do.
+deny_covers() {
+	local g=${1#Edit(}
+	g=${g%)}
+	case "$g" in
+	/*)
+		g=${g#/}
+		g=${g//\*\*/\*}
+		[[ $2 == $g ]]
+		;;
+	'**/'*)
+		g=${g#'**/'}
+		[[ $2 == $g || $2 == */$g ]]
+		;;
+	*) return 1 ;;
+	esac
+}
+
+# guarded PATH: the harness guard itself. A ticket's allow list never reaches it.
+guarded() {
+	case "$1" in .claude | .claude/* | scripts/ticket) return 0 ;; esac
+	return 1
+}
+
+# session_settings: writes $TD/session-settings.json, the project settings for one write session.
+# An Edit deny rule is dropped when the ticket's allow list names a protected path it covers, except
+# the rules that cover .claude/ or scripts/ticket. Rooted /x rules become absolute paths, because a
+# --settings file resolves them against its own directory and not against the worktree.
+session_settings() {
+	local base=$WT/.claude/settings.json rule a x wt drop=()
+	[ -f "$base" ] || die "$base is missing"
+	wt=$(cd "$WT" && pwd -P)
+	while IFS= read -r rule; do
+		case "$rule" in "Edit("*) ;; *) continue ;; esac
+		deny_covers "$rule" .claude/settings.json && continue
+		deny_covers "$rule" scripts/ticket && continue
+		while IFS= read -r a; do
+			a=${a%/}
+			[ -n "$a" ] || continue
+			guarded "$a" && continue
+			for x in "$a" "$a/x"; do
+				if is_protected "$x" && deny_covers "$rule" "$x"; then
+					drop+=("$rule")
+					break 2
+				fi
+			done
+		done <<EOF
+$T_ALLOW
+EOF
+	done < <(jq -r '.permissions.deny[]' "$base")
+	jq --arg wt "$wt" '
+		def rooted: if test("^(Edit|Read)\\(/([^/]|$)") then sub("^(?<t>Edit|Read)\\(/"; "\(.t)(/" + $wt + "/") else . end;
+		.permissions.deny |= ((. - $ARGS.positional) | map(rooted)) | .permissions.allow |= map(rooted)
+	' "$base" --args ${drop[@]+"${drop[@]}"} >"$TD/session-settings.json" || die "cannot write $TD/session-settings.json"
+}
+
 # claude_call STEP MODEL EFFORT BUDGET SCHEMA MODE: runs one headless session in the worktree.
 # The structured result is saved to $TD/STEP.json. Returns 1 and sets R_REASON on failure.
 claude_call() {
@@ -190,11 +247,12 @@ claude_call() {
 		(cd "$WT" && with_timeout "$SECS_CLAUDE" "${CENV[@]}" "$CLAUDE_BIN" -p --model "$model" --effort "$effort" \
 			--output-format json --json-schema "$schema_json" --setting-sources project --strict-mcp-config \
 			--permission-mode dontAsk --no-session-persistence --disable-slash-commands --max-budget-usd "$budget" \
-			--tools Read,Grep,Glob,Bash --disallowedTools Edit Write NotebookEdit "Bash(git add:*)" "Bash(git commit:*)" "Bash(make:*)" "Bash(go:*)" <"$prompt" >"$out" 2>"$err")
+			--tools Read,Grep,Glob,Bash --disallowedTools Edit Write NotebookEdit "Bash(git add:*)" "Bash(git commit:*)" "Bash(make:*)" "Bash(go:*)" "Bash(cat:*)" "Bash(rg:*)" "Bash(grep:*)" "Bash(find:*)" "Bash(head:*)" "Bash(wc:*)" "Bash(ls:*)" <"$prompt" >"$out" 2>"$err")
 		;;
-	*) # write: the allow and deny lists in .claude/settings.json apply
+	*) # write: .claude/settings.json, with the ticket's allow list applied to the protected-path denies
+		session_settings
 		(cd "$WT" && with_timeout "$SECS_CLAUDE" "${CENV[@]}" "$CLAUDE_BIN" -p --model "$model" --effort "$effort" \
-			--output-format json --json-schema "$schema_json" --setting-sources project --strict-mcp-config \
+			--output-format json --json-schema "$schema_json" --setting-sources "" --settings "$TD/session-settings.json" --strict-mcp-config \
 			--permission-mode dontAsk --no-session-persistence --disable-slash-commands --max-budget-usd "$budget" \
 			--disallowedTools WebFetch WebSearch <"$prompt" >"$out" 2>"$err")
 		;;
@@ -554,6 +612,46 @@ cmd_start() {
 	set_result started false "worktree $WT on $branch from $base"
 }
 
+# dep_name DEPENDENCY: the module path, without a version ("example.com/m v1.2.3" and "example.com/m@v1.2.3" both give example.com/m).
+dep_name() { printf '%s' "$1" | awk '{print $1}' | sed 's/@.*//'; }
+
+# adr_names DEP: succeeds when an accepted ADR at the base commit names the module DEP in full (not a prefix, not on a
+# line or under a heading that says "rejected"). Only modules with a dot in the first path element can be named.
+adr_names() {
+	local d=$1 f re
+	case "${d%%/*}" in *.*) ;; *) return 1 ;; esac
+	re=$(printf '%s' "$d" | sed 's/[.[\*^$+?(){}|]/\\&/g')
+	re="(^|[^A-Za-z0-9._/-])$re(\$|[^A-Za-z0-9_/.-]|\.(\$|[^A-Za-z0-9]))"
+	while IFS= read -r f; do
+		git -C "$WT" show "$BASE:$f" 2>/dev/null | awk '
+			/^- Status: accepted/ { ok = 1 }
+			/^#/ { skip = ($0 ~ /[Rr]ejected/) }
+			!skip && !/[Rr]ejected/ { body = body $0 "\n" }
+			END { if (ok) printf "%s", body }' | grep -qE -- "$re" && return 0
+	done < <(git -C "$WT" ls-tree --name-only "$BASE" docs/adr/ 2>/dev/null | grep '\.md$')
+	return 1
+}
+
+# dep_authorized DEPENDENCY: named in the ticket's `dependencies` list, or by an accepted ADR as of the base commit.
+dep_authorized() {
+	local d e f
+	d=$(dep_name "$1")
+	[ -n "$d" ] || return 1
+	while IFS= read -r e; do
+		[ -n "$e" ] && [ "$(dep_name "$e")" = "$d" ] && return 0
+	done <<EOF
+$T_DEPS
+EOF
+	adr_names "$d"
+}
+
+unauthorized_deps() { # the plan's new dependencies that dep_authorized rejects, one per line
+	local d
+	while IFS= read -r d; do
+		dep_authorized "$d" || printf '%s\n' "$d"
+	done < <(jq -r '.new_dependencies[]' "$TD/plan.json")
+}
+
 cmd_tests() {
 	require_state started plan_blocked
 	[ "$T_LEVEL" = core ] || die "only core tickets have a tests stage"
@@ -561,8 +659,10 @@ cmd_tests() {
 	prompt_plan
 	claude_call plan sonnet medium "$BUDGET_PLAN" plan plan || { set_result plan_blocked true "$R_REASON"; return; }
 	jq -e 'has("tests") and has("ambiguities") and has("contract_change_required") and has("new_dependencies")' "$TD/plan.json" >/dev/null || { set_result plan_blocked true "plan.json is missing required fields"; return; }
-	if jq -e '.contract_change_required or (.new_dependencies | length > 0) or ([.ambiguities[] | select(.blocking)] | length > 0)' "$TD/plan.json" >/dev/null; then
-		set_result plan_blocked true "plan needs a decision (contract change, new dependency or blocking question); see .ticket/$ID/plan.json"
+	local deps
+	deps=$(unauthorized_deps)
+	if jq -e '.contract_change_required or ([.ambiguities[] | select(.blocking)] | length > 0)' "$TD/plan.json" >/dev/null || [ -n "$deps" ]; then
+		set_result plan_blocked true "plan needs a decision (contract change, new dependency or blocking question)${deps:+; new dependency not in an accepted ADR or the ticket: $(printf '%s' "$deps" | tr '\n' ' ')}; see .ticket/$ID/plan.json"
 		return
 	fi
 	prompt_tests
@@ -800,7 +900,7 @@ main() {
 		esac
 		shift
 	done
-	[[ "$ID" =~ ^[A-Z0-9]+-[0-9]+$ ]] || die "ticket id must look like W0-1 or W12-3"
+	[[ "$ID" =~ ^[A-Z0-9]+-[0-9]+[a-z]?$ ]] || die "ticket id must look like W0-1, W12-3 or W0-0b"
 	TD=$ROOT/.ticket/$ID
 	WT=$ROOT.worktrees/$ID
 	if [ "$DRY" = 1 ]; then
