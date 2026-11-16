@@ -52,7 +52,7 @@ If the week 1 or week 2 gates slip by more than a week, move the launch to week 
 | **Name: done.** Moonglass, moonglass.dev owned. Claim the GitHub org (`moonglass` or the nearest available), package names and social handles | Blocks launch assets and the repository |
 | **Buy a separate user-content domain** for managed subdomains (V§8, open decision 2) | Needed for the Public Suffix List application; cannot be a subdomain of moonglass.dev |
 | **Apply to the Public Suffix List** on cookie-isolation grounds, and **ask Let's Encrypt for a rate-limit adjustment** | No SLA; often one to two weeks, sometimes months, and requests aimed at Let's Encrypt limits are rejected (S§3.4). Managed subdomains are v1, so this no longer blocks launch |
-| Repository, CI on real Docker, test fleet; **release signing key on a hardware token; canary and stable channels** | Everything after depends on it; the first agent binary must already be signed |
+| Repository, CI on real Docker, test fleet; **two release signing keys on hardware tokens (ADR-0007); canary and stable channels** | Everything after depends on it; the first agent binary must already be signed |
 | Write the threat model (S§4), the first protocol file, the **container-spec deny list** (S§3.2) and the **key design** (S§3.11) as documents | These are the specs the agents build against and the reviewer agent checks against |
 | Agent workflow: track specs, reviewer-agent brief, definition of done | So week 1 produces product, not process |
 

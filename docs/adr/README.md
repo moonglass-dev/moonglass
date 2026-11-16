@@ -1,8 +1,8 @@
 # Architecture decision records
 
-One file per decision. Each follows the same template: Status · Date · Context · Decision · Consequences · Alternatives rejected · Open questions · Links.
+One file per decision. Each follows the same template: Status · Date · Context · Decision · Consequences · Alternatives rejected · Open questions (only when a spike or a named owner decision still holds one) · Links.
 
-Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milestones.md`) and B§ (`build-plan.md`). Anything the plan does not state is marked _Proposed_.
+Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milestones.md`) and B§ (`build-plan.md`). The owner's decisions of 2026-11-16 are written into each ADR's decision section.
 
 | ADR | Decision |
 |---|---|
@@ -12,7 +12,7 @@ Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milest
 | [0004](0004-container-spec-policy.md) | The agent denies dangerous container specs by default; the only exceptions are scoped allows in `agent.toml` |
 | [0005](0005-mvp-authentication.md) | MVP sign-in is GitHub and email links on hosted, a bootstrap token and `server login-link` on self-hosted, with step-up for approvals; passkeys and TOTP arrive in v1 |
 | [0006](0006-operation-registry.md) | One operation registry is the only API surface; REST, the CLI and later MCP are generated from it, and it does authorisation and audit |
-| [0007](0007-releases-and-updates.md) | Releases are signed, flow from canary to stable, roll out in stages and revert themselves; after launch the control plane speaks the current and previous agent protocol version only |
+| [0007](0007-releases-and-updates.md) | Releases carry OpenSSH signatures from two pinned FIDO2 keys from W1-6, flow from canary to stable, roll out in stages and revert themselves; after launch the control plane speaks the current and previous agent protocol version only |
 
 ADR-0008 (protobuf codegen tool) is written by ticket W0-3.
 

@@ -100,7 +100,7 @@ Format: **ID — title** · packages · needs · level · lane. Then the accepta
 - **W1-3 — Enrolment** · `internal/keys` (agent identity only), `internal/agent`, server endpoint · W0-3, W1-2 · Core · primary. One-time token (a replay fails), the fingerprint printed, the control-plane key pinned. Adds the real `moonglass server` and `moonglass agent enroll` subcommands.
 - **W1-4 — Connection and heartbeat** · `internal/agent`, `internal/server` · W1-3 · Core · primary. Outbound WSS, reconnect with backoff and jitter, the server goes offline and recovers in an integration test.
 - **W1-5 — Proxy process** · `internal/proxy`, `moonglass proxy` · SPIKE-1 · Standard · secondary. Caddy 2.11.9 embedded; admin API on a Unix socket; counter module; one route over HTTPS. Caddy's internal issuer locally, ACME staging on the fleet.
-- **W1-6 — Install script and systemd units** · `scripts/install`, `deploy/systemd/` · W1-4, W1-5 · Core · primary. Service user, hardened units, Docker group access for the agent only.
+- **W1-6 — Install script and systemd units** · `scripts/install`, `deploy/systemd/` · W1-4, W1-5 · Core · primary. Service user, hardened units, Docker group access for the agent only. Verifies every downloaded artifact's signature against the two pinned release keys before installing (ADR-0007).
 - **W1-7 — Memory budget check** · CI, `scripts/measure-memory` · W1-5, W0-4 · Light · secondary. CI fails above budget.
 - → **G1**
 
@@ -163,7 +163,7 @@ Format: **ID — title** · packages · needs · level · lane. Then the accepta
 - **W7-3 — `moonglass import`** · `internal/importer` · W6-4, W3-2 · Standard · primary. Compose and Coolify. Values are encrypted locally before upload.
 - **W7-4 — Commercial module and hosted entitlements** · separate repository · W2-1 · Standard · secondary. Free tier: one person, two servers, no managed subdomains. The open build contains no plan checks.
 - **W7-5 — Control-plane backup** · `internal/server` · W7-1 · Standard · secondary.
-- **W7-6 — Release pipeline** · CI, `internal/update` · W1-6 · Core · primary. Signing on a hardware token, canary and stable channels, staged rollout, self-update with revert.
+- **W7-6 — Release pipeline** · CI, `internal/update` · W1-6 · Core · primary. CI provenance, canary and stable channels, staged rollout, self-update with revert, and the agent's signature verifier. Signing itself starts at W1-6 (ADR-0007).
 - **W7-7 — First-deploy wizard** · `ui/` · W4-6 · Light · secondary.
 - → **G7**, soak starts
 
@@ -281,7 +281,7 @@ Things only you can do. The agents' tickets are W0-1 to W0-5 above.
 
 - [ ] Create the GitHub org and the `moonglass` repository; turn on branch protection for `main` (required CI checks, no direct pushes, squash merge only).
 - [ ] Serve the Go vanity import for `moonglass.dev/moonglass` from moonglass.dev (one `<meta name="go-import">` tag).
-- [ ] Release signing key on a hardware token; the public key goes in the repository later (W7-6).
+- [ ] Two release signing keys (`ed25519-sk`, `-O verify-required`) on two FIDO2 tokens, primary and backup, kept apart; both public keys committed to the repository before W1-6 (ADR-0007).
 - [ ] Accounts and an API token for the three test-fleet VPSs.
 - [ ] Buy the user-content domain; apply to the Public Suffix List; send Let's Encrypt the rate-limit request.
 - [ ] Waitlist page live (W0-5); book ten migration interviews.

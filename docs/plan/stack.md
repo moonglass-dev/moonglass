@@ -52,7 +52,7 @@ Priorities, in your order: security, performance, footprint, UX. One constraint 
 | Logs and metrics | Docker's `local` log driver, streamed on demand; cgroup v2 samples rolled up into SQLite. Charts in v1 | **Build** the sampler | No full-text log search, no charts at launch |
 | Backups | Native dump tools → zstd → age, encrypted to the **environment key** → any S3-compatible bucket; volumes through restic in v1 | Reuse | restic is a second executable, run on demand |
 | Secrets | age (X25519): envelope keys per environment, an owner recovery key, wrapping and rotation (§3.11). The reference Go library on servers and CLI; the same author's TypeScript implementation in the browser | Reuse the crypto; **build** key distribution | Losing every server *and* the recovery key loses the secrets, by design |
-| API | Go's standard HTTP server with Huma generating OpenAPI from Go types; one operation registry feeds REST, CLI and MCP | Reuse | Discipline: no endpoint exists outside the registry |
+| API | Go's standard HTTP server with Huma generating OpenAPI from Go types; one operation registry feeds REST, CLI and MCP | Reuse | Discipline: no operation exists outside the registry |
 | MCP | Official Go SDK v1.7+, spec 2026-07-28, stateless Streamable HTTP, OAuth 2.1 | Reuse | None; Go is a Tier 1 SDK |
 | Auth | **MVP:** GitHub sign-in, email magic links, one-time login links printed on a self-hosted box, server-side sessions, step-up for approvals. **v1:** passkeys (`go-webauthn`), TOTP, generic OIDC | Reuse libraries; **build** the flows | MFA depends on GitHub until v1 |
 | API and agent tokens | Opaque random tokens, stored hashed, with scope rows | **Build** (small) | No offline verification or delegation yet |

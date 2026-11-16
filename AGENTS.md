@@ -64,7 +64,7 @@ Stop and ask before changing a contract (`.proto` files, registry operations, th
 - Never log secret values or tokens.
 - No protocol message ever carries a shell string for the host.
 - `agent.toml` is local policy the control plane cannot change.
-- Container specs are denied by default for: privileged mode; host bind mounts; host network, PID, IPC, UTS or user namespaces; added capabilities; devices; Docker or containerd socket mounts; disabled seccomp or AppArmor. The only exception is a scoped allow in `agent.toml`.
+- Every container spec and build is denied by default for: `privileged`; bind mounts of host paths other than named volumes and the agent-managed data directory; any mount of `docker.sock`, `containerd.sock` or the Docker data root, under any path or alias; host network, PID, IPC, UTS or user namespaces, and `network_mode: container:<id>` across projects; `cap_add`, `devices`, `device_cgroup_rules`; `security_opt` that disables seccomp, AppArmor or SELinux; `sysctls` outside the allow-list; a custom `cgroup_parent`; a non-default `runtime`; BuildKit entitlements `security.insecure` and `network.host`. The only exception is a scoped allow in `agent.toml` (`docs/threat-model.md` §6).
 - Docs never claim more than the threat model supports.
 
 ## Trusted core
@@ -76,6 +76,7 @@ Changes to these paths get line-by-line review by the owner. Most do not exist y
 - `internal/keys`
 - `internal/auth`
 - `internal/store`
+- `internal/registry`
 - `scripts/install`
 - `deploy/systemd`
 - release signing and self-update
