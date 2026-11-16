@@ -49,7 +49,7 @@ Run on the worktree, cheapest first, stopping at the first failure. Output is th
 
 1. `clean`: everything committed, at least one commit past the base.
 2. `paths`: no protected path (`.github`, `.claude`, `Makefile`, `.golangci.yml`, `AGENTS.md`, `CLAUDE.md`, `docs/adr`, `*.proto`, `*.pb.go`, `scripts/ticket`, `schemas`); `go.mod` and `go.sum` unchanged; every changed path inside the ticket's `packages`, its `spec`, or `testdata/tests.txt`. The ticket's `allow` list exempts named paths.
-3. `size`: non-test diff under 800 lines.
+3. `size`: non-test diff under 800 lines. Generated `*.pb.go` is excluded, as are `*_test.go`, `testdata/`, and `go.sum`.
 4. `words`: no TODO, FIXME, fallback or legacy in added lines (Markdown excluded).
 5. `tests-immutable`: no changed or deleted lines in existing `*_test.go`; core's locked test files unchanged.
 6. `named-tests`: each test in the ticket's `tests` passes and is not skipped.

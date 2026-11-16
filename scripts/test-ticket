@@ -137,6 +137,43 @@ mul_test "$good_test"
 commit oversized
 expect_fail "oversized diff fails" size
 
+# 6d. Generated *.pb.go does not count toward the size cap.
+# *.pb.go is a protected path, so the ticket must allow it, as a real proto ticket does.
+reset_wt
+cp "$TICKET_ROOT/.ticket/FAKE-1/ticket.md" "$TMP/fake-1-ticket.md"
+python3 -c '
+from pathlib import Path
+p = Path("'"$TICKET_ROOT"'/.ticket/FAKE-1/ticket.md")
+t = p.read_text()
+old = """packages:
+  - pkg/calc
+tests:
+"""
+new = """packages:
+  - pkg/calc
+allow:
+  - pkg/calc/calc.pb.go
+tests:
+"""
+if old not in t:
+    raise SystemExit("FAKE-1 frontmatter not in expected shape")
+p.write_text(t.replace(old, new, 1))
+'
+mul_impl
+mul_test "$good_test"
+{
+	printf 'package calc\n\n'
+	i=0
+	while [ $i -lt 850 ]; do
+		printf 'var gen%d = %d\n' "$i" "$i"
+		i=$((i + 1))
+	done
+} >"$WT/pkg/calc/calc.pb.go"
+commit generated-pbgo
+out=$("$TICKET" verify FAKE-1)
+check "generated .pb.go is excluded from the size cap" '.state == "verified" and .needs_human == false' "$out"
+cp "$TMP/fake-1-ticket.md" "$TICKET_ROOT/.ticket/FAKE-1/ticket.md"
+
 # 6a. A .gitattributes file is protected.
 reset_wt
 mul_impl
