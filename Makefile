@@ -36,14 +36,17 @@ test:
 
 test-one:
 	@test -n '$(PKG)' && test -n '$(NAME)' || { echo 'usage: make test-one PKG=./cmd/moonglass NAME=TestVersionPrintsVersionCommitAndDate' >&2; exit 2; }
-	go test -count=1 -run '^$(NAME)$$' $(PKG)
+	@printf '%s' '$(NAME)' | grep -Eq '^[A-Za-z0-9_]+$$' || { echo 'NAME must be a Go test identifier' >&2; exit 2; }
+	@printf '%s' '$(PKG)' | grep -Eq '^\./[A-Za-z0-9_./-]*$$' || { echo 'PKG must be a relative package path starting with ./' >&2; exit 2; }
+	go test -count=1 -run '^$(NAME)$$' '$(PKG)'
 
 test-harness:
 	bash scripts/test-ticket
 
 test-integration:
 	@test -n '$(PKG)' || { echo 'usage: make test-integration PKG=./internal/deploy' >&2; exit 2; }
-	go test -count=1 -tags integration $(PKG)
+	@printf '%s' '$(PKG)' | grep -Eq '^\./[A-Za-z0-9_./-]*$$' || { echo 'PKG must be a relative package path starting with ./' >&2; exit 2; }
+	go test -count=1 -tags integration '$(PKG)'
 
 # -race needs cgo; the binaries built by build and build-all stay static.
 race:
