@@ -1,0 +1,60 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - depguard
+    - errcheck
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - godox
+    - gosec
+    - govet
+    - ineffassign
+    - nolintlint
+    - staticcheck
+    - unused
+  settings:
+    depguard:
+      rules:
+        main:
+          list-mode: strict
+          # A new dependency requires an ADR in docs/adr/ and an entry here.
+          allow:
+            - $gostd
+            - moonglass.dev/moonglass
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^fmt\.Print.*$
+          pkg: ^fmt$
+          msg: only cmd/ writes to the terminal
+        - pattern: ^log\.Print.*$
+          pkg: ^log$
+          msg: only cmd/ writes to the terminal
+    godox:
+      keywords:
+        - TODO
+        - FIXME
+        - XXX
+        - HACK
+    govet:
+      enable-all: true
+    nolintlint:
+      require-specific: true
+      require-explanation: true
+  exclusions:
+    rules:
+      - path: ^cmd/
+        linters:
+          - forbidigo
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - moonglass.dev/moonglass

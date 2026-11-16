@@ -1,0 +1,3 @@
+moonglass.dev/moonglass/cmd/moonglass TestUsageOnMissingOrUnknownCommand
+moonglass.dev/moonglass/cmd/moonglass TestVersionPrintsVersionCommitAndDate
+moonglass.dev/moonglass/cmd/moonglass TestVersionReportsFailedWrite
