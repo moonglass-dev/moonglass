@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# Tests the ticket harness: one fake ticket that must pass verify, and fakes that must each fail one gate.
+# Builds a throwaway repository and worktree under a temp directory. Needs git, go, jq and perl; no Claude calls.
+set -u -o pipefail
+
+TICKET=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/ticket
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/ticket-test.XXXXXX") || exit 2
+trap 'rm -rf "$TMP"' EXIT
+
+export TICKET_ROOT=$TMP/repo
+export TICKET_CI_CMD='go test ./...'
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com
+mkdir -p "$TICKET_ROOT" && cd "$TICKET_ROOT" || exit 2
+
+git init -q -b main .
+mkdir -p pkg/calc pkg/other docs/tickets
+printf 'module example.com/fix\n\ngo 1.21\n' >go.mod
+printf '.ticket/\n' >.gitignore
+printf 'ci:\n\tgo test ./...\n' >Makefile
+cat >pkg/calc/calc.go <<'EOF'
+package calc
+
+func Add(a, b int) int { return a + b }
+EOF
+cat >pkg/calc/calc_test.go <<'EOF'
+package calc
+
+import "testing"
+
+func TestAdd(t *testing.T) {
+	if got := Add(1, 2); got != 3 {
+		t.Errorf("Add(1, 2): expected 3, got %d", got)
+	}
+}
+EOF
+mkdir -p testdata
+printf './pkg/calc TestAdd\n' >testdata/tests.txt
+cat >pkg/other/other.go <<'EOF'
+package other
+EOF
+cat >docs/tickets/FAKE-1.md <<'EOF'
+---
+id: FAKE-1
+level: standard
+packages:
+  - pkg/calc
+tests:
+  - ./pkg/calc TestMul
+---
+
+# Multiply two numbers
+EOF
+git add -A && git commit -q -m base
+
+fail=0
+check() { # name, jq expression that must be true on the verify output, output
+	if printf '%s' "$3" | jq -e "$2" >/dev/null 2>&1; then
+		echo "PASS $1"
+	else
+		echo "FAIL $1: $3"
+		fail=1
+	fi
+}
+
+out=$("$TICKET" start FAKE-1)
+check "start" '.state == "started" and .needs_human == false' "$out"
+WT=$TMP/repo.worktrees/FAKE-1
+BASE=$(git -C "$WT" rev-parse HEAD)
+
+commit() { git -C "$WT" add -A && git -C "$WT" commit -q -m "$1"; }
+reset_wt() { git -C "$WT" reset -q --hard "$BASE" && git -C "$WT" clean -qfd; }
+
+mul_impl() { printf '\nfunc Mul(a, b int) int { return a * b }\n' >>"$WT/pkg/calc/calc.go"; }
+mul_test() { # body of TestMul
+	printf '\nfunc TestMul(t *testing.T) {\n%s\n}\n' "$1" >>"$WT/pkg/calc/calc_test.go"
+}
+good_test='	if got := Mul(2, 3); got != 6 {
+		t.Errorf("Mul(2, 3): expected 6, got %d", got)
+	}'
+
+expect_fail() { # name, gate
+	out=$("$TICKET" verify FAKE-1)
+	check "$1" ".state == \"verify_failed\" and .needs_human == true and (.reason | contains(\"gate $2 \"))" "$out"
+}
+
+# 1. A good change passes every gate, including red-on-base through a compile failure.
+reset_wt
+mul_impl
+mul_test "$good_test"
+commit good
+out=$("$TICKET" verify FAKE-1)
+check "good change passes verify" '.state == "verified" and .needs_human == false' "$out"
+
+# 2. A skipped named test.
+reset_wt
+mul_impl
+mul_test '	t.Skip("later")'
+commit skipped
+expect_fail "skipped test fails" tests-immutable
+
+# 3. A weakened existing test.
+reset_wt
+mul_impl
+mul_test "$good_test"
+sed -i.bak 's/got != 3/got != 4 \&\& got != 3/' "$WT/pkg/calc/calc_test.go" && rm -f "$WT/pkg/calc/calc_test.go.bak"
+commit weakened
+expect_fail "weakened test fails" tests-immutable
+
+# 4. A protected path.
+reset_wt
+mul_impl
+mul_test "$good_test"
+printf '\n# edit\n' >>"$WT/Makefile"
+commit protected
+expect_fail "protected-path edit fails" paths
+
+# 5. A change outside the ticket's packages.
+reset_wt
+mul_impl
+mul_test "$good_test"
+printf '\nfunc Extra() {}\n' >>"$WT/pkg/other/other.go"
+commit outside
+expect_fail "out-of-package diff fails" paths
+
+# 6. An oversized non-test diff.
+reset_wt
+mul_impl
+mul_test "$good_test"
+{
+	printf 'package calc\n\n'
+	i=0
+	while [ $i -lt 850 ]; do
+		printf 'var big%d = %d\n' "$i" "$i"
+		i=$((i + 1))
+	done
+} >"$WT/pkg/calc/big.go"
+commit oversized
+expect_fail "oversized diff fails" size
+
+# 6a. A .gitattributes file is protected.
+reset_wt
+mul_impl
+mul_test "$good_test"
+printf '*.go diff=evil\n' >"$WT/pkg/calc/.gitattributes"
+commit gitattributes
+expect_fail ".gitattributes edit fails" paths
+
+# 6b. Removing a line from testdata/tests.txt.
+reset_wt
+mul_impl
+mul_test "$good_test"
+: >"$WT/testdata/tests.txt"
+commit tests-list-shrunk
+expect_fail "removed tests.txt line fails" tests-immutable
+
+# 6c. A build constraint added to a test file.
+reset_wt
+mul_impl
+mul_test "$good_test"
+printf '//go:build never\n\npackage calc\n' >"$WT/pkg/calc/extra_test.go"
+commit build-constraint
+expect_fail "added build constraint fails" tests-immutable
+
+# 7. Dry run needs no Claude and prints one line.
+out=$("$TICKET" run FAKE-1 --dry-run)
+check "dry run reports the pipeline" '.state == "dry_run"' "$out"
+
+out=$("$TICKET" reset FAKE-1 --yes)
+check "reset removes the worktree" '.state == "reset"' "$out"
+[ ! -e "$WT" ] || { echo "FAIL reset left $WT"; fail=1; }
+
+[ $fail -eq 0 ] && echo "all harness tests passed"
+exit $fail

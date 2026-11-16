@@ -12,7 +12,7 @@ LIST_TESTS := set -o pipefail; go test -list . ./... | awk '\
 	/^(Test|Fuzz|Example)/ { names[n++] = $$1; next } \
 	$$1 == "ok" { for (i = 0; i < n; i++) print $$2, names[i]; n = 0 }' | LC_ALL=C sort
 
-.PHONY: build build-all fmt fmt-check lint test test-one race test-list check-test-list ci
+.PHONY: build build-all fmt fmt-check lint test test-one test-integration test-harness race test-list check-test-list ci
 .NOTPARALLEL:
 
 build:
@@ -38,8 +38,16 @@ test-one:
 	@test -n '$(PKG)' && test -n '$(NAME)' || { echo 'usage: make test-one PKG=./cmd/moonglass NAME=TestVersionPrintsVersionCommitAndDate' >&2; exit 2; }
 	go test -count=1 -run '^$(NAME)$$' $(PKG)
 
+test-harness:
+	bash scripts/test-ticket
+
+test-integration:
+	@test -n '$(PKG)' || { echo 'usage: make test-integration PKG=./internal/deploy' >&2; exit 2; }
+	go test -count=1 -tags integration $(PKG)
+
+# -race needs cgo; the binaries built by build and build-all stay static.
 race:
-	go test -count=1 -shuffle=on -race ./...
+	CGO_ENABLED=1 go test -count=1 -shuffle=on -race ./...
 
 test-list:
 	$(LIST_TESTS) > testdata/tests.txt
@@ -47,4 +55,15 @@ test-list:
 check-test-list:
 	@$(LIST_TESTS) | diff -u testdata/tests.txt - || { echo 'testdata/tests.txt is out of date: run "make test-list" and commit the result' >&2; exit 1; }
 
-ci: fmt-check lint test race check-test-list build-all
+# Runs each step quietly. A failing step prints its failed test names and its last 60 lines.
+ci:
+	@for step in fmt-check lint test race check-test-list build-all; do \
+		out=$$(mktemp); \
+		if $(MAKE) --no-print-directory $$step >"$$out" 2>&1; then \
+			echo "ok   $$step"; rm -f "$$out"; \
+		else \
+			echo "FAIL $$step"; \
+			grep -Eo -- '--- FAIL: [^ ]+' "$$out" | sort -u | head -n 20; \
+			tail -n 60 "$$out"; rm -f "$$out"; exit 1; \
+		fi; \
+	done

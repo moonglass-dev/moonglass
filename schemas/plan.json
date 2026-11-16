@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ticket", "tests", "files", "signatures", "ambiguities", "contract_change_required", "new_dependencies"],
+  "properties": {
+    "ticket": {"type": "string"},
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "file", "asserts"],
+        "properties": {
+          "name": {"type": "string"},
+          "file": {"type": "string"},
+          "asserts": {"type": "string"}
+        }
+      }
+    },
+    "files": {"type": "array", "items": {"type": "string"}},
+    "signatures": {"type": "array", "items": {"type": "string"}},
+    "ambiguities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question", "blocking", "proposed_answer"],
+        "properties": {
+          "question": {"type": "string"},
+          "blocking": {"type": "boolean"},
+          "proposed_answer": {"type": "string"}
+        }
+      }
+    },
+    "contract_change_required": {"type": "boolean"},
+    "new_dependencies": {"type": "array", "items": {"type": "string"}}
+  }
+}

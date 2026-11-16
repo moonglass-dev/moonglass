@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "blocked_reason", "contract_change_needed", "notes"],
+  "properties": {
+    "status": {"type": "string", "enum": ["done", "blocked"]},
+    "blocked_reason": {"type": "string"},
+    "contract_change_needed": {"type": "boolean"},
+    "notes": {"type": "string", "description": "At most 400 characters."}
+  }
+}

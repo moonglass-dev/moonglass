@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "checked", "findings"],
+  "properties": {
+    "verdict": {"type": "string", "enum": ["approve", "request_changes"]},
+    "checked": {"type": "array", "items": {"type": "string"}},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "category", "file", "line", "what_breaks", "failing_scenario", "suggested_test"],
+        "properties": {
+          "severity": {"type": "string", "enum": ["blocker", "major", "minor"]},
+          "category": {"type": "string"},
+          "file": {"type": "string"},
+          "line": {"type": "integer"},
+          "what_breaks": {"type": "string"},
+          "failing_scenario": {"type": "string"},
+          "suggested_test": {"type": "string"}
+        }
+      }
+    }
+  }
+}
