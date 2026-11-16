@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Report resident memory (RSS) for a process. Used later by W1-7 to enforce
+# the agent+proxy budget. No cloud token is required or read.
+set -u -o pipefail
+
+usage() {
+	cat <<'USAGE' >&2
+usage: scripts/measure-memory --pid PID
+       scripts/measure-memory --cmd COMMAND [ARGS...]
+
+Prints one line: rss_kib <kibibytes> pid <pid>
+Linux uses /proc/<pid>/status. macOS uses ps. Other platforms exit 2.
+USAGE
+	exit 2
+}
+
+rss_kib_for_pid() {
+	local pid=$1 rss
+	if [ -r "/proc/$pid/status" ]; then
+		rss=$(awk '/^VmRSS:/{print $2; found=1} END{exit found?0:1}' "/proc/$pid/status") || return 1
+		printf '%s' "$rss"
+		return 0
+	fi
+	case "$(uname -s)" in
+	Darwin)
+		# ps -o rss= reports kibibytes on macOS.
+		rss=$(ps -o rss= -p "$pid" 2>/dev/null | tr -d ' ')
+		[ -n "$rss" ] && [ "$rss" -eq "$rss" ] 2>/dev/null || return 1
+		printf '%s' "$rss"
+		return 0
+		;;
+	*)
+		echo "unsupported platform: $(uname -s) (need Linux /proc or macOS ps)" >&2
+		return 2
+		;;
+	esac
+}
+
+[ $# -ge 1 ] || usage
+
+case "$1" in
+--pid)
+	[ $# -eq 2 ] || usage
+	pid=$2
+	case "$pid" in *[!0-9]*|'') echo "pid must be a number" >&2; exit 2 ;; esac
+	rss=$(rss_kib_for_pid "$pid") || { echo "could not read RSS for pid $pid" >&2; exit 1; }
+	printf 'rss_kib %s pid %s\n' "$rss" "$pid"
+	;;
+--cmd)
+	shift
+	[ $# -ge 1 ] || usage
+	"$@" &
+	pid=$!
+	# One sample after the process has started. If it exits immediately,
+	# still try once; failure is an error.
+	sleep 0.1
+	if ! kill -0 "$pid" 2>/dev/null; then
+		wait "$pid" || true
+		echo "command exited before RSS could be sampled" >&2
+		exit 1
+	fi
+	rss=$(rss_kib_for_pid "$pid") || status=$?
+	kill "$pid" 2>/dev/null || true
+	wait "$pid" 2>/dev/null || true
+	if [ -z "${rss:-}" ]; then
+		exit "${status:-1}"
+	fi
+	printf 'rss_kib %s pid %s\n' "$rss" "$pid"
+	;;
+-h|--help) usage ;;
+*) usage ;;
+esac

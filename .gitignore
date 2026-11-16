@@ -6,3 +6,6 @@ coverage.*
 .ticket/
 
 .claude/settings.local.json
+
+# Local fleet inventory may name servers; never commit a token.
+scripts/fleet/inventory

@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# Wipe and rebuild the three Moonglass test-fleet VPSs on Hetzner Cloud.
+# The token is read from the environment only. This script never writes it,
+# never prints it, and refuses to do any real API work without it.
+set -u -o pipefail
+
+usage() {
+	cat <<'USAGE' >&2
+usage: scripts/fleet/wipe-rebuild [--dry-run]
+
+Rebuilds the three test-fleet servers (2 GB x86, 2 GB arm64, 4 GB x86).
+Reads HCLOUD_TOKEN or MOONGLASS_FLEET_TOKEN from the environment.
+Server ids come from the environment or from scripts/fleet/inventory.
+
+  --dry-run   Print the intended actions and exit 0 without calling the API.
+USAGE
+	exit 2
+}
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
+ROOT=$(cd "$SCRIPT_DIR/../.." && pwd -P)
+INVENTORY=$SCRIPT_DIR/inventory
+API=https://api.hetzner.cloud/v1
+IMAGE_DEFAULT=ubuntu-24.04
+
+DRY=0
+for arg in "$@"; do
+	case "$arg" in
+	--dry-run) DRY=1 ;;
+	-h|--help) usage ;;
+	*) echo "unknown argument: $arg" >&2; usage ;;
+	esac
+done
+
+# Load non-secret inventory into the environment if present. The file must not
+# contain a token; ignore token-like keys if someone added them by mistake.
+if [ -f "$INVENTORY" ]; then
+	while IFS= read -r line || [ -n "$line" ]; do
+		case "$line" in
+		''|\#*) continue ;;
+		HCLOUD_TOKEN=*|MOONGLASS_FLEET_TOKEN=*)
+			echo "scripts/fleet/inventory must not contain a token; remove that line and export the token in the shell" >&2
+			exit 2
+			;;
+		[A-Za-z_]*=*)
+			key=${line%%=*}
+			val=${line#*=}
+			# Only fill in unset keys so the real environment wins.
+			if [ -z "${!key:-}" ]; then
+				export "$key=$val"
+			fi
+			;;
+		esac
+	done <"$INVENTORY"
+fi
+
+TOKEN=${HCLOUD_TOKEN:-${MOONGLASS_FLEET_TOKEN:-}}
+IMAGE=${FLEET_IMAGE:-$IMAGE_DEFAULT}
+
+ids=(
+	"${FLEET_SERVER_X86_2GB:-}:${IMAGE}:2GB-x86"
+	"${FLEET_SERVER_ARM64_2GB:-}:${IMAGE}:2GB-arm64"
+	"${FLEET_SERVER_X86_4GB:-}:${IMAGE}:4GB-x86"
+)
+
+missing_ids=0
+for entry in "${ids[@]}"; do
+	id=${entry%%:*}
+	if [ -z "$id" ]; then
+		missing_ids=1
+	fi
+done
+
+if [ "$DRY" = 1 ]; then
+	echo "dry-run: would rebuild the test fleet on Hetzner Cloud"
+	for entry in "${ids[@]}"; do
+		id=${entry%%:*}
+		rest=${entry#*:}
+		image=${rest%%:*}
+		label=${rest#*:}
+		if [ -n "$id" ]; then
+			echo "dry-run: rebuild server $id ($label) with image $image"
+		else
+			echo "dry-run: $label has no server id (set FLEET_SERVER_* or scripts/fleet/inventory)"
+		fi
+	done
+	if [ -z "$TOKEN" ]; then
+		echo "dry-run: no HCLOUD_TOKEN or MOONGLASS_FLEET_TOKEN in the environment; a real run would refuse"
+	else
+		echo "dry-run: a token is present in the environment (not shown)"
+	fi
+	exit 0
+fi
+
+if [ -z "$TOKEN" ]; then
+	echo "refusing to rebuild: set HCLOUD_TOKEN or MOONGLASS_FLEET_TOKEN in the environment" >&2
+	exit 1
+fi
+if [ "$missing_ids" = 1 ]; then
+	echo "refusing to rebuild: set FLEET_SERVER_X86_2GB, FLEET_SERVER_ARM64_2GB and FLEET_SERVER_X86_4GB, or copy scripts/fleet/inventory.example to scripts/fleet/inventory" >&2
+	exit 1
+fi
+
+# Token is passed only as an Authorization header, never echoed, never in argv
+# of a logged child besides curl (which does not put headers in ps on this path
+# when using a file descriptor). Use a header file in a private temp dir.
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/fleet.XXXXXX") || exit 1
+cleanup() { rm -rf "$tmp"; }
+trap cleanup EXIT
+umask 077
+# Write the header without `set -x` leaking it. The file is deleted on exit.
+printf 'Authorization: Bearer %s\n' "$TOKEN" >"$tmp/auth"
+# Drop TOKEN from the environment for the rest of the script.
+unset TOKEN HCLOUD_TOKEN MOONGLASS_FLEET_TOKEN
+
+fail=0
+for entry in "${ids[@]}"; do
+	id=${entry%%:*}
+	rest=${entry#*:}
+	image=${rest%%:*}
+	label=${rest#*:}
+	echo "rebuilding server $id ($label) with image $image"
+	# Body is not secret. Status is printed; response body only on failure,
+	# and never includes our token.
+	code=$(curl -sS -o "$tmp/body" -w '%{http_code}' \
+		-H @"$tmp/auth" \
+		-H 'Content-Type: application/json' \
+		-X POST "$API/servers/${id}/actions/rebuild" \
+		-d "{\"image\":\"$image\"}") || code=000
+	if [ "$code" != "201" ]; then
+		echo "rebuild of server $id failed (HTTP $code)" >&2
+		# Do not cat the body blindly if it might echo request headers; the
+		# Hetzner error JSON does not include the Authorization header.
+		if [ -s "$tmp/body" ]; then
+			sed 's/Bearer [^"]*/Bearer [redacted]/g' "$tmp/body" >&2
+			echo >&2
+		fi
+		fail=1
+	fi
+done
+
+[ "$fail" = 0 ] || exit 1
+echo "rebuild requested for all three servers"

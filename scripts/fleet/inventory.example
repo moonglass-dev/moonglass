@@ -1,0 +1,9 @@
+# Copy to scripts/fleet/inventory (gitignored) or set the same keys in the environment.
+# Token is never stored here: export HCLOUD_TOKEN or MOONGLASS_FLEET_TOKEN in the shell.
+#
+# The week-0 test fleet (docs/plan/milestones.md §1):
+FLEET_SERVER_X86_2GB=                    # Hetzner server id, 2 GB x86
+FLEET_SERVER_ARM64_2GB=                  # Hetzner server id, 2 GB arm64
+FLEET_SERVER_X86_4GB=                    # Hetzner server id, 4 GB x86
+# Optional: image used when rebuilding (default: ubuntu-24.04)
+# FLEET_IMAGE=ubuntu-24.04
