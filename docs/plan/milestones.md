@@ -49,7 +49,7 @@ If the week 1 or week 2 gates slip by more than a week, move the launch to week 
 
 | Do | Why now |
 |---|---|
-| **Name: done.** Moonglass, moonglass.dev owned. Claim the GitHub org (`moonglass` or the nearest available), package names and social handles | Blocks launch assets and the repository |
+| **Name: done.** Moonglass, moonglass.dev owned. The code is in the private repository `github.com/moonglass-dev/moonglass` until it moves to a GitHub organization. `moonglass` is taken by a user account. Package names and social handles are still open | The repository no longer blocks development. The organization name can wait until launch |
 | **Buy a separate user-content domain** for managed subdomains (V§8, open decision 2) | Needed for the Public Suffix List application; cannot be a subdomain of moonglass.dev |
 | **Apply to the Public Suffix List** on cookie-isolation grounds, and **ask Let's Encrypt for a rate-limit adjustment** | No SLA; often one to two weeks, sometimes months, and requests aimed at Let's Encrypt limits are rejected (S§3.4). Managed subdomains are v1, so this no longer blocks launch |
 | Repository, CI on real Docker, test fleet; **two release signing keys on hardware tokens (ADR-0007); canary and stable channels** | Everything after depends on it; the first agent binary must already be signed |
@@ -363,5 +363,5 @@ The two limit measures tell you how large the paying population is before you bu
 **Open**
 1. **Is week 8 a date or a quality bar?** I recommend a quality bar with week 10 as the fallback.
 2. **The user-content domain** (V§8, open decision 2). Needed in week 0.
-3. **GitHub org name**, if `moonglass` is taken.
+3. **GitHub organization name.** Development stays in the private repository `github.com/moonglass-dev/moonglass` until the move. `moonglass` is taken by a user account. Pick the organization name before the public launch. The module path stays `moonglass.dev/moonglass`.
 4. **Experiment thresholds** in 2.2. They are my numbers; adjust them before the experiments start, not after the results arrive.

@@ -6,6 +6,8 @@ Moonglass is an open-source deploy platform for your own servers. It is being bu
 
 **Status: pre-alpha, not usable yet.** This repository holds the plan and the first plumbing. Nothing above works today.
 
+The code is private at [moonglass-dev/moonglass](https://github.com/moonglass-dev/moonglass) until it moves to a GitHub organization. The module path stays `moonglass.dev/moonglass`.
+
 ## Build and test
 
 You need Go and golangci-lint. `go.mod` names the Go version, and `.github/workflows/ci.yml` names the golangci-lint version.

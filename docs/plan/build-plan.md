@@ -178,7 +178,7 @@ Format: **ID — title** · packages · needs · level · lane. Then the accepta
 - **W8-M — Marketplace images** · `scripts/marketplace/` · Light · background.
 - → **G8**, launch
 
-Once the GitHub repository exists, a Light ticket turns this list into issues. Until then, this file is the backlog.
+The repository is the private `github.com/moonglass-dev/moonglass` until it moves to a GitHub organization. This file stays the backlog until a Light ticket turns it into issues.
 
 ---
 
@@ -279,7 +279,7 @@ Compare main against docs/plan/*, docs/adr/* and docs/specs/*. List every place 
 
 Things only you can do. The agents' tickets are W0-1 to W0-5 above.
 
-- [ ] Create the GitHub org and the `moonglass` repository; turn on branch protection for `main` (required CI checks, no direct pushes, squash merge only).
+- [x] Repository for now: private `github.com/moonglass-dev/moonglass`. `main` requires a pull request and a passing `ci` check, and squash merge is the only merge. It moves to a GitHub organization later. `moonglass` is taken by a user account, so the organization name stays open (M§8).
 - [ ] Serve the Go vanity import for `moonglass.dev/moonglass` from moonglass.dev (one `<meta name="go-import">` tag).
 - [ ] Two release signing keys (`ed25519-sk`, `-O verify-required`) on two FIDO2 tokens, primary and backup, kept apart; both public keys committed to the repository before W1-6 (ADR-0007).
 - [ ] Accounts and an API token for the three test-fleet VPSs.

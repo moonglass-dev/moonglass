@@ -8,6 +8,7 @@ A control plane coordinates; a small agent and proxy on each server do the work 
 - One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and the CLI. Each role is added by its own ticket; only `moonglass version` exists today.
 - Config lives at `/etc/moonglass/agent.toml`, data at `/var/lib/moonglass`.
 - Environment variables are `MOONGLASS_*`. The domain is moonglass.dev. The Go module is `moonglass.dev/moonglass`.
+- The code is in the private repository `github.com/moonglass-dev/moonglass` until it moves to a GitHub organization. That move does not change the module path.
 - The product was renamed. Never reintroduce the old working name; the one historical note is in `docs/plan/research.md`.
 
 ## Sources of truth
