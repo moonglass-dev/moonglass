@@ -28,6 +28,15 @@ The blocker (the token was spent before the data dir was proven writable) was fi
 - **`--print-enroll-token` prints the live bearer to stdout,** which is the journal under systemd. Warn in the spec, or write it to a 0600 file.
 - **`agent enroll` uses `http.DefaultClient` and `context.Background()`:** no timeout and no signal handling, so a black-holed URL hangs forever.
 
+### W1-5 (Opus review minors, not fixed in the one product-bug round)
+
+The major finding (a pushed config could move the admin API to TCP or the certificate keys out of the data dir) was fixed in #18 with a guard socket in front of Caddy's admin API. These remain:
+
+- **A rejected counter config leaves a phantom release.** Caddy provisions before it validates, so `countsFor(c.Release)` registers the release (even `""`) before validation fails, and `GET /moonglass/counters` reports it for the life of the process.
+- **WebSocket sessions are recorded as request latency.** The counter times `ServeHTTP`, which for an upgraded (101) request returns only when the connection closes. A 10-minute WebSocket lands in the >1000 ms bucket and inflates `latency_nanos_total`, which auto-rollback (W4-3) is meant to read. Time to response headers instead, or exclude upgrades.
+- **`moonglass proxy --data-dir DIR` has no success-path test.** Only usage errors are tested at the CLI; flag wiring to `proxy.Run`, SIGTERM shutdown and exit 0 are not.
+- **CI time grew from about 2 to 12 minutes** with Caddy linked (race and `build-all`). Worth caching or splitting before more tickets queue behind it.
+
 ## Owner decisions (do not close in a ticket)
 
 - **W1-1 open questions 6 and 7** (`pid`/`ipc` `container:` cross-project; `service:` inheriting host networking). Left as-is; owner is deciding.
