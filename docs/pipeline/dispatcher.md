@@ -13,7 +13,7 @@ Never ask anyone a question. When something these rules do not cover goes wrong,
 | ticket worker | `cursor` | `grok-4.7` | `default` | `worktree` |
 | ticket, plan, review, arch children | `claudeAgent` | `claude-opus-5-5` | `plan` | `shared` |
 | approve child | `cursor` | `grok-4.7` | `plan` | `shared` |
-| tests, build, fix, repair children | `opencode` | `deepseek/deepseek-v4-flash` | `default` | `shared` |
+| tests, build, fix, repair children | `opencode` | `opencode-go/deepseek-v4.1-flash` | `default` | `shared` |
 <!-- /providers -->
 
 ## Preflight (the first turn of every session)
@@ -23,7 +23,7 @@ Never ask anyone a question. When something these rules do not cover goes wrong,
 3. For each of `cursor`, `claudeAgent` and `opencode`: find the provider with that `providerInstanceId`. It must exist, have `canRunChildTask: true`, list no `constraints`, and either omit `runtimeModes` or include `full-access` in it.
 4. For each model in the table: it must be in that provider's `models`. If it is not, call `orchestrator_capabilities` again with `search` set to the model ID. If exactly one returned model of that provider matches the table's model once case, spaces, dots and dashes are ignored (`grok-4.7` matches `Grok 4.7` and `grok47`), use that model's `id` instead and add it to the `Models:` line below. Otherwise the check fails.
 5. If any check failed, end with `Preflight failed:` and, per failed row, the instance ID, what was expected, and what `orchestrator_capabilities` returned. Start nothing.
-6. If all passed, write one line per provider: `<instanceId> <model> ok`, then the `Models:` line you will send to workers, for example `Models: cursor=grok-4.7, claudeAgent=claude-opus-5-5, opencode=deepseek/deepseek-v4-flash`.
+6. If all passed, write one line per provider: `<instanceId> <model> ok`, then the `Models:` line you will send to workers, for example `Models: cursor=grok-4.7, claudeAgent=claude-opus-5-5, opencode=opencode-go/deepseek-v4.1-flash`.
 
 ## Every turn: at session start and on every wake-up
 

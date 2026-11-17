@@ -15,7 +15,7 @@ The dispatcher's message may override a model ID (a line `Models: cursor=…, cl
 | ticket worker | `cursor` | `grok-4.7` | `default` | `worktree` |
 | ticket, plan, review, arch children | `claudeAgent` | `claude-opus-5-5` | `plan` | `shared` |
 | approve child | `cursor` | `grok-4.7` | `plan` | `shared` |
-| tests, build, fix, repair children | `opencode` | `deepseek/deepseek-v4-flash` | `default` | `shared` |
+| tests, build, fix, repair children | `opencode` | `opencode-go/deepseek-v4.1-flash` | `default` | `shared` |
 <!-- /providers -->
 
 Every child shares your worktree (`isolation: "shared"`): your worktree already isolates this ticket, and the scripts read the child's changes from it.
