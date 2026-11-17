@@ -1,51 +1,64 @@
 # Moonglass
 
-## What this is
+Moonglass is an open-source deploy platform for your own servers: zero-downtime deploys, one-click restores, nothing to SSH into, in under 100 MB. A control plane coordinates; a small agent and proxy on each server do the work and keep running without it.
 
-Moonglass is an open-source deploy platform for your own servers: zero-downtime deploys, one-click restores, nothing to SSH into, in under 100 MB.
-A control plane coordinates; a small agent and proxy on each server do the work and keep running without it.
+One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and the CLI. Config lives at `/etc/moonglass/agent.toml`, data at `/var/lib/moonglass`. Environment variables are `MOONGLASS_*`. The Go module is `moonglass.dev/moonglass`; the code is in the private repository `github.com/moonglass-dev/moonglass`. The product was renamed: never reintroduce the old working name.
 
-- One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and the CLI. Each role is added by its own ticket; only `moonglass version` exists today.
-- Config lives at `/etc/moonglass/agent.toml`, data at `/var/lib/moonglass`.
-- Environment variables are `MOONGLASS_*`. The domain is moonglass.dev. The Go module is `moonglass.dev/moonglass`.
-- The code is in the private repository `github.com/moonglass-dev/moonglass` until it moves to a GitHub organization. That move does not change the module path.
-- The product was renamed. Never reintroduce the old working name; the one historical note is in `docs/plan/research.md`.
+## Repo map
 
-## Sources of truth
-
-- `docs/plan/`: research, vision, stack, milestones and the build plan.
-- `docs/adr/`: decisions.
-- `docs/specs/`: behaviour, one file per area.
-- `docs/threat-model.md`: what every change is reviewed against.
-
-Stop and ask before changing a contract (`.proto` files, registry operations, the `agent.toml` schema, the storage schema) or an ADR.
+| Path | What |
+|---|---|
+| `cmd/moonglass/` | The binary's entry point and role wiring |
+| `internal/<package>/` | Product code, one package per area: `agent`, `api`, `cli`, `keys`, `policy`, `protocol`, `proxy`, `registry`, `release`, `server`, `store`, and `installtest` (tests for `scripts/install`) |
+| `proto/` | Protocol `.proto` sources; generated Go is in `internal/protocol/agentv1/` |
+| `scripts/` | `install`, `measure-memory`, `fleet/`, and the pipeline wrappers `ticket-status`, `verify`, `ship` |
+| `tools/pipeline/` | The pipeline's deterministic logic, behind those wrappers |
+| `deploy/systemd/` | Hardened units |
+| `testdata/` | `tests.txt` (the list of every test) and shared fixtures |
+| `docs/plan/` | Research, vision, stack, milestones and `build-plan.md`, the ticket list |
+| `docs/specs/`, `docs/adr/`, `docs/threat-model.md` | Behaviour, decisions, and what every change is reviewed against |
+| `docs/tickets/` | One file per ticket (front matter holds its status) and `<ID>/` with its result files |
+| `docs/pipeline/` | How the ticket pipeline runs, and every agent prompt |
 
 ## Commands
 
-`fmt`, `fmt-check` and `lint` need `golangci-lint` on your `PATH`, at the version pinned in `.github/workflows/ci.yml`.
+`fmt`, `fmt-check` and `lint` need `golangci-lint` at the version pinned in `.github/workflows/ci.yml`.
 
 | Command | Does |
 |---|---|
-| `make build` | Static binary for this machine, in `bin/moonglass` |
-| `make build-all` | Static `linux/amd64` and `linux/arm64` binaries in `bin/` |
+| `make ci` | The one gate: `fmt-check`, `lint`, `proto-check`, `test`, `check-test-list`, `build-all` |
+| `make test` | Every test, uncached, shuffled, with the race detector; writes `coverage.out` |
+| `make test-one PKG=./cmd/moonglass NAME=TestName` | One test |
 | `make fmt` | Apply gofumpt and goimports |
-| `make fmt-check` | Fail if any file is unformatted |
-| `make lint` | Run golangci-lint |
-| `make test` | Run every test, uncached, in shuffled order |
-| `make test-one PKG=./cmd/moonglass NAME=TestName` | Run one test |
-| `make race` | Run every test with the race detector |
-| `make test-list` | Rewrite `testdata/tests.txt`, the list of every test |
-| `make check-test-list` | Fail if `testdata/tests.txt` differs from a fresh list |
-| `make ci` | `fmt-check`, `lint`, `test`, `race`, `check-test-list`, `build-all`, in that order |
+| `make test-list` | Rewrite `testdata/tests.txt`. Run it after adding tests |
+| `make generate` | Rewrite the generated REST and CLI from the registry |
+| `make proto` | Regenerate protocol Go from `proto/` |
+| `make build` / `make build-all` | Static binaries in `bin/` |
+| `make memory-budget` | The idle-memory test alone |
+
+## Rules for every agent
+
+- **Never ask questions.** Decide from the files you were given. If you cannot finish, write `docs/tickets/<ID>/BLOCKED.md` with the reason on its first line, and stop.
+- **Allowed paths.** Change only the paths in your ticket's `allowed_paths`, plus the ticket's own docs and `testdata/tests.txt`. A directory entry covers everything under it.
+- **Protected paths** change only through a ticket whose `allowed_paths` names them at or below their own root: `.github/`, `.claude/`, `docs/adr/`, `docs/pipeline/`, `docs/plan/`, `tools/pipeline/`, `scripts/`, `proto/`, `*.proto`, `*.pb.go`, `Makefile`, `.golangci.yml`, `.gitignore`, `AGENTS.md`, `CLAUDE.md`, `docs/threat-model.md`, `go.mod`, `go.sum`.
+- **Banned words** in added lines outside docs: TODO, FIXME, XXX, HACK, fallback, legacy.
+- **Contracts** (`.proto` files, registry operations, the `agent.toml` schema, the storage schema) and ADRs change only after the owner approves. The plan step stops such a ticket as needs-human.
+- Only the pipeline scripts change a ticket's `status`, commit result files, push, open PRs or merge.
+
+## Definition of done
+
+- Every test named in the ticket exists, passes and is not skipped.
+- `make ci` is green, and `scripts/verify check <ID>` passes every gate.
+- The spec is updated when behaviour changed.
+- No placeholders, no code for later tickets.
 
 ## Engineering rules
 
 - One way to do each thing.
 - No fallback, legacy or compatibility code. When a design changes, delete the old path in the same change.
 - Fail loudly. Wrap errors in context (`fmt.Errorf("…: %w", err)`) and say what to do.
-- No new dependency without an ADR.
-- Standard library first.
-- Plain functions, plain SQL, obvious names.
+- No new dependency without an accepted ADR that names the module.
+- Standard library first. Plain functions, plain SQL, obvious names.
 - Authorisation is declared next to the operation, never in hidden middleware.
 - Generated code is never edited by hand.
 - `CGO_ENABLED=0`, static binaries.
@@ -54,8 +67,7 @@ Stop and ask before changing a contract (`.proto` files, registry operations, th
 
 - Write the failing test first.
 - Table-driven tests, with failure messages that show the expected and actual values.
-- Never delete, skip, weaken or hard-code a test to get green. If an unrelated test fails, fix it properly or stop and report.
-- Run `make test-list` after adding tests.
+- Never delete, skip, weaken or hard-code a test to get green. If an unrelated test fails, fix it properly or block.
 - Integration tests use a real Docker Engine, not mocks of its API.
 - Tests are safe to run in two worktrees at once: ports from `:0`, temp directories, Docker resources labelled per run and removed afterwards.
 
@@ -70,26 +82,9 @@ Stop and ask before changing a contract (`.proto` files, registry operations, th
 
 ## Trusted core
 
-Changes to these paths get line-by-line review by the owner. Most do not exist yet.
+These paths are `risk: high`: named tests locked before code, Opus review always, and the owner reads every line.
 
-- `internal/protocol`
-- `internal/policy`
-- `internal/keys`
-- `internal/auth`
-- `internal/store`
-- `internal/registry`
-- `scripts/install`
-- `deploy/systemd`
-- release signing and self-update
-
-## Definition of done
-
-- `make ci` is green.
-- Evidence is pasted: the exact command and the tail of its output.
-- Every acceptance test named in the ticket exists and passes.
-- Specs are updated if behaviour changed.
-- No placeholders.
-- One commit per ticket, titled `<ID>: <title>`.
+`internal/protocol`, `internal/policy`, `internal/keys`, `internal/auth`, `internal/store`, `internal/registry`, `internal/update`, `scripts/install`, `deploy/systemd`, and release signing and self-update.
 
 ## Gotchas
 
@@ -97,8 +92,4 @@ Changes to these paths get line-by-line review by the owner. Most do not exist y
 - Builds must fit a 2 GB server.
 - Agent plus proxy idle at or under 100 MB.
 - Browser-side encryption does not protect against a compromised control plane serving JavaScript.
-
-## Pointers
-
-- `docs/plan/build-plan.md`: the ticket loop.
-- `docs/specs/ui.md`: UI work. Also `ui/AGENTS.md`, once it exists.
+- UI work follows `docs/specs/ui.md`, and `ui/AGENTS.md` once it exists.

@@ -1,47 +1,54 @@
 ---
-id: W0-0
-level: standard
-packages:
+id: W9-9
+title: One line, imperative, what the ticket delivers
+status: todo
+risk: standard
+depends_on: [W9-1, W9-2]
+allowed_paths:
   - internal/example
+  - docs/specs/example.md
+max_diff_lines: 400
 tests:
-  - ./internal/example TestExampleDoesTheThing
-spec: docs/specs/example.md
+  - ./internal/example TestNamedBehaviourHolds
 reads:
-  - docs/adr/0000-example.md
-allow: []
-dependencies: []
+  - docs/specs/example.md
+  - docs/threat-model.md
 ---
 
-# A verb and an outcome
+# One line, imperative, what the ticket delivers
 
-## Outcome
+The intent from the build plan, expanded into two or three sentences: the behaviour that exists after this ticket, and the spec or ADR it implements.
 
-What a user or the next ticket can do once this merges.
+## Scope
+
+- What changes, package by package. Name the packages: they become `allowed_paths`.
+
+## Acceptance criteria
+
+- One line per test named in `tests`: the test, and the behaviour it proves.
+- Anything else that must hold, stated so a script or a reviewer can check it.
 
 ## Out of scope
 
-What this ticket must not do.
-
-## Acceptance tests
-
-- `TestExampleDoesTheThing`: what it asserts.
+The neighbouring work that belongs to other tickets, by ID.
 
 ## Security notes
 
-Threat-model sections this touches. Write "none" if none.
-
-## Done when
-
-- `make ci` is green and every test above passes.
+The threat-model sections (`docs/threat-model.md` §n) this ticket touches and what must hold. "None" only for docs-only tickets.
 
 <!--
-Frontmatter fields:
-  id        Ticket id, same as the file name.
-  level     core | standard | light. Decides the pipeline and the reviewer model.
-  packages  Paths the diff may touch (a directory covers everything under it). Anything else fails verify.
-  tests     Acceptance tests, one per line as "./package/path TestName". Each must pass and not be skipped.
-  spec      The spec file this ticket implements. It may be edited; no other doc may.
-  reads     Extra files the agent must read first.
-  allow     Paths exempt from the protected-path, go.mod and package gates, and editable in the ticket's session despite the settings deny list. Empty by default. A ticket with dependencies must name go.mod and go.sum. .claude/ and scripts/ticket stay denied.
-  dependencies  Modules the ticket adds, each with a version: "module/path v1.2.3" or "module/path@v1.2.3". Before the impl session the harness runs go get and go mod tidy for exactly these entries, in the worktree; the model never runs go get. An entry with no version blocks impl. Anything else the plan adds must be named by an accepted ADR, or the plan blocks.
+Front matter, all keys required. scripts/ticket-status rejects any other key.
+
+- id: as in docs/plan/build-plan.md. The file is docs/tickets/<id>.md.
+- status: todo, planned, tests-locked, built, in-review, merged, blocked, needs-human.
+  Only the pipeline scripts change it (docs/pipeline/README.md).
+- risk: low, standard or high (build plan §1). standard and high must name tests.
+- depends_on: exactly the build plan's list.
+- allowed_paths: every path the change may touch. A directory entry covers
+  everything under it. Protected paths (AGENTS.md) need an entry at or below
+  their own root. The ticket's own docs and testdata/tests.txt are always allowed.
+- max_diff_lines: counted lines (added + removed) outside tests, docs, Markdown,
+  generated files and go.sum. Usually 200 to 600.
+- tests: `./package/path TestName`, each written by the tests step and locked.
+- reads: the files a child must read beyond AGENTS.md and this ticket.
 -->

@@ -24,7 +24,7 @@ Every port is `:0` and every directory is temp, so two worktrees can run the che
 
 ## CI
 
-`make memory-budget` runs the test alone. It is a step of `make ci`, which GitHub Actions runs on `ubuntu-latest`. The test also runs under `make test`.
+`make memory-budget` runs the test alone. It also runs under `make test`, a step of `make ci`, which GitHub Actions runs on `ubuntu-latest`.
 
 ## Not covered
 

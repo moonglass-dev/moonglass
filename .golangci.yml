@@ -129,6 +129,16 @@ linters:
         linters:
           - errcheck
         text: "Error return value is not checked"
+      # The pipeline tool runs fixed tools (git, gh, go, make, golangci-lint)
+      # without a shell and reads files inside its own checkout.
+      - path: ^tools/pipeline/
+        linters:
+          - gosec
+        text: "G204|G304|G702|G703"
+      - path: ^tools/pipeline/
+        linters:
+          - govet
+        text: "fieldalignment:"
       # gosec does not run on tests, so nolint:gosec in them is "unused".
       - path: _test\.go
         linters:

@@ -4,7 +4,7 @@ Wipe and rebuild the three week-0 test-fleet VPSs (2 GB x86, 2 GB arm64, 4 GB x8
 
 ## Token
 
-Export `HCLOUD_TOKEN` or `MOONGLASS_FLEET_TOKEN` in your own shell. The scripts read it at run time, never store it, and never print it. Do not put a token in `scripts/fleet/inventory` or any file in this repository. Agents in the ticket harness run with a scrubbed environment and must not be given the token.
+Export `HCLOUD_TOKEN` or `MOONGLASS_FLEET_TOKEN` in your own shell. The scripts read it at run time, never store it, and never print it. Do not put a token in `scripts/fleet/inventory` or any file in this repository. Pipeline agents inherit the environment of the shell that started T3 Code, so never export a token there; run fleet scripts from a separate shell.
 
 ## Inventory
 

@@ -4,6 +4,10 @@ Product and contract leftovers that should not block the current ticket. Owner-o
 
 ## Open
 
+### Lint (moved from the retired harness follow-ups)
+
+- **depguard cannot yet confine compose-go and go-toml to `internal/policy` only.** A second strict allow-list with `files: "!**/internal/policy/**"` still ran the main rule on policy files and broke lint. Today's deny rule covers only `cmd/` and `internal/protocol/` (see the comment in `.golangci.yml`). Tighten it when depguard file globs are confirmed to combine correctly.
+
 ### W1-2 (Opus review minors, not fixed in the one product-bug round)
 
 The major finding (the application role is not allowed to be a superuser, have `BYPASSRLS`, or own the tables) was fixed in #13. These remain:

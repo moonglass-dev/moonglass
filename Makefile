@@ -44,7 +44,7 @@ LIST_TESTS := set -o pipefail; go test -list . ./... | awk '\
 	/^(Test|Fuzz|Example)/ { names[n++] = $$1; next } \
 	$$1 == "ok" { for (i = 0; i < n; i++) print $$2, names[i]; n = 0 }' | LC_ALL=C sort
 
-.PHONY: build build-all fmt fmt-check lint test test-one test-integration test-harness race memory-budget test-list check-test-list generate proto proto-tools proto-check ci
+.PHONY: build build-all fmt fmt-check lint test test-one test-integration memory-budget test-list check-test-list generate proto proto-tools proto-check ci
 .NOTPARALLEL:
 
 build:
@@ -63,8 +63,11 @@ fmt-check:
 lint:
 	golangci-lint run
 
+# Every test, uncached, shuffled, under the race detector (which needs cgo; the
+# binaries built by build and build-all stay static). coverage.out feeds the
+# changed-line coverage that scripts/verify records.
 test:
-	go test -count=1 -shuffle=on ./...
+	CGO_ENABLED=1 go test -count=1 -shuffle=on -race -coverprofile=coverage.out ./...
 
 test-one:
 	@test -n '$(PKG)' && test -n '$(NAME)' || { echo 'usage: make test-one PKG=./cmd/moonglass NAME=TestVersionPrintsVersionCommitAndDate' >&2; exit 2; }
@@ -72,19 +75,13 @@ test-one:
 	@printf '%s' '$(PKG)' | grep -Eq '^\./[A-Za-z0-9_./-]*$$' || { echo 'PKG must be a relative package path starting with ./' >&2; exit 2; }
 	go test -count=1 -run '^$(NAME)$$' '$(PKG)'
 
-test-harness:
-	bash scripts/test-ticket
-
 test-integration:
 	@test -n '$(PKG)' || { echo 'usage: make test-integration PKG=./internal/deploy' >&2; exit 2; }
 	@printf '%s' '$(PKG)' | grep -Eq '^\./[A-Za-z0-9_./-]*$$' || { echo 'PKG must be a relative package path starting with ./' >&2; exit 2; }
 	go test -count=1 -tags integration '$(PKG)'
 
-# -race needs cgo; the binaries built by build and build-all stay static.
-race:
-	CGO_ENABLED=1 go test -count=1 -shuffle=on -race ./...
-
 # Fails when idle agent + proxy RSS is above the 100 MiB ceiling (docs/specs/memory.md).
+# make test runs the same test; this target runs it alone.
 memory-budget:
 	go test -count=1 -run '^TestProxyAndAgentIdleUnderBudget$$' ./internal/proxy
 
@@ -132,7 +129,7 @@ proto-check: proto
 
 # Runs each step quietly. A failing step prints its failed test names and its last 60 lines.
 ci:
-	@for step in fmt-check lint proto-check test race memory-budget check-test-list build-all; do \
+	@for step in fmt-check lint proto-check test check-test-list build-all; do \
 		out=$$(mktemp); \
 		if $(MAKE) --no-print-directory $$step >"$$out" 2>&1; then \
 			echo "ok   $$step"; rm -f "$$out"; \
