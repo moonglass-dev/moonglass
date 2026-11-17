@@ -1,0 +1,3 @@
+services:
+  root: {image: "@IMAGE@", volumes: ["@DOCKER_ROOT@:/x"]}
+  inside: {image: "@IMAGE@", volumes: ["@DOCKER_SUB@:/x"]}

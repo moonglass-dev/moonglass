@@ -1,0 +1,4 @@
+[[containers.allow]]
+project = "monitoring"
+image = "@IMAGE_B@"
+data_dirs = ["db"]

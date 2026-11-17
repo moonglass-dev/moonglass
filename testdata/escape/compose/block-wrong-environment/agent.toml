@@ -1,0 +1,5 @@
+[[containers.allow]]
+project = "monitoring"
+image = "@IMAGE@"
+environment = "staging"
+pid_host = true

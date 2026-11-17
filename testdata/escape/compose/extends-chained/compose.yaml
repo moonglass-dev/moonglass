@@ -1,0 +1,8 @@
+services:
+  middle:
+    extends:
+      file: base.yaml
+      service: base
+  web:
+    extends:
+      service: middle

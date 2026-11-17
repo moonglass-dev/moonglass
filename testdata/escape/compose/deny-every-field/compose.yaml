@@ -1,0 +1,23 @@
+services:
+  privileged: {image: "@IMAGE@", privileged: true}
+  bind-mounts: {image: "@IMAGE@", volumes: ["@SRV@:/data"]}
+  data-dirs: {image: "@IMAGE@", volumes: ["@MOUNTS@/monitoring/db:/data"]}
+  docker-socket: {image: "@IMAGE@", volumes: ["@DOCKER_SOCK@:/var/run/docker.sock"]}
+  containerd-socket: {image: "@IMAGE@", volumes: ["@CONTAINERD_SOCK@:/run/containerd.sock"]}
+  docker-data-root: {image: "@IMAGE@", volumes: ["@DOCKER_SUB@:/x"]}
+  network-host: {image: "@IMAGE@", network_mode: host}
+  pid-host: {image: "@IMAGE@", pid: host}
+  ipc-host: {image: "@IMAGE@", ipc: host}
+  uts-host: {image: "@IMAGE@", uts: host}
+  userns-host: {image: "@IMAGE@", userns_mode: host}
+  network-container: {image: "@IMAGE@", network_mode: "container:other1"}
+  cap-add: {image: "@IMAGE@", cap_add: [SYS_ADMIN]}
+  devices: {image: "@IMAGE@", devices: ["/dev/fuse:/dev/fuse"]}
+  device-cgroup-rules: {image: "@IMAGE@", device_cgroup_rules: ["c 1:3 mr"]}
+  security-opt: {image: "@IMAGE@", security_opt: ["seccomp=unconfined"]}
+  sysctls: {image: "@IMAGE@", sysctls: {net.core.rmem_max: 1}}
+  cgroup-parent: {image: "@IMAGE@", cgroup_parent: custom.slice}
+  runtime: {image: "@IMAGE@", runtime: runsc}
+  build-insecure: {build: {context: ., entitlements: [security.insecure]}}
+  build-network-host: {build: {context: ., entitlements: [network.host]}}
+  build-privileged: {build: {context: ., privileged: true}}

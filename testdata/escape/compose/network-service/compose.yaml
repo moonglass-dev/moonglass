@@ -1,0 +1,6 @@
+services:
+  db:
+    image: "@IMAGE@"
+  app:
+    image: "@IMAGE@"
+    network_mode: "service:db"

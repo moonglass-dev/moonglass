@@ -1,0 +1,6 @@
+x-common: &common
+  image: "@IMAGE@"
+  privileged: true
+services:
+  web:
+    <<: *common

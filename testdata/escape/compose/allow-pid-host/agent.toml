@@ -1,0 +1,5 @@
+[[containers.allow]]
+project = "monitoring"
+image = "@IMAGE@"
+pid_host = true
+bind_mounts = ["@SRV@:/data:ro"]

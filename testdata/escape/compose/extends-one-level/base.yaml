@@ -1,0 +1,4 @@
+services:
+  base:
+    image: "@IMAGE@"
+    privileged: true

@@ -1,0 +1,4 @@
+services:
+  included:
+    image: "@IMAGE@"
+    privileged: true

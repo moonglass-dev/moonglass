@@ -1,0 +1,3 @@
+services:
+  socket: {image: "@IMAGE@", volumes: ["@CONTAINERD_SOCK@:/x"]}
+  parent: {image: "@IMAGE@", volumes: ["@CONTAINERD_DIR@:/x"]}

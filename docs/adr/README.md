@@ -14,6 +14,7 @@ Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milest
 | [0006](0006-operation-registry.md) | One operation registry is the only API surface; REST, the CLI and later MCP are generated from it, and it does authorisation and audit |
 | [0007](0007-releases-and-updates.md) | Releases carry OpenSSH signatures from two pinned FIDO2 keys from W1-6, flow from canary to stable, roll out in stages and revert themselves; after launch the control plane speaks the current and previous agent protocol version only |
 | [0008](0008-protobuf-codegen.md) | Official `protoc` + `protoc-gen-go` (`google.golang.org/protobuf`), versions pinned, generated Go checked in |
+| [0009](0009-policy-dependencies.md) | `compose-go/v2 v2.17.0` and `go-toml/v2 v2.4.3`, imported only by `internal/policy`, for Compose resolution and strict `agent.toml` parsing |
 
 
 ## Changing a decision

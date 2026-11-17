@@ -1,0 +1,12 @@
+services:
+  web:
+    image: "@IMAGE@"
+    volumes: ["data:/data"]
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges"]
+    sysctls:
+      net.core.somaxconn: 1024
+      net.ipv4.ip_local_port_range: "1024 65000"
+    network_mode: "container:web1"
+volumes:
+  data:

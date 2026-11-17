@@ -1,0 +1,4 @@
+services:
+  web:
+    image: prom/node-exporter:latest
+    pid: host

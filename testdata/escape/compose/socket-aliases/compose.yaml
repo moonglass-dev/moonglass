@@ -1,0 +1,12 @@
+services:
+  short: {image: "@IMAGE@", volumes: ["@DOCKER_SOCK@:/var/run/docker.sock"]}
+  long:
+    image: "@IMAGE@"
+    volumes:
+      - type: bind
+        source: "@DOCKER_SOCK@"
+        target: /var/run/docker.sock
+  run-alias: {image: "@IMAGE@", volumes: ["@SOCK_ALIAS@:/x"]}
+  symlink: {image: "@IMAGE@", volumes: ["@SOCK_LINK@:/x"]}
+  hard-link: {image: "@IMAGE@", volumes: ["@SOCK_HARD@:/x"]}
+  parent: {image: "@IMAGE@", volumes: ["@SOCK_DIR@:/x"]}

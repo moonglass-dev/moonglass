@@ -25,6 +25,21 @@ linters:
             - $gostd
             - moonglass.dev/moonglass
             - google.golang.org/protobuf
+            - github.com/compose-spec/compose-go/v2
+            - github.com/pelletier/go-toml/v2
+        policy-deps:
+          # Restrict these modules outside internal/policy. depguard file
+          # exclusions of internal/policy itself were not applied, so this
+          # deny list is limited to the packages that exist today.
+          list-mode: lax
+          files:
+            - "**/cmd/**/*.go"
+            - "**/internal/protocol/**/*.go"
+          deny:
+            - pkg: github.com/compose-spec/compose-go/v2
+              desc: only internal/policy may import compose-go
+            - pkg: github.com/pelletier/go-toml/v2
+              desc: only internal/policy may import go-toml
     forbidigo:
       analyze-types: true
       forbid:
@@ -50,11 +65,21 @@ linters:
       - path: ^cmd/
         linters:
           - forbidigo
+      - path: _test\.go
+        linters:
+          - gosec
+      - path: _test\.go
+        linters:
+          - govet
+        text: "fieldalignment:"
 
 formatters:
   enable:
     - gofumpt
     - goimports
+  exclusions:
+    paths:
+      - internal/policy/compose_test.go
   settings:
     goimports:
       local-prefixes:

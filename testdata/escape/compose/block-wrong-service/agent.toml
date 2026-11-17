@@ -1,0 +1,5 @@
+[[containers.allow]]
+project = "monitoring"
+image = "@IMAGE@"
+service = "db"
+pid_host = true

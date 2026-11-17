@@ -1,0 +1,7 @@
+services:
+  web:
+    image: "@IMAGE@"
+  debug:
+    image: "@IMAGE@"
+    profiles: [debug]
+    pid: host

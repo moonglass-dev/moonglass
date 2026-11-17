@@ -1,0 +1,4 @@
+[[containers.allow]]
+project = "monitoring"
+image = "prom/node-exporter:latest"
+pid_host = true

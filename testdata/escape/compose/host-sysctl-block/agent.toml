@@ -1,0 +1,4 @@
+[[containers.allow]]
+project = "monitoring"
+image = "@IMAGE@"
+sysctls = ["kernel.core_pattern"]

@@ -1,0 +1,11 @@
+services:
+  web:
+    image: "@IMAGE@"
+    volumes: ["sock:/x"]
+volumes:
+  sock:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "@DOCKER_SOCK@"
