@@ -13,8 +13,6 @@
       "Read(~/.aws/**)",
       "Edit(/.git)",
       "Edit(/.git/**)",
-      "Bash(git push *)",
-      "Bash(git * push *)",
       "Bash(git reset *)",
       "Bash(git rebase *)",
       "Bash(git config *)",
