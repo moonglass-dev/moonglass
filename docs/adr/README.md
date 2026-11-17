@@ -15,6 +15,7 @@ Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milest
 | [0007](0007-releases-and-updates.md) | Releases carry OpenSSH signatures from two pinned FIDO2 keys from W1-6, flow from canary to stable, roll out in stages and revert themselves; after launch the control plane speaks the current and previous agent protocol version only |
 | [0008](0008-protobuf-codegen.md) | Official `protoc` + `protoc-gen-go` (`google.golang.org/protobuf`), versions pinned, generated Go checked in |
 | [0009](0009-policy-dependencies.md) | `compose-go/v2 v2.17.0` and `go-toml/v2 v2.4.3`, imported only by `internal/policy`, for Compose resolution and strict `agent.toml` parsing |
+| [0010](0010-storage-dependencies.md) | `pgx/v5 v5.13.0` and `modernc.org/sqlite v1.62.0`, imported only by `internal/store`, for the Postgres and SQLite backends |
 
 
 ## Changing a decision

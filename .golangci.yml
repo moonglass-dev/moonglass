@@ -27,6 +27,8 @@ linters:
             - google.golang.org/protobuf
             - github.com/compose-spec/compose-go/v2
             - github.com/pelletier/go-toml/v2
+            - github.com/jackc/pgx/v5
+            - modernc.org/sqlite
         policy-deps:
           # Restrict these modules outside internal/policy. depguard file
           # exclusions of internal/policy itself were not applied, so this
@@ -40,6 +42,10 @@ linters:
               desc: only internal/policy may import compose-go
             - pkg: github.com/pelletier/go-toml/v2
               desc: only internal/policy may import go-toml
+            - pkg: github.com/jackc/pgx/v5
+              desc: only internal/store may import pgx
+            - pkg: modernc.org/sqlite
+              desc: only internal/store may import modernc sqlite
     forbidigo:
       analyze-types: true
       forbid:
@@ -72,6 +78,14 @@ linters:
         linters:
           - govet
         text: "fieldalignment:"
+      - path: _test\.go
+        linters:
+          - govet
+        text: "shadow:"
+      - path: _test\.go
+        linters:
+          - errcheck
+        text: "rows.Close"
 
 formatters:
   enable:
