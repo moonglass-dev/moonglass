@@ -1,0 +1,29 @@
+[Unit]
+Description=Moonglass proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=moonglass-proxy
+ExecStart=/usr/local/bin/moonglass proxy --data-dir /var/lib/moonglass/proxy
+Restart=on-failure
+RestartSec=2
+StateDirectory=moonglass/proxy
+StateDirectoryMode=0700
+MemoryMax=64M
+NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,31 @@
+[Unit]
+Description=Moonglass agent
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=moonglass
+SupplementaryGroups=docker
+EnvironmentFile=/etc/moonglass/agent.env
+ExecStart=/usr/local/bin/moonglass agent connect --data-dir /var/lib/moonglass/agent --url ${MOONGLASS_URL}
+Restart=on-failure
+RestartSec=2
+StateDirectory=moonglass/agent
+StateDirectoryMode=0700
+MemoryMax=48M
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

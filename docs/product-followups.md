@@ -37,6 +37,10 @@ The major finding (a pushed config could move the admin API to TCP or the certif
 - **`moonglass proxy --data-dir DIR` has no success-path test.** Only usage errors are tested at the CLI; flag wiring to `proxy.Run`, SIGTERM shutdown and exit 0 are not.
 - **CI time grew from about 2 to 12 minutes** with Caddy linked (race and `build-all`). Worth caching or splitting before more tickets queue behind it.
 
+### W1-6 (deferred after review)
+
+- **`ssh-keygen -Y verify` does not enforce the FIDO2 user-presence and user-verification flags** that the threat model and `docs/specs/install.md` require of the release signature. A signature made without PIN verification can still install. Deferred after W1-6 review; the install script has no flags check.
+
 ## Owner decisions (do not close in a ticket)
 
 - **W1-1 open questions 6 and 7** (`pid`/`ipc` `container:` cross-project; `service:` inheriting host networking). Left as-is; owner is deciding.

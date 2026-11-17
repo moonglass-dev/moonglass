@@ -1,0 +1,125 @@
+#!/bin/sh
+# Install Moonglass: the static binary and the hardened systemd units.
+#
+# Every artifact is verified with `ssh-keygen -Y verify` (OpenSSH 8.2 or later)
+# against the pinned release keys below, in a private staging directory, before
+# anything is written to the install location. One failure installs nothing.
+# See docs/specs/install.md.
+#
+# Usage: install [--from DIR|URL] [--allowed-signers FILE] [--prefix DIR] [--unit-dir DIR]
+set -eu
+
+RELEASE_URL="https://moonglass.dev/releases/latest"
+NAMESPACE="moonglass-release"
+SERVICE_USER="moonglass"
+PROXY_USER="moonglass-proxy"
+ARTIFACTS="moonglass SHA256SUMS moonglass.sbom.json moonglass-agent.service moonglass-proxy.service"
+
+# The two pinned release public keys (primary and backup ed25519-sk keys),
+# in allowed_signers form. OWNER: replace each OWNER-PASTE line with
+#   moonglass-release namespaces="moonglass-release" sk-ssh-ed25519@openssh.com AAAA...
+# The script refuses to run while an OWNER-PASTE line is present.
+PINNED_SIGNERS='
+OWNER-PASTE primary release public key here
+OWNER-PASTE backup release public key here
+'
+
+die() {
+	printf 'moonglass-install: %s\n' "$*" >&2
+	exit 1
+}
+
+from="$RELEASE_URL"
+signers=""
+prefix=""
+unit_dir=""
+while [ $# -gt 0 ]; do
+	[ $# -ge 2 ] || die "$1 needs a value; usage: install [--from DIR|URL] [--allowed-signers FILE] [--prefix DIR] [--unit-dir DIR]"
+	case "$1" in
+	--from) from="$2" ;;
+	--allowed-signers) signers="$2" ;;
+	--prefix) prefix="$2" ;;
+	--unit-dir) unit_dir="$2" ;;
+	*) die "unknown argument $1; usage: install [--from DIR|URL] [--allowed-signers FILE] [--prefix DIR] [--unit-dir DIR]" ;;
+	esac
+	shift 2
+done
+
+# A system install uses the default layout and also sets up the host. A custom
+# prefix or unit dir installs files only.
+host_setup=0
+if [ -z "$prefix" ] && [ -z "$unit_dir" ]; then
+	host_setup=1
+fi
+: "${prefix:=/usr/local}"
+: "${unit_dir:=/etc/systemd/system}"
+
+command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen not found; install OpenSSH 8.2 or later"
+
+stage="$(mktemp -d)" || die "cannot create a staging directory; check TMPDIR"
+trap 'rm -rf "$stage"' EXIT HUP INT TERM
+
+if [ -z "$signers" ]; then
+	case "$PINNED_SIGNERS" in
+	*OWNER-PASTE*) die "the pinned release keys are not set in this script; the owner must paste both public keys (see docs/specs/install.md), or pass --allowed-signers FILE" ;;
+	esac
+	signers="$stage/allowed_signers"
+	printf '%s\n' "$PINNED_SIGNERS" >"$signers"
+fi
+[ -r "$signers" ] || die "cannot read allowed signers file $signers"
+
+fetch() {
+	case "$from" in
+	http://* | https://*)
+		command -v curl >/dev/null 2>&1 || die "curl not found; install curl or use --from DIR"
+		curl --fail --silent --show-error --location --output "$stage/$1" "$from/$1" || return 1
+		;;
+	*)
+		cp "$from/$1" "$stage/$1" || return 1
+		;;
+	esac
+}
+
+for name in $ARTIFACTS; do
+	fetch "$name" || die "$name: cannot fetch from $from; check the path or URL"
+	if ! fetch "$name.sig" 2>/dev/null; then
+		die "$name: signature file $name.sig is missing; nothing was installed"
+	fi
+done
+
+for name in $ARTIFACTS; do
+	if ! ssh-keygen -Y verify -f "$signers" -I "$NAMESPACE" -n "$NAMESPACE" \
+		-s "$stage/$name.sig" <"$stage/$name" >/dev/null 2>"$stage/verify.err"; then
+		die "$name: signature does not verify against the pinned release keys; nothing was installed"
+	fi
+done
+
+want="$(awk '$2 == "moonglass" { print $1 }' "$stage/SHA256SUMS")"
+if command -v sha256sum >/dev/null 2>&1; then
+	have="$(sha256sum "$stage/moonglass" | awk '{ print $1 }')"
+else
+	have="$(shasum -a 256 "$stage/moonglass" | awk '{ print $1 }')"
+fi
+[ -n "$want" ] && [ "$want" = "$have" ] || die "moonglass: SHA-256 does not match the signed SHA256SUMS; nothing was installed"
+
+# Everything verified. Only now write to the install location.
+mkdir -p "$prefix/bin" "$unit_dir" || die "cannot create $prefix/bin or $unit_dir; run as root or pick another --prefix"
+install -m 0755 "$stage/moonglass" "$prefix/bin/moonglass.new" || die "moonglass: cannot write $prefix/bin; run as root"
+mv -f "$prefix/bin/moonglass.new" "$prefix/bin/moonglass" || die "moonglass: cannot replace $prefix/bin/moonglass"
+for unit in moonglass-agent.service moonglass-proxy.service; do
+	install -m 0644 "$stage/$unit" "$unit_dir/$unit" || die "$unit: cannot write $unit_dir; run as root"
+done
+
+if [ "$host_setup" -eq 1 ]; then
+	[ "$(id -u)" -eq 0 ] || die "host setup needs root; run with sudo"
+	id "$SERVICE_USER" >/dev/null 2>&1 ||
+		useradd --system --no-create-home --home-dir /var/lib/moonglass --shell /usr/sbin/nologin "$SERVICE_USER" ||
+		die "cannot create user $SERVICE_USER"
+	id "$PROXY_USER" >/dev/null 2>&1 ||
+		useradd --system --no-create-home --home-dir /var/lib/moonglass/proxy --shell /usr/sbin/nologin "$PROXY_USER" ||
+		die "cannot create user $PROXY_USER"
+	install -d -m 0755 -o root -g root /etc/moonglass
+	systemctl daemon-reload || die "systemctl daemon-reload failed"
+fi
+
+printf 'moonglass-install: installed %s/bin/moonglass and the units in %s\n' "$prefix" "$unit_dir" >&2
