@@ -453,7 +453,7 @@ outside the ticket's packages: $p"
 gate_size() {
 	local n
 	n=$(git -C "$WT" diff "${GD[@]}" --no-renames --numstat "$BASE" HEAD | awk '
-		$3 ~ /_test\.go$/ || $3 ~ /\.pb\.go$/ || $3 ~ /(^|\/)testdata\// || $3 == "go.sum" { next }
+		$3 ~ /_test\.go$/ || $3 ~ /\.pb\.go$/ || $3 ~ /(^|\/)testdata\// || $3 == "go.sum" || $3 == "go.mod" { next }
 		$1 != "-" { n += $1 + $2 } END { print n + 0 }')
 	[ "$n" -lt "$MAX_NEW_LINES" ] || { echo "non-test diff is $n lines; the limit is under $MAX_NEW_LINES. Split the ticket." | gate_fail size; return 1; }
 }

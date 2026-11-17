@@ -25,6 +25,7 @@ Nits and residual holes to fix later. Do not block product tickets on these. The
 
 ## Closed in recent tickets
 
+- The size gate no longer counts `go.mod`, like `go.sum`; W1-5 added about 155 generated `// indirect` lines for Caddy and failed the gate at 802 lines.
 - The words gate no longer scans `go.mod` and `go.sum`; module paths such as `golang.org/x/crypto/x509roots/fallback` (a Caddy requirement) are not our words.
 - Letter-suffix ticket IDs (W0-6).
 - Per-session allow-list override of protected-path Edit denies; `.claude/` and `scripts/ticket` stay guarded (W0-6).
