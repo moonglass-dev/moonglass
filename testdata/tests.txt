@@ -50,6 +50,8 @@ moonglass.dev/moonglass/internal/policy TestRejectionHasNoEnvironmentValues
 moonglass.dev/moonglass/internal/policy TestRejectionNamesFieldAndAllowLines
 moonglass.dev/moonglass/internal/policy TestSocketAndDataRootAliasesRejected
 moonglass.dev/moonglass/internal/protocol FuzzEnvelopeDecode
+moonglass.dev/moonglass/internal/protocol TestDeployMessagesRejectUnknownType
+moonglass.dev/moonglass/internal/protocol TestDeployRoundTrip
 moonglass.dev/moonglass/internal/protocol TestEnrollRoundTrip
 moonglass.dev/moonglass/internal/protocol TestEnvelopeRejectsMalformed
 moonglass.dev/moonglass/internal/protocol TestEnvelopeRejectsOversized
@@ -57,6 +59,9 @@ moonglass.dev/moonglass/internal/protocol TestEnvelopeRoundTrip
 moonglass.dev/moonglass/internal/protocol TestEnvelopeRoundTripEveryType
 moonglass.dev/moonglass/internal/protocol TestErrorCodes
 moonglass.dev/moonglass/internal/protocol TestHeartbeatRoundTrip
+moonglass.dev/moonglass/internal/protocol TestRollbackRoundTrip
+moonglass.dev/moonglass/internal/protocol TestRunPreDeployRoundTrip
+moonglass.dev/moonglass/internal/protocol TestSwitchReleaseRoundTrip
 moonglass.dev/moonglass/internal/protocol TestWrapRejectsTypeMismatch
 moonglass.dev/moonglass/internal/proxy TestAdminAPIOnUnixSocket
 moonglass.dev/moonglass/internal/proxy TestAdminSocketRefusesOtherMutations
@@ -64,6 +69,10 @@ moonglass.dev/moonglass/internal/proxy TestCounterRecordsRequest
 moonglass.dev/moonglass/internal/proxy TestNoTCPAdminPort
 moonglass.dev/moonglass/internal/proxy TestOneHTTPSRouteInternalIssuer
 moonglass.dev/moonglass/internal/proxy TestPushedConfigCannotOpenTCPAdmin
+moonglass.dev/moonglass/internal/release TestDeployThenSwitchMakesNewCurrent
+moonglass.dev/moonglass/internal/release TestIllegalTransitionDoesNotChangeState
+moonglass.dev/moonglass/internal/release TestPreDeployFailureLeavesOldServing
+moonglass.dev/moonglass/internal/release TestRollbackRestoresPrevious
 moonglass.dev/moonglass/internal/server TestEnrollRejectsInvalidToken
 moonglass.dev/moonglass/internal/server TestEnrollRejectsReplay
 moonglass.dev/moonglass/internal/store TestAppRoleCannotBypassRLS

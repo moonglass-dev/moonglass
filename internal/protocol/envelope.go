@@ -205,6 +205,14 @@ func validatePayload(msg proto.Message) error {
 	switch m := msg.(type) {
 	case *agentv1.EnrollResponse:
 		return validateEnrollResult(m.GetResult())
+	case *agentv1.Deploy:
+		return validateDeploy(m)
+	case *agentv1.SwitchRelease:
+		return validateSwitchRelease(m)
+	case *agentv1.Rollback:
+		return validateRollback(m)
+	case *agentv1.RunPreDeploy:
+		return validateRunPreDeploy(m)
 	default:
 		return nil
 	}
@@ -216,7 +224,11 @@ func validateType(t agentv1.MessageType) error {
 		agentv1.MessageType_ENROLL_RESPONSE,
 		agentv1.MessageType_HEARTBEAT,
 		agentv1.MessageType_HEARTBEAT_ACK,
-		agentv1.MessageType_ERROR:
+		agentv1.MessageType_ERROR,
+		agentv1.MessageType_DEPLOY,
+		agentv1.MessageType_SWITCH_RELEASE,
+		agentv1.MessageType_ROLLBACK,
+		agentv1.MessageType_RUN_PRE_DEPLOY:
 		return nil
 	case agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED:
 		return fmt.Errorf("unspecified message type: %w", ErrMalformed)
@@ -265,6 +277,14 @@ func typeOf(msg proto.Message) (agentv1.MessageType, error) {
 		return agentv1.MessageType_HEARTBEAT_ACK, nil
 	case *agentv1.Error:
 		return agentv1.MessageType_ERROR, nil
+	case *agentv1.Deploy:
+		return agentv1.MessageType_DEPLOY, nil
+	case *agentv1.SwitchRelease:
+		return agentv1.MessageType_SWITCH_RELEASE, nil
+	case *agentv1.Rollback:
+		return agentv1.MessageType_ROLLBACK, nil
+	case *agentv1.RunPreDeploy:
+		return agentv1.MessageType_RUN_PRE_DEPLOY, nil
 	default:
 		return agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED, fmt.Errorf("unsupported message %T: %w", msg, ErrUnknownType)
 	}

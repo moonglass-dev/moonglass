@@ -20,6 +20,10 @@ enum MessageType {
   HEARTBEAT = 3;
   HEARTBEAT_ACK = 4;
   ERROR = 5;
+  DEPLOY = 6;
+  SWITCH_RELEASE = 7;
+  ROLLBACK = 8;
+  RUN_PRE_DEPLOY = 9;
 }
 
 message Error {
@@ -59,3 +63,29 @@ message Heartbeat {
 }
 
 message HeartbeatAck {}
+
+// Deploy creates a candidate release for an app.
+message Deploy {
+  string app_id = 1;
+  string release_id = 2;
+  string image = 3;
+}
+
+// SwitchRelease promotes a ready candidate release to current.
+message SwitchRelease {
+  string app_id = 1;
+  string release_id = 2;
+}
+
+// Rollback promotes the previous release back to current.
+message Rollback {
+  string app_id = 1;
+}
+
+// RunPreDeploy runs the pre-deploy command of a candidate release. args is an exec argv, never a shell string.
+message RunPreDeploy {
+  string app_id = 1;
+  string release_id = 2;
+  repeated string args = 3;
+  bool reversible = 4;
+}

@@ -30,6 +30,10 @@ const (
 	MessageType_HEARTBEAT                MessageType = 3
 	MessageType_HEARTBEAT_ACK            MessageType = 4
 	MessageType_ERROR                    MessageType = 5
+	MessageType_DEPLOY                   MessageType = 6
+	MessageType_SWITCH_RELEASE           MessageType = 7
+	MessageType_ROLLBACK                 MessageType = 8
+	MessageType_RUN_PRE_DEPLOY           MessageType = 9
 )
 
 // Enum value maps for MessageType.
@@ -41,6 +45,10 @@ var (
 		3: "HEARTBEAT",
 		4: "HEARTBEAT_ACK",
 		5: "ERROR",
+		6: "DEPLOY",
+		7: "SWITCH_RELEASE",
+		8: "ROLLBACK",
+		9: "RUN_PRE_DEPLOY",
 	}
 	MessageType_value = map[string]int32{
 		"MESSAGE_TYPE_UNSPECIFIED": 0,
@@ -49,6 +57,10 @@ var (
 		"HEARTBEAT":                3,
 		"HEARTBEAT_ACK":            4,
 		"ERROR":                    5,
+		"DEPLOY":                   6,
+		"SWITCH_RELEASE":           7,
+		"ROLLBACK":                 8,
+		"RUN_PRE_DEPLOY":           9,
 	}
 )
 
@@ -510,6 +522,234 @@ func (*HeartbeatAck) Descriptor() ([]byte, []int) {
 	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{5}
 }
 
+// Deploy creates a candidate release for an app.
+type Deploy struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	ReleaseId     string                 `protobuf:"bytes,2,opt,name=release_id,json=releaseId,proto3" json:"release_id,omitempty"`
+	Image         string                 `protobuf:"bytes,3,opt,name=image,proto3" json:"image,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Deploy) Reset() {
+	*x = Deploy{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Deploy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Deploy) ProtoMessage() {}
+
+func (x *Deploy) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Deploy.ProtoReflect.Descriptor instead.
+func (*Deploy) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Deploy) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *Deploy) GetReleaseId() string {
+	if x != nil {
+		return x.ReleaseId
+	}
+	return ""
+}
+
+func (x *Deploy) GetImage() string {
+	if x != nil {
+		return x.Image
+	}
+	return ""
+}
+
+// SwitchRelease promotes a ready candidate release to current.
+type SwitchRelease struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	ReleaseId     string                 `protobuf:"bytes,2,opt,name=release_id,json=releaseId,proto3" json:"release_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SwitchRelease) Reset() {
+	*x = SwitchRelease{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SwitchRelease) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SwitchRelease) ProtoMessage() {}
+
+func (x *SwitchRelease) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SwitchRelease.ProtoReflect.Descriptor instead.
+func (*SwitchRelease) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SwitchRelease) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *SwitchRelease) GetReleaseId() string {
+	if x != nil {
+		return x.ReleaseId
+	}
+	return ""
+}
+
+// Rollback promotes the previous release back to current.
+type Rollback struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Rollback) Reset() {
+	*x = Rollback{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Rollback) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Rollback) ProtoMessage() {}
+
+func (x *Rollback) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Rollback.ProtoReflect.Descriptor instead.
+func (*Rollback) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Rollback) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+// RunPreDeploy runs the pre-deploy command of a candidate release. args is an exec argv, never a shell string.
+type RunPreDeploy struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	ReleaseId     string                 `protobuf:"bytes,2,opt,name=release_id,json=releaseId,proto3" json:"release_id,omitempty"`
+	Args          []string               `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty"`
+	Reversible    bool                   `protobuf:"varint,4,opt,name=reversible,proto3" json:"reversible,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunPreDeploy) Reset() {
+	*x = RunPreDeploy{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunPreDeploy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunPreDeploy) ProtoMessage() {}
+
+func (x *RunPreDeploy) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunPreDeploy.ProtoReflect.Descriptor instead.
+func (*RunPreDeploy) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RunPreDeploy) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *RunPreDeploy) GetReleaseId() string {
+	if x != nil {
+		return x.ReleaseId
+	}
+	return ""
+}
+
+func (x *RunPreDeploy) GetArgs() []string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *RunPreDeploy) GetReversible() bool {
+	if x != nil {
+		return x.Reversible
+	}
+	return false
+}
+
 var File_proto_moonglass_agent_v1_agent_proto protoreflect.FileDescriptor
 
 const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
@@ -534,14 +774,38 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x06result\x18\x02 \x01(\x0e2 .moonglass.agent.v1.EnrollResultR\x06result\"0\n" +
 	"\tHeartbeat\x12#\n" +
 	"\ragent_version\x18\x01 \x01(\tR\fagentVersion\"\x0e\n" +
-	"\fHeartbeatAck*\x81\x01\n" +
+	"\fHeartbeatAck\"T\n" +
+	"\x06Deploy\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1d\n" +
+	"\n" +
+	"release_id\x18\x02 \x01(\tR\treleaseId\x12\x14\n" +
+	"\x05image\x18\x03 \x01(\tR\x05image\"E\n" +
+	"\rSwitchRelease\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1d\n" +
+	"\n" +
+	"release_id\x18\x02 \x01(\tR\treleaseId\"!\n" +
+	"\bRollback\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\"x\n" +
+	"\fRunPreDeploy\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1d\n" +
+	"\n" +
+	"release_id\x18\x02 \x01(\tR\treleaseId\x12\x12\n" +
+	"\x04args\x18\x03 \x03(\tR\x04args\x12\x1e\n" +
+	"\n" +
+	"reversible\x18\x04 \x01(\bR\n" +
+	"reversible*\xc3\x01\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eENROLL_REQUEST\x10\x01\x12\x13\n" +
 	"\x0fENROLL_RESPONSE\x10\x02\x12\r\n" +
 	"\tHEARTBEAT\x10\x03\x12\x11\n" +
 	"\rHEARTBEAT_ACK\x10\x04\x12\t\n" +
-	"\x05ERROR\x10\x05*x\n" +
+	"\x05ERROR\x10\x05\x12\n" +
+	"\n" +
+	"\x06DEPLOY\x10\x06\x12\x12\n" +
+	"\x0eSWITCH_RELEASE\x10\a\x12\f\n" +
+	"\bROLLBACK\x10\b\x12\x12\n" +
+	"\x0eRUN_PRE_DEPLOY\x10\t*x\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aINVALID\x10\x01\x12\x10\n" +
@@ -569,7 +833,7 @@ func file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_moonglass_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_moonglass_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_proto_moonglass_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_proto_moonglass_agent_v1_agent_proto_goTypes = []any{
 	(MessageType)(0),       // 0: moonglass.agent.v1.MessageType
 	(ErrorCode)(0),         // 1: moonglass.agent.v1.ErrorCode
@@ -580,6 +844,10 @@ var file_proto_moonglass_agent_v1_agent_proto_goTypes = []any{
 	(*EnrollResponse)(nil), // 6: moonglass.agent.v1.EnrollResponse
 	(*Heartbeat)(nil),      // 7: moonglass.agent.v1.Heartbeat
 	(*HeartbeatAck)(nil),   // 8: moonglass.agent.v1.HeartbeatAck
+	(*Deploy)(nil),         // 9: moonglass.agent.v1.Deploy
+	(*SwitchRelease)(nil),  // 10: moonglass.agent.v1.SwitchRelease
+	(*Rollback)(nil),       // 11: moonglass.agent.v1.Rollback
+	(*RunPreDeploy)(nil),   // 12: moonglass.agent.v1.RunPreDeploy
 }
 var file_proto_moonglass_agent_v1_agent_proto_depIdxs = []int32{
 	0, // 0: moonglass.agent.v1.Envelope.type:type_name -> moonglass.agent.v1.MessageType
@@ -604,7 +872,7 @@ func file_proto_moonglass_agent_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_moonglass_agent_v1_agent_proto_rawDesc), len(file_proto_moonglass_agent_v1_agent_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   6,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -22,7 +22,7 @@ Every message is wrapped in an envelope before it is sent.
 | `payload` | `bytes` | Encoded payload message for that type, possibly empty. |
 | `error` | `Error` | Required when `type` is `ERROR`, and forbidden on any other type. This is the only place an error travels; it is not also encoded in `payload`. |
 
-`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`.
+`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`.
 
 Encode (`Marshal`) and decode (`Unmarshal`) round-trip a well-formed envelope. `Marshal` is deterministic. The on-the-wire encoding is a 4-byte big-endian length of the protobuf payload, followed by that many bytes of protobuf. The length must match the rest of the buffer exactly, so a truncated or trailing-garbage input is rejected.
 
@@ -61,6 +61,25 @@ No field is a host shell command.
 ## Heartbeat (types only in v0)
 
 `Heartbeat` carries `agent_version` (string). `HeartbeatAck` has no fields. Both round-trip through the envelope. Opening a Heartbeat acknowledgement as an Enroll request is an error. The control plane is expected to see heartbeats about every 30 seconds (S§5); v0 does not schedule them.
+
+## Deploy commands (W2-2)
+
+Four commands, each a protobuf type carried in the envelope. None has a field that is a host shell command or a host path. They have no response or result types: a failure travels in the existing `ERROR` envelope, and outcomes of execution belong to later tickets. The legal order of these commands for one app is `docs/specs/release.md`.
+
+An identifier (`app_id`, `release_id`) is 1 to 64 bytes of `[A-Za-z0-9._-]`. Violations are rejected with `ErrMalformed` when the payload is opened, before any later code acts.
+
+| Message | Type | Fields |
+|---|---|---|
+| `Deploy` | `DEPLOY` | `app_id`, `release_id`, `image` |
+| `SwitchRelease` | `SWITCH_RELEASE` | `app_id`, `release_id` |
+| `Rollback` | `ROLLBACK` | `app_id` only; it names no target release |
+| `RunPreDeploy` | `RUN_PRE_DEPLOY` | `app_id`, `release_id`, `args`, `reversible` |
+
+`image` is an image reference of 1 to 512 bytes with no whitespace, no control characters and no leading `-`. Validation is structural only; digest pinning is not required.
+
+`args` is an exec argv: 1 to 32 entries, each 1 to 1024 bytes with no NUL. Every entry, including the first, must be non-empty. Entries are never joined and never passed to a host shell. `reversible` says whether the pre-deploy step can be undone (S§3.13); it is carried as sent and does not change the release transitions.
+
+`RunPreDeploy` does not repeat the image: the executor takes it from the `Deploy` with the same `release_id`.
 
 ## Error codes
 
