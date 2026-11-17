@@ -141,7 +141,10 @@ models() { # sets IMPL_MODEL, REVIEW_MODEL (empty for no review)
 # ---------------------------------------------------------------- process helpers
 
 # Scrubbed environment for everything that runs agent-written code or the agent itself.
-ENVP=(env -i "PATH=$PATH" "HOME=$HOME" "USER=${USER:-}" "TERM=${TERM:-dumb}" "LANG=${LANG:-en_US.UTF-8}" "TMPDIR=${TMPDIR:-/tmp}" "GOFLAGS=-mod=readonly")
+ENVB=(env -i "PATH=$PATH" "HOME=$HOME" "USER=${USER:-}" "TERM=${TERM:-dumb}" "LANG=${LANG:-en_US.UTF-8}" "TMPDIR=${TMPDIR:-/tmp}")
+ENVP=("${ENVB[@]}" "GOFLAGS=-mod=readonly")
+# Go settings the dependency fetch takes from the caller (proxy, checksum database, private modules, caches). GOFLAGS is not one of them.
+GO_FETCH_VARS="GOPROXY GOSUMDB GOPRIVATE GONOPROXY GONOSUMDB GOINSECURE GOMODCACHE GOPATH"
 claude_env() {
 	CENV=("${ENVP[@]}")
 	local v
@@ -273,6 +276,15 @@ claude_call() {
 
 # ---------------------------------------------------------------- prompts
 
+# bash_rules: the shell rules for every session that has Bash. Permission rules match one command at a time.
+bash_rules() {
+	cat <<'EOF'
+Run exactly one command per Bash call. Never chain commands with ';', '|' or '&&'.
+If a command is denied, retry with a simpler allowed single command; one denial does not mean Bash is unavailable.
+Report blocked only after several distinct allowed commands have failed.
+EOF
+}
+
 ticket_text() { cat "$TD/ticket.md"; }
 reads_text() {
 	printf 'AGENTS.md\n'
@@ -300,6 +312,7 @@ Write only the failing acceptance tests for ticket $ID, following the plan below
 Table-driven tests, failure messages that show expected and actual values. Run them and confirm they fail (a compile failure for a missing package counts). Touch only these packages:
 $T_PACKAGES
 Do not touch go.mod, protected paths, or existing test lines. Commit as "$ID: tests". Then stop.
+$(bash_rules)
 
 Ticket:
 $(ticket_text)
@@ -325,9 +338,11 @@ EOF
 		cat <<EOF
 Touch only these paths:
 $T_PACKAGES
-Stop and report blocked before changing a contract (proto, registry operations, agent.toml schema, storage schema), an ADR, or adding a dependency.
+Stop and report blocked before changing a contract (proto, registry operations, agent.toml schema, storage schema) or an ADR.
+The harness already ran go get and go mod tidy for the ticket's dependencies, so go.mod and go.sum may be changed and uncommitted: commit them with your work. You cannot run go get, go install or go mod tidy; do not try. A module you need that is not in the ticket's dependencies is a new dependency: stop and report blocked.
 No placeholders, no TODOs, no fallback or legacy paths, no code for later tickets. Errors are wrapped with context and say what to do.
 Never weaken, skip or delete an existing test. Run make ci, run make test-list, commit as "$ID: $T_TITLE" (git add the files first), and leave the tree clean. Then stop.
+$(bash_rules)
 
 Ticket:
 $(ticket_text)
@@ -366,6 +381,7 @@ prompt_fix() {
 	cat >"$TD/fix.prompt.md" <<EOF
 Address these review findings for ticket $ID on the current branch. For each one, either fix it with a test that fails first, or explain precisely why it is not a defect (in notes). Change nothing else. Never weaken, skip or delete an existing test.
 Run make ci, run make test-list, commit as "$ID: address review" (git add the files first), and leave the tree clean. Then stop.
+$(bash_rules)
 
 Findings:
 $(jq '[.findings[] | select(.severity == "blocker" or .severity == "major")]' "$TD/review.json")
@@ -655,6 +671,55 @@ unauthorized_deps() { # the plan's new dependencies that dep_authorized rejects,
 	done < <(jq -r '.new_dependencies[]' "$TD/plan.json")
 }
 
+# dep_spec ENTRY: prints "module@version" for go get, from "module v1.2.3" or "module@v1.2.3". Fails when there is no usable version.
+dep_spec() {
+	local m v extra
+	read -r m v extra <<<"${1/@/ }"
+	# A full semantic version only: v1, v1.2 and v2dev are queries that resolve to whatever is newest. A path with '..' could be a package pattern.
+	local sv='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+	[[ $m =~ ^[A-Za-z0-9][A-Za-z0-9._~/-]*$ && $m != *..* && $v =~ $sv && -z $extra ]] || return 1
+	printf '%s@%s' "$m" "$v"
+}
+
+# parse_deps: DEP_SPECS gets one "module@version" per entry of the ticket's `dependencies`. Fails with R_REASON when an entry has no version.
+DEP_SPECS=()
+parse_deps() {
+	local e s bad=""
+	DEP_SPECS=()
+	while IFS= read -r e; do
+		[ -n "$e" ] || continue
+		if s=$(dep_spec "$e"); then DEP_SPECS+=("$s"); else bad="$bad '$e'"; fi
+	done <<EOF
+$T_DEPS
+EOF
+	[ -z "$bad" ] || { R_REASON="every dependency needs a version, 'module/path v1.2.3' or 'module/path@v1.2.3':$bad"; return 1; }
+}
+
+# go_fetch ARGS: runs go in the worktree with the caller's network settings and without GOFLAGS=-mod=readonly.
+# GOTOOLCHAIN=local: a listed module can never make go download and switch to another toolchain, or raise go.mod's go line.
+# FETCH_PROXY, when set, replaces the caller's GOPROXY for that call.
+go_fetch() {
+	local v fenv=("${ENVB[@]}")
+	for v in $GO_FETCH_VARS; do [ -z "${!v+x}" ] || fenv+=("$v=${!v}"); done
+	fenv+=("GOTOOLCHAIN=local")
+	[ -z "${FETCH_PROXY:-}" ] || fenv+=("GOPROXY=$FETCH_PROXY")
+	(cd "$WT" && with_timeout "$SECS_GO" "${fenv[@]}" go "$@") >>"$TD/deps.log" 2>&1
+}
+
+# fetch_deps: the harness, not the model, adds the ticket's `dependencies` to go.mod and go.sum before the impl session. Nothing is committed.
+# tidy drops a module that nothing imports yet, so the second go get puts it back for the session to use.
+# Tidy runs offline, after go mod download has cached the modules already required: it can resolve what the listed modules bring and nothing else.
+# An import of a module that is not listed (and not already in go.mod) fails there instead of being looked up at latest.
+fetch_deps() {
+	[ -n "$T_DEPS" ] || return 0
+	parse_deps || return 1
+	in_list go.mod "$T_ALLOW" && in_list go.sum "$T_ALLOW" || { R_REASON="a ticket with dependencies must list go.mod and go.sum in allow, or verify rejects the change"; return 1; }
+	: >"$TD/deps.log"
+	log "fetch ${DEP_SPECS[*]}"
+	go_fetch get "${DEP_SPECS[@]}" && go_fetch mod download && FETCH_PROXY=off go_fetch mod tidy && go_fetch get "${DEP_SPECS[@]}" ||
+		{ R_REASON="go get or go mod tidy failed for ${DEP_SPECS[*]} (a module that is imported but not in the ticket's dependencies cannot be fetched); no model session was started; see .ticket/$ID/deps.log: $(tail -n 3 "$TD/deps.log" | tr '\n' ' ' | cut -c1-300)"; return 1; }
+}
+
 cmd_tests() {
 	require_state started plan_blocked
 	[ "$T_LEVEL" = core ] || die "only core tickets have a tests stage"
@@ -693,6 +758,7 @@ cmd_tests() {
 cmd_impl() {
 	require_state started tests_ready impl_blocked verify_failed
 	local attempt failure=""
+	fetch_deps || { set_result impl_blocked true "$R_REASON"; return; }
 	for attempt in 1 2; do
 		prompt_impl "$failure"
 		if ! claude_call impl "$IMPL_MODEL" medium "$BUDGET_IMPL" impl write; then
@@ -872,6 +938,7 @@ cmd_dry_run() {
 	local missing p base n
 	base=$(git -C "$ROOT" rev-parse --verify "$BASE_BRANCH^{commit}" 2>/dev/null) || die "base branch $BASE_BRANCH not found"
 	for p in $T_SPEC $T_READS; do [ -e "$ROOT/$p" ] || die "ticket lists '$p' but it does not exist"; done
+	parse_deps || die "$R_REASON"
 	n=$(printf '%s\n' "$T_TESTS" | grep -c . || true)
 	missing=$(preflight)
 	if [ -n "$missing" ]; then

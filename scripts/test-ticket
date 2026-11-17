@@ -7,7 +7,8 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 TICKET=$HERE/ticket
 SETTINGS=$HERE/../.claude/settings.json
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/ticket-test.XXXXXX") || exit 2
-trap 'rm -rf "$TMP"' EXIT
+# The Go module cache is read-only.
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP"' EXIT
 
 export TICKET_ROOT=$TMP/repo
 export TICKET_CI_CMD='go test ./...'
@@ -399,7 +400,7 @@ S=$(cat "$SETTINGS")
 for c in 'ls' 'ls *' 'cat *' 'rg *' 'grep *' 'find *' 'head *' 'wc *' 'go list *' 'git show *'; do
 	check "settings allow Bash($c)" "any(.permissions.allow[]; . == \"Bash($c)\")" "$S"
 done
-for c in 'find *-delete*' 'find *-exec*' 'find *-fprint*' 'rg *--pre*' 'go get *' 'git push *'; do
+for c in 'find *-delete*' 'find *-exec*' 'find *-fprint*' 'rg *--pre*' 'go get *' 'go install *' 'go run *' 'go * -mod *' 'git push *'; do
 	check "settings deny Bash($c)" "any(.permissions.deny[]; . == \"Bash($c)\")" "$S"
 done
 for c in '/.claude/**' '/scripts/ticket' '/Makefile' '/docs/adr/**' '**/*.proto' '**/*.pb.go' '/.golangci.yml'; do
@@ -467,6 +468,176 @@ done
 check "settings do not deny git add -n" 'any(.permissions.deny[]; test("^Bash\\(git add [^)]*-n")) | not' "$S"
 # An allowed commit starts with one of these prefixes, so -F, -t, -n, --amend and friends cannot lead the command.
 check "git commit allows start only with a safe flag then -m" '[.permissions.allow[] | select(startswith("Bash(git commit "))] | all(test("^Bash\\(git commit (-m|-q -m|-qm|--quiet -m|-a -m|-am|-s -m|-sm|--allow-empty -m) \\*\\)$"))' "$S"
+
+# 11b. go version and go env are read-only queries; go env cannot write configuration.
+for c in 'go version' 'go env' 'go env *'; do
+	check "settings allow Bash($c)" "any(.permissions.allow[]; . == \"Bash($c)\")" "$S"
+done
+for c in 'go version' 'go env' 'go env GOPATH' 'go env GOMODCACHE GOFLAGS' 'go env -json'; do
+	if allowed "$c" && ! denied "$c"; then
+		echo "PASS allowed and not denied: $c"
+	else
+		echo "FAIL expected allow without deny: $c"
+		fail=1
+	fi
+done
+for c in 'go env -w GOFLAGS=-mod=mod' 'go env -w GOPROXY=off' 'go env -u GOFLAGS' 'go env GOFLAGS -w' 'go env -json -w GOPATH=/x' 'go env --w GOPATH=/x' 'go get example.com/m@v1.0.0' 'go install example.com/m@v1.0.0' 'go run ./x'; do
+	if denied "$c"; then
+		echo "PASS denied: $c"
+	else
+		echo "FAIL expected a deny to match: $c"
+		fail=1
+	fi
+done
+for c in 'go version -m /bin/ls' 'go mod tidy'; do
+	if allowed "$c"; then
+		echo "FAIL expected no allow to match: $c"
+		fail=1
+	else
+		echo "PASS not allowed: $c"
+	fi
+done
+
+# 12. The harness fetches the ticket's dependencies before the impl session; the model never runs go get.
+# A local module proxy stands in for the network. Go settings reach the fetch only through GO_FETCH_VARS.
+mkproxy() { # module version [go version]: writes a one-package module into the file proxy
+	local m=$1 v=$2 g=${3:-1.21} d=$TMP/proxy/$1/@v
+	mkdir -p "$d"
+	printf '{"Version":"%s","Time":"2020-01-01T00:00:00Z"}' "$v" >"$d/$v.info"
+	printf 'module %s\n\ngo %s\n' "$m" "$g" >"$d/$v.mod"
+	printf '%s\n' "$v" >"$d/list"
+	python3 -I - "$m" "$v" "$d/$v.zip" "$g" <<'PY'
+import sys, zipfile
+m, v, out, g = sys.argv[1:]
+with zipfile.ZipFile(out, "w") as z:
+    z.writestr(f"{m}@{v}/go.mod", f"module {m}\n\ngo {g}\n")
+    z.writestr(f"{m}@{v}/dep.go", "package dep\n")
+PY
+}
+mkproxy example.com/dep v1.0.0
+mkproxy example.com/dep2 v1.2.3
+mkproxy example.com/evil v1.0.0
+mkproxy example.com/newgo v1.0.0 1.99
+export GOPROXY=file://$TMP/proxy GOSUMDB=off GOMODCACHE=$TMP/modcache
+# A harness that inherited -mod=readonly could not run go get; it must not pass this on.
+export GOFLAGS=-mod=readonly
+
+fake3() { # id, dependencies lines, allow lines
+	cat <<EOF
+---
+id: $1
+level: standard
+packages:
+  - pkg/calc
+allow:
+$3
+tests: []
+dependencies:
+$2
+---
+
+# Use a dependency
+EOF
+}
+GOALLOW='  - go.mod
+  - go.sum'
+export CLAUDE_BIN=$TMP/fake-claude CLAUDE_FAKE_PLAN=$TMP/plan.json CLAUDE_FAKE_OUT=$TMP/session-settings.json
+started() { # id, dependencies lines, allow lines: writes the ticket and starts it
+	fake3 "$1" "$2" "$3" >"$TICKET_ROOT/docs/tickets/$1.md"
+	"$TICKET" start "$1" >/dev/null
+}
+fetch_blocked='.state == "impl_blocked" and .needs_human == true'
+
+# A dependency with no version blocks impl; no model session starts.
+started FAKE-3 '  - example.com/dep' "$GOALLOW"
+rm -f "$CLAUDE_FAKE_OUT"
+out=$("$TICKET" impl FAKE-3)
+check "dependency without a version blocks impl" "$fetch_blocked and (.reason | contains(\"needs a version\")) and (.reason | contains(\"example.com/dep\"))" "$out"
+[ ! -e "$CLAUDE_FAKE_OUT" ] && echo "PASS no model session for an unversioned dependency" || { echo "FAIL a model session ran"; fail=1; }
+check "dry run rejects an unversioned dependency" '.state == "error" and (.reason | contains("needs a version"))' "$("$TICKET" run FAKE-3 --dry-run)"
+for e in 'example.com/dep latest' 'example.com/dep@latest' 'example.com/dep 1.0.0' '-u v1.0.0' 'example.com/dep v1.0.0 v1.0.1' 'example.com/dep v1' 'example.com/dep@v1.2' 'example.com/dep v2dev' 'example.com/... v1.0.0'; do
+	fake3 FAKE-3 "  - $e" "$GOALLOW" >"$TICKET_ROOT/.ticket/FAKE-3/ticket.md"
+	check "dependency '$e' blocks impl" "$fetch_blocked and (.reason | contains(\"needs a version\"))" "$("$TICKET" impl FAKE-3)"
+done
+
+# go.mod and go.sum must be in allow, or verify would reject the fetched change.
+fake3 FAKE-3 '  - example.com/dep v1.0.0' '  - pkg/calc' >"$TICKET_ROOT/.ticket/FAKE-3/ticket.md"
+check "dependencies without go.mod and go.sum in allow block impl" "$fetch_blocked and (.reason | contains(\"go.mod and go.sum\"))" "$("$TICKET" impl FAKE-3)"
+
+# A module the proxy does not have fails go get; no model session starts.
+fake3 FAKE-3 '  - example.com/missing v1.0.0' "$GOALLOW" >"$TICKET_ROOT/.ticket/FAKE-3/ticket.md"
+rm -f "$CLAUDE_FAKE_OUT"
+out=$("$TICKET" impl FAKE-3)
+check "a failing go get blocks impl" "$fetch_blocked and (.reason | contains(\"go get or go mod tidy failed\")) and (.reason | contains(\"deps.log\"))" "$out"
+[ ! -e "$CLAUDE_FAKE_OUT" ] && echo "PASS no model session after a failed go get" || { echo "FAIL a model session ran"; fail=1; }
+
+# Both version spellings are fetched, in the worktree, uncommitted, before the model session. example.com/adr-named is named by an ADR only: not fetched.
+fake3 FAKE-3 '  - example.com/dep v1.0.0
+  - example.com/dep2@v1.2.3' "$GOALLOW" >"$TICKET_ROOT/.ticket/FAKE-3/ticket.md"
+WT3=$TMP/repo.worktrees/FAKE-3
+HEAD3=$(git -C "$WT3" rev-parse HEAD)
+rm -f "$CLAUDE_FAKE_OUT"
+out=$("$TICKET" impl FAKE-3)
+check "impl retried from impl_blocked fetches, then starts the session" '.state == "impl_blocked" and (.reason | contains("fake stop"))' "$out"
+[ -e "$CLAUDE_FAKE_OUT" ] && echo "PASS the model session started after the fetch" || { echo "FAIL no model session"; fail=1; }
+M=$(cat "$WT3/go.mod")
+check "go.mod requires the 'module version' dependency" 'contains("example.com/dep v1.0.0")' "$(jq -Rs . <<<"$M")"
+check "go.mod requires the 'module@version' dependency" 'contains("example.com/dep2 v1.2.3")' "$(jq -Rs . <<<"$M")"
+check "go.mod has no ADR-only dependency" 'contains("adr-named") | not' "$(jq -Rs . <<<"$M")"
+check "go.sum has the fetched modules" 'contains("example.com/dep v1.0.0 h1:") and contains("example.com/dep2 v1.2.3 h1:")' "$(jq -Rs . <"$WT3/go.sum")"
+[ "$(git -C "$WT3" rev-parse HEAD)" = "$HEAD3" ] && echo "PASS the harness commits nothing" || { echo "FAIL the harness committed"; fail=1; }
+check "go.mod and go.sum are left modified for the session" '(map(select(.[3:] == "go.mod" or .[3:] == "go.sum")) | length) == 2' "$(git -C "$WT3" status --porcelain | jq -R . | jq -s .)"
+# Running it again with the modules already present changes nothing.
+S1=$(shasum -a 256 "$WT3/go.mod" "$WT3/go.sum")
+check "a second impl fetch succeeds" '.state == "impl_blocked" and (.reason | contains("fake stop"))' "$("$TICKET" impl FAKE-3)"
+[ "$(shasum -a 256 "$WT3/go.mod" "$WT3/go.sum")" = "$S1" ] && echo "PASS the second fetch is a no-op" || { echo "FAIL the second fetch changed go.mod or go.sum"; fail=1; }
+
+# Only the ticket's own dependencies are fetched: code that imports an unlisted module does not get it looked up and added.
+started FAKE-5 '  - example.com/dep v1.0.0' "$GOALLOW"
+WT5=$TMP/repo.worktrees/FAKE-5
+printf 'package calc\n\nimport _ "example.com/evil"\n' >"$WT5/pkg/calc/evil.go"
+git -C "$WT5" add pkg/calc/evil.go && git -C "$WT5" -c user.name=t -c user.email=t@t commit -q -m "import an unlisted module"
+jq '.state = "verify_failed"' "$TICKET_ROOT/.ticket/FAKE-5/state.json" >"$TMP/state.json" && cp "$TMP/state.json" "$TICKET_ROOT/.ticket/FAKE-5/state.json"
+rm -f "$CLAUDE_FAKE_OUT"
+out=$("$TICKET" impl FAKE-5)
+check "an import of an unlisted module blocks impl, naming it" "$fetch_blocked and (.reason | contains(\"example.com/evil\"))" "$out"
+[ ! -e "$CLAUDE_FAKE_OUT" ] && echo "PASS no model session after an unlisted import" || { echo "FAIL a model session ran"; fail=1; }
+grep -q 'example.com/evil' "$WT5/go.mod" "$WT5/go.sum" && { echo "FAIL the unlisted module was added to go.mod or go.sum"; fail=1; } || echo "PASS the unlisted module is not in go.mod or go.sum"
+
+# A listed module that needs a newer go than the worktree's is not allowed to raise go.mod's go line or switch toolchains.
+started FAKE-6 '  - example.com/newgo v1.0.0' "$GOALLOW"
+WT6=$TMP/repo.worktrees/FAKE-6
+G6=$(grep -E '^(go|toolchain) ' "$WT6/go.mod")
+rm -f "$CLAUDE_FAKE_OUT"
+out=$("$TICKET" impl FAKE-6)
+check "a dependency needing a newer go blocks impl" "$fetch_blocked and (.reason | contains(\"go get or go mod tidy failed\"))" "$out"
+[ "$(grep -E '^(go|toolchain) ' "$WT6/go.mod")" = "$G6" ] && echo "PASS the go and toolchain lines are unchanged" || { echo "FAIL go.mod's go or toolchain line changed"; fail=1; }
+[ ! -e "$CLAUDE_FAKE_OUT" ] && echo "PASS no model session for a dependency needing a newer go" || { echo "FAIL a model session ran"; fail=1; }
+
+# A ticket with no dependencies fetches nothing.
+started FAKE-4 '' "$GOALLOW"
+sed -i.bak '/^dependencies:/d' "$TICKET_ROOT/.ticket/FAKE-4/ticket.md" && rm -f "$TICKET_ROOT/.ticket/FAKE-4/ticket.md.bak"
+"$TICKET" impl FAKE-4 >/dev/null
+[ ! -e "$TICKET_ROOT/.ticket/FAKE-4/deps.log" ] && git -C "$TMP/repo.worktrees/FAKE-4" diff --quiet && echo "PASS no dependencies, no fetch" || { echo "FAIL a fetch ran without dependencies"; fail=1; }
+
+# The prompts tell the model not to run go get, and to use one command per Bash call.
+P=$TICKET_ROOT/.ticket/FAKE-3/impl.prompt.md
+for f in "$P" "$TICKET_ROOT/.ticket/FAKE-2/tests.prompt.md"; do
+	for s in 'Run exactly one command per Bash call' "Never chain commands with ';', '|' or '&&'" 'retry with a simpler allowed single command' 'one denial does not mean Bash is unavailable' 'only after several distinct allowed commands have failed'; do
+		grep -qF -- "$s" "$f" && echo "PASS $(basename "$f") says: $s" || { echo "FAIL $(basename "$f") lacks: $s"; fail=1; }
+	done
+done
+grep -qF 'The harness already ran go get and go mod tidy' "$P" && grep -qF 'cannot run go get' "$P" && echo "PASS impl prompt: the harness fetches, the model does not run go get" || { echo "FAIL impl prompt about go get"; fail=1; }
+grep -qF 'adding a dependency' "$P" && { echo "FAIL impl prompt still tells the model to add dependencies"; fail=1; } || echo "PASS impl prompt does not tell the model to add dependencies"
+grep -qF 'a new dependency: stop and report blocked' "$P" && echo "PASS impl prompt: an unexpected dependency still blocks" || { echo "FAIL impl prompt: unexpected dependency rule"; fail=1; }
+# The fix prompt: one finding, in a review that sits in review.json.
+jq '.state = "review_findings"' "$TICKET_ROOT/.ticket/FAKE-3/state.json" >"$TMP/state.json" && cp "$TMP/state.json" "$TICKET_ROOT/.ticket/FAKE-3/state.json"
+printf '{"verdict":"fail","checked":[],"findings":[{"severity":"major","category":"x","file":"f.go","line":1,"what_breaks":"b","failing_scenario":"s","suggested_test":"t"}]}' >"$TICKET_ROOT/.ticket/FAKE-3/review.json"
+"$TICKET" fix FAKE-3 >/dev/null
+for s in 'Run exactly one command per Bash call' "Never chain commands with ';', '|' or '&&'" 'retry with a simpler allowed single command' 'only after several distinct allowed commands have failed'; do
+	grep -qF -- "$s" "$TICKET_ROOT/.ticket/FAKE-3/fix.prompt.md" && echo "PASS fix prompt says: $s" || { echo "FAIL fix prompt lacks: $s"; fail=1; }
+done
+unset CLAUDE_BIN CLAUDE_FAKE_PLAN CLAUDE_FAKE_OUT GOPROXY GOSUMDB GOMODCACHE GOFLAGS
 
 # 7. Dry run needs no Claude and prints one line.
 out=$("$TICKET" run FAKE-1 --dry-run)

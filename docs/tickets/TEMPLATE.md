@@ -42,6 +42,6 @@ Frontmatter fields:
   tests     Acceptance tests, one per line as "./package/path TestName". Each must pass and not be skipped.
   spec      The spec file this ticket implements. It may be edited; no other doc may.
   reads     Extra files the agent must read first.
-  allow     Paths exempt from the protected-path, go.mod and package gates, and editable in the ticket's session despite the settings deny list. Empty by default. Name go.mod to add a dependency. .claude/ and scripts/ticket stay denied.
-  dependencies  Modules the ticket adds ("module/path v1.2.3"). Anything else the plan adds must be named by an accepted ADR, or the plan blocks.
+  allow     Paths exempt from the protected-path, go.mod and package gates, and editable in the ticket's session despite the settings deny list. Empty by default. A ticket with dependencies must name go.mod and go.sum. .claude/ and scripts/ticket stay denied.
+  dependencies  Modules the ticket adds, each with a version: "module/path v1.2.3" or "module/path@v1.2.3". Before the impl session the harness runs go get and go mod tidy for exactly these entries, in the worktree; the model never runs go get. An entry with no version blocks impl. Anything else the plan adds must be named by an accepted ADR, or the plan blocks.
 -->
