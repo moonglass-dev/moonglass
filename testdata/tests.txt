@@ -1,6 +1,14 @@
+moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollFailures
+moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollPrintsFingerprint
 moonglass.dev/moonglass/cmd/moonglass TestUsageOnMissingOrUnknownCommand
 moonglass.dev/moonglass/cmd/moonglass TestVersionPrintsVersionCommitAndDate
 moonglass.dev/moonglass/cmd/moonglass TestVersionReportsFailedWrite
+moonglass.dev/moonglass/internal/agent TestEnrollAcceptsAndPins
+moonglass.dev/moonglass/internal/agent TestEnrollDoesNotConsumeTokenOnMalformedKeys
+moonglass.dev/moonglass/internal/agent TestEnrollReplayFails
+moonglass.dev/moonglass/internal/agent TestEnrollUnwritableDataDirDoesNotConsumeToken
+moonglass.dev/moonglass/internal/keys TestFingerprintIsSHA256OfSigningKey
+moonglass.dev/moonglass/internal/keys TestGenerateAgentIdentity
 moonglass.dev/moonglass/internal/policy FuzzParse
 moonglass.dev/moonglass/internal/policy TestAllowBlockMatchesEveryNamedKey
 moonglass.dev/moonglass/internal/policy TestAllowEveryKeyAllowsItsField
@@ -50,6 +58,8 @@ moonglass.dev/moonglass/internal/protocol TestEnvelopeRoundTripEveryType
 moonglass.dev/moonglass/internal/protocol TestErrorCodes
 moonglass.dev/moonglass/internal/protocol TestHeartbeatRoundTrip
 moonglass.dev/moonglass/internal/protocol TestWrapRejectsTypeMismatch
+moonglass.dev/moonglass/internal/server TestEnrollRejectsInvalidToken
+moonglass.dev/moonglass/internal/server TestEnrollRejectsReplay
 moonglass.dev/moonglass/internal/store TestAppRoleCannotBypassRLS
 moonglass.dev/moonglass/internal/store TestConformancePostgres
 moonglass.dev/moonglass/internal/store TestConformanceSQLite
