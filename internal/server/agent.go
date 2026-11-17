@@ -54,9 +54,25 @@ func (s *Server) authorizeAgent(pub ed25519.PublicKey) error {
 // Heartbeat is answered with a HeartbeatAck carrying the same request id, and
 // anything else closes the connection.
 func (s *Server) AgentHandler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc(agentPath, s.handleAgent)
+	mux, _ := s.mountAgent()
 	return mux
+}
+
+// AgentRoutes lists the "METHOD path" patterns AgentHandler mounts.
+func (s *Server) AgentRoutes() []string {
+	_, routes := s.mountAgent()
+	return routes
+}
+
+func (s *Server) mountAgent() (*http.ServeMux, []string) {
+	mux := http.NewServeMux()
+	var routes []string
+	add := func(pattern string, h http.HandlerFunc) {
+		mux.HandleFunc(pattern, h)
+		routes = append(routes, pattern)
+	}
+	add("GET "+agentPath, s.handleAgent)
+	return mux, routes
 }
 
 func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {

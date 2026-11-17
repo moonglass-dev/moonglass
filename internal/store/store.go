@@ -62,6 +62,42 @@ type TokenInfo struct {
 	Used      bool
 }
 
+// Scope is one token scope row; "*" matches anything (ADR-0006 decision 3).
+type Scope struct {
+	Project     string
+	Environment string
+	Operation   string
+}
+
+// Token is an API token without its secret: the secret is stored only as a
+// hash. Revoked is read from the lookup row.
+type Token struct {
+	ID        string
+	OrgID     string
+	UserID    string
+	Name      string
+	Last4     string
+	ExpiresAt string
+	Scopes    []Scope
+	Revoked   bool
+}
+
+// AuditEvent is one hash-chained audit row. PrevHash is empty for Seq 1.
+type AuditEvent struct {
+	OrgID         string
+	ID            string
+	At            string
+	PrincipalKind string
+	UserID        string
+	TokenID       string
+	Operation     string
+	Outcome       string
+	Reason        string
+	PrevHash      string
+	Hash          string
+	Seq           int64
+}
+
 // Store is the storage interface both backends implement.
 type Store interface {
 	Close() error
@@ -82,6 +118,16 @@ type Store interface {
 	// ErrNotFound, ErrTokenUsed or ErrTokenExpired when the token cannot be used.
 	UseEnrolmentToken(ctx context.Context, tokenHash string, now time.Time) (orgID string, err error)
 	EnrolmentTokens(ctx context.Context, orgID string) ([]TokenInfo, error)
+	// AddToken stores t, its scope rows and tokenHash (see HashToken).
+	AddToken(ctx context.Context, orgID string, t Token, tokenHash string) error
+	// TokenByHash finds a token by the hash of its text and returns it with
+	// its holder's role. It returns ErrNotFound when no token or membership matches.
+	TokenByHash(ctx context.Context, tokenHash string) (Token, Role, error)
+	// AppendAudit adds the event that seal builds for the next sequence number
+	// and the previous hash, in one transaction so the chain stays serial.
+	AppendAudit(ctx context.Context, orgID string, seal func(prevHash string, seq int64) AuditEvent) error
+	// AuditEvents returns the org's events in sequence order.
+	AuditEvents(ctx context.Context, orgID string) ([]AuditEvent, error)
 }
 
 // HashToken returns the hex SHA-256 of a bearer token. Only this value is stored.

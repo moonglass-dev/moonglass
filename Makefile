@@ -44,7 +44,7 @@ LIST_TESTS := set -o pipefail; go test -list . ./... | awk '\
 	/^(Test|Fuzz|Example)/ { names[n++] = $$1; next } \
 	$$1 == "ok" { for (i = 0; i < n; i++) print $$2, names[i]; n = 0 }' | LC_ALL=C sort
 
-.PHONY: build build-all fmt fmt-check lint test test-one test-integration test-harness race memory-budget test-list check-test-list proto proto-tools proto-check ci
+.PHONY: build build-all fmt fmt-check lint test test-one test-integration test-harness race memory-budget test-list check-test-list generate proto proto-tools proto-check ci
 .NOTPARALLEL:
 
 build:
@@ -94,6 +94,11 @@ test-list:
 check-test-list:
 	@$(LIST_TESTS) | diff -u testdata/tests.txt - || { echo 'testdata/tests.txt is out of date: run "make test-list" and commit the result' >&2; exit 1; }
 
+# Rewrites internal/api/openapi.json and internal/cli/generated.go from the registry.
+# make test (and so make ci) fails when either file is stale.
+generate:
+	go test -count=1 ./internal/api -run '^TestGeneratedOpenAPIIsCurrent$$' -update
+	go test -count=1 ./internal/cli -run '^TestGeneratedCLIIsCurrent$$' -update
 
 proto-tools: $(PROTOC) $(PROTOC_GEN_GO)
 

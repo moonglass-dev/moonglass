@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"moonglass.dev/moonglass/internal/agent"
+	"moonglass.dev/moonglass/internal/cli"
 	"moonglass.dev/moonglass/internal/server"
 )
 
@@ -22,36 +23,30 @@ var (
 	date    = "unknown"
 )
 
-const usage = `Usage: moonglass <command>
-
-Commands:
-  version                                                  Print the version, commit and build date
-  server [--data-dir DIR] [--listen ADDR] [--agent-listen ADDR] [--print-enroll-token]
-                                                           Run the control plane
-  agent enroll [--data-dir DIR] --url URL TOKEN            Enrol this machine and print its fingerprint
-  agent connect [--data-dir DIR] --url URL                 Connect to the control plane over WSS and send heartbeats
-  proxy --data-dir DIR                                     Run the proxy (Caddy) with its admin API on a Unix socket in DIR
-`
+// usage lists the generated and the local subcommands.
+var usage = cli.Usage()
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
+// run dispatches through cli.Run: operations are generated from the registry,
+// and these are the local-only commands named in registry.LocalCommands.
 func run(args []string, stdout, stderr io.Writer) int {
-	switch {
-	case len(args) == 1 && args[0] == "version":
-		return runVersion(stdout, stderr)
-	case len(args) >= 1 && args[0] == "server":
-		return runServer(args[1:], stdout, stderr)
-	case len(args) >= 2 && args[0] == "agent" && args[1] == "enroll":
-		return runAgentEnroll(args[2:], stdout, stderr)
-	case len(args) >= 2 && args[0] == "agent" && args[1] == "connect":
-		return runAgentConnect(args[2:], stderr)
-	case len(args) >= 1 && args[0] == "proxy":
-		return runProxy(args[1:], stderr)
+	local := map[string]func([]string) int{
+		"version": func(rest []string) int {
+			if len(rest) != 0 {
+				_, _ = io.WriteString(stderr, usage)
+				return 2
+			}
+			return runVersion(stdout, stderr)
+		},
+		"server":        func(rest []string) int { return runServer(rest, stdout, stderr) },
+		"agent enroll":  func(rest []string) int { return runAgentEnroll(rest, stdout, stderr) },
+		"agent connect": func(rest []string) int { return runAgentConnect(rest, stderr) },
+		"proxy":         func(rest []string) int { return runProxy(rest, stderr) },
 	}
-	_, _ = io.WriteString(stderr, usage)
-	return 2
+	return cli.Run(args, os.Getenv, stdout, stderr, local)
 }
 
 func runVersion(stdout, stderr io.Writer) int {

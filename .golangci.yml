@@ -31,6 +31,7 @@ linters:
             - modernc.org/sqlite
             - github.com/caddyserver/caddy/v2
             - github.com/coder/websocket
+            - github.com/danielgtaylor/huma/v2
         proxy-deps:
           # Caddy is imported only by internal/proxy. cmd/ calls proxy.Run.
           list-mode: lax
@@ -56,6 +57,16 @@ linters:
           deny:
             - pkg: github.com/coder/websocket
               desc: only internal/agent and internal/server may import coder/websocket
+        huma-deps:
+          # Huma is imported only by internal/api (ADR-0013). Every file
+          # outside internal/api is covered, so new packages are too.
+          list-mode: lax
+          files:
+            - "$all"
+            - "!**/internal/api/**"
+          deny:
+            - pkg: github.com/danielgtaylor/huma/v2
+              desc: only internal/api may import Huma
         policy-deps:
           # Restrict these modules outside internal/policy. depguard file
           # exclusions of internal/policy itself were not applied, so this
@@ -132,6 +143,9 @@ formatters:
     paths:
       - internal/policy/compose_test.go
       - internal/agent/connect_test.go
+      # Locked W2-1 tests that gofumpt would reformat.
+      - internal/cli/cli_test.go
+      - internal/store/tokens_audit_test.go
   settings:
     goimports:
       local-prefixes:

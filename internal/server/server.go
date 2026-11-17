@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"moonglass.dev/moonglass/internal/api"
+	"moonglass.dev/moonglass/internal/registry"
 	"moonglass.dev/moonglass/internal/store"
 	"moonglass.dev/moonglass/internal/store/sqlite"
 )
@@ -33,6 +35,7 @@ var tokenEncoding = base32.StdEncoding.WithPadding(base32.NoPadding)
 // Server is the control plane: a store and the control-plane Ed25519 identity.
 type Server struct {
 	st  store.Store
+	reg *registry.Registry
 	now func() time.Time
 	key ed25519.PrivateKey
 }
@@ -44,7 +47,7 @@ func New(st store.Store, dataDir string, now func() time.Time) (*Server, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Server{st: st, key: key, now: now}, nil
+	return &Server{st: st, reg: registry.New(st, now), key: key, now: now}, nil
 }
 
 func loadOrCreateKey(dataDir string) (ed25519.PrivateKey, error) {
@@ -80,11 +83,39 @@ func loadOrCreateKey(dataDir string) (ed25519.PrivateKey, error) {
 	return priv, nil
 }
 
-// Handler serves the HTTP API.
-func (s *Server) Handler() http.Handler {
+// mount builds the mux and the "METHOD path" patterns on it: the enrolment
+// route and every registry operation, each mounted through one helper.
+func (s *Server) mount() (*http.ServeMux, []string) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/enroll", s.handleEnroll)
+	var routes []string
+	add := func(pattern string, h http.Handler) {
+		mux.Handle(pattern, h)
+		routes = append(routes, pattern)
+	}
+	add("POST /v1/enroll", http.HandlerFunc(s.handleEnroll))
+	apiHandler := api.New(s.reg)
+	for _, spec := range registry.Operations() {
+		add(spec.Method+" "+spec.Path, apiHandler)
+	}
+	return mux, routes
+}
+
+// Routes lists the "METHOD path" patterns Handler mounts.
+func (s *Server) Routes() []string {
+	_, routes := s.mount()
+	return routes
+}
+
+// Handler serves the HTTP API: enrolment and the registry operations.
+func (s *Server) Handler() http.Handler {
+	mux, _ := s.mount()
 	return mux
+}
+
+// MintOwnerToken creates an owner token (scope "* * *") for userID and returns
+// its text, which is shown only now.
+func (s *Server) MintOwnerToken(ctx context.Context, orgID, userID, name string, expires time.Time) (string, error) {
+	return registry.MintToken(ctx, s.st, orgID, userID, name, []registry.Scope{{Project: "*", Environment: "*", Operation: "*"}}, expires, s.now())
 }
 
 // IssueEnrolToken creates a one-hour, one-use enrolment token for orgID and

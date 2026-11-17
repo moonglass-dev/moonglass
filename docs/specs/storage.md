@@ -25,12 +25,17 @@ Every table has `org_id`, except the lookup tables listed in one file in `intern
 - `user_orgs` — lookup key is `user_id`. Maps to `org_id`. One row per org the user belongs to. This is how a request finds the caller's orgs before `app.org_id` is set.
 - `agent_keys` — lookup key is the agent's public key. Maps to `server_id` and `org_id`.
 - `enrolment_token_hashes` — lookup key is `SHA-256` of the bearer token. Maps to `org_id`, expiry, and a used/revoked marker. The plaintext token is never stored. Format of the bearer value is ADR-0005 (256 bits, `mg_` plus 52 lowercase unpadded base32); this ticket stores and looks up the hash only.
+- `token_hashes` — lookup key is `SHA-256` of an API token (`docs/specs/registry.md`). Maps to `org_id` and `token_id`, with a revoked marker. It has no RLS because the org is not known when it is read.
+
 
 ### Row-level tables
 
 - `orgs` — `org_id` equals the org's `id`. Created with a row for itself.
 - `memberships` — `org_id`, `user_id`, `role`, uniqueness on `(org_id, user_id)`. `role` is one of `owner`, `admin`, `member`, `viewer` (ADR-0006). There is no separate `roles` table: the allowed values are the role list, enforced by a constraint on both backends.
 - `servers` — `org_id`, `id` (the `server_id`), `created_at`. The public key lives only in `agent_keys`.
+- `tokens` — `org_id`, `id`, `user_id` (the human owner), `name`, `last4`, `expires_at`, `created_at`. Never the secret; the `mg_` prefix is constant and not stored.
+- `token_scopes` — `org_id`, `token_id`, `project`, `environment`, `operation`; `*` is the wildcard. An owner token has exactly one row, `* * *`.
+- `audit_events` — `org_id`, `seq` (from 1, primary key with `org_id`), `id`, `at`, `principal_kind` (`human` or `agent`), `user_id`, `token_id`, `operation`, `outcome` (`allowed`, `denied` or `error`), `reason`, `prev_hash`, `hash`. `prev_hash` is empty for `seq` 1. The registry is the only writer, through `AppendAudit`, which reads the chain head and inserts in one transaction and retries when another writer takes the same `seq`.
 
 A person is a stable `user_id` minted when their first `user_identities` row is written. There is no `users` table with names or other profile fields: those would need `org_id` and RLS (a person can belong to several orgs) and are not needed to enrol or store memberships. `user_identities` plus `user_orgs` plus `memberships` are the user tables for this ticket.
 

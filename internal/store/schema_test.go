@@ -22,7 +22,7 @@ func TestSchemasMatch(t *testing.T) {
 }
 
 func TestLookupTablesMatchSchema(t *testing.T) {
-	want := []string{"agent_keys", "enrolment_token_hashes", "user_identities", "user_orgs"}
+	want := []string{"agent_keys", "enrolment_token_hashes", "token_hashes", "user_identities", "user_orgs"}
 	if !sameStrings(store.LookupTables, want) {
 		t.Errorf("store.LookupTables = %v, want %v", store.LookupTables, want)
 	}
@@ -42,6 +42,33 @@ func TestLookupTablesMatchSchema(t *testing.T) {
 	}
 	denyExact := map[string]bool{"name": true, "secret": true, "wrapped_key": true, "token": true, "plaintext": true, "scope": true, "scopes": true}
 	denySub := []string{"secret", "wrapped", "plaintext", "scope"}
+
+	t.Run("postgres rls", func(t *testing.T) {
+		rows, err := env.rawDB(t, env.superDSN).Query(`SELECT c.relname, c.relrowsecurity
+			FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname <> 'schema_migrations'`)
+		if err != nil {
+			t.Fatalf("query pg_class: %v", err)
+		}
+		defer rows.Close()
+		var bad []string
+		for rows.Next() {
+			var name string
+			var rls bool
+			if err := rows.Scan(&name, &rls); err != nil {
+				t.Fatalf("scan: %v", err)
+			}
+			if !rls && !lookup[name] {
+				bad = append(bad, name)
+			}
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatalf("rows: %v", err)
+		}
+		if len(bad) > 0 {
+			t.Errorf("tables with neither row-level security nor a store.LookupTables entry: %v, want none", bad)
+		}
+	})
 
 	for _, b := range backends {
 		t.Run(b.name, func(t *testing.T) {
