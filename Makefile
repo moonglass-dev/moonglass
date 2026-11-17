@@ -44,7 +44,7 @@ LIST_TESTS := set -o pipefail; go test -list . ./... | awk '\
 	/^(Test|Fuzz|Example)/ { names[n++] = $$1; next } \
 	$$1 == "ok" { for (i = 0; i < n; i++) print $$2, names[i]; n = 0 }' | LC_ALL=C sort
 
-.PHONY: build build-all fmt fmt-check lint test test-one test-integration test-harness race test-list check-test-list proto proto-tools proto-check ci
+.PHONY: build build-all fmt fmt-check lint test test-one test-integration test-harness race memory-budget test-list check-test-list proto proto-tools proto-check ci
 .NOTPARALLEL:
 
 build:
@@ -83,6 +83,10 @@ test-integration:
 # -race needs cgo; the binaries built by build and build-all stay static.
 race:
 	CGO_ENABLED=1 go test -count=1 -shuffle=on -race ./...
+
+# Fails when idle agent + proxy RSS is above the 100 MiB ceiling (docs/specs/memory.md).
+memory-budget:
+	go test -count=1 -run '^TestProxyAndAgentIdleUnderBudget$$' ./internal/proxy
 
 test-list:
 	$(LIST_TESTS) > testdata/tests.txt
@@ -123,7 +127,7 @@ proto-check: proto
 
 # Runs each step quietly. A failing step prints its failed test names and its last 60 lines.
 ci:
-	@for step in fmt-check lint proto-check test race check-test-list build-all; do \
+	@for step in fmt-check lint proto-check test race memory-budget check-test-list build-all; do \
 		out=$$(mktemp); \
 		if $(MAKE) --no-print-directory $$step >"$$out" 2>&1; then \
 			echo "ok   $$step"; rm -f "$$out"; \

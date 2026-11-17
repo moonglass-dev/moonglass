@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Report resident memory (RSS) for a process. Used later by W1-7 to enforce
-# the agent+proxy budget. No cloud token is required or read.
+# Report resident memory (RSS) for a process. Used by the agent+proxy budget
+# test (docs/specs/memory.md). No cloud token is required or read.
 set -u -o pipefail
 
 usage() {

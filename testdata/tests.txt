@@ -80,6 +80,7 @@ moonglass.dev/moonglass/internal/proxy TestAdminSocketRefusesOtherMutations
 moonglass.dev/moonglass/internal/proxy TestCounterRecordsRequest
 moonglass.dev/moonglass/internal/proxy TestNoTCPAdminPort
 moonglass.dev/moonglass/internal/proxy TestOneHTTPSRouteInternalIssuer
+moonglass.dev/moonglass/internal/proxy TestProxyAndAgentIdleUnderBudget
 moonglass.dev/moonglass/internal/proxy TestPushedConfigCannotOpenTCPAdmin
 moonglass.dev/moonglass/internal/release TestDeployThenSwitchMakesNewCurrent
 moonglass.dev/moonglass/internal/release TestIllegalTransitionDoesNotChangeState
