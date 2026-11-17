@@ -41,6 +41,23 @@ The major finding (a pushed config could move the admin API to TCP or the certif
 
 - **`ssh-keygen -Y verify` does not enforce the FIDO2 user-presence and user-verification flags** that the threat model and `docs/specs/install.md` require of the release signature. A signature made without PIN verification can still install. Deferred after W1-6 review; the install script has no flags check.
 
+### W2-2 (Opus review minors, not fixed in the one product-bug round)
+
+Review verdict was approve (#21). These remain:
+
+- **`FuzzEnvelopeDecode` never calls `Open`.** The ticket said new payloads go through the existing envelope fuzz, but that fuzz only runs `Unmarshal`/`Marshal`. The new validators (`validateDeploy`, `validateImage`, `validateArgs`, and the other three command validators) are not fuzzed. Add `Open` of each new type after a successful `Unmarshal`, with seeds for valid `DEPLOY` and `RUN_PRE_DEPLOY` envelopes, and assert it never panics.
+- **Image validation only rejects Unicode category Cc, not format characters (Cf).** `U+200B` (zero-width space), `U+202E` (right-to-left override), bidi isolates and `U+FEFF` still pass, so a reference can look harmless in logs or the UI and differ in its real bytes. Reject any byte below 0x21 or above 0x7E.
+- **The "release id is unique within an app" invariant is overstated.** The machine only rejects ids equal to the current current or previous release. After a rollback (which drops the rolled-back-from release) or a failed pre-deploy (which drops the candidate), the same id can be deployed again with a different image. Soften the spec, or reject reuse, before W2-4/W2-6 rely on uniqueness.
+
+### W1-4 (Opus review minors, not fixed in the one product-bug round)
+
+The blocker (dial had no timeout) and the two majors (redirects could leave TLS and the pin; a dropped connection was noticed only at the next heartbeat, and a locked subtest waited the real 30s interval) were fixed in #22. These remain:
+
+- **`agentURL` overwrites the URL path with `/v1/agent` instead of joining it.** `moonglass agent connect --url https://cp.example.com/moonglass` would dial `/v1/agent` and miss a path-prefixed reverse proxy.
+- **`.golangci.yml` exclusions in the tests are broader than they need to be.** An errcheck text match turns the linter off for every unchecked error in `connect_test.go` and `agent_test.go`, and `connect_test.go` is excluded from gofumpt/goimports entirely.
+- **"The agent does not open an inbound listen port" is a string search in `connect.go` only.** `net.ListenTCP` (or a listener in another file in the package) would not fail the test.
+
+
 ## Owner decisions (do not close in a ticket)
 
 - **W1-1 open questions 6 and 7** (`pid`/`ipc` `container:` cross-project; `service:` inheriting host networking). Left as-is; owner is deciding.
