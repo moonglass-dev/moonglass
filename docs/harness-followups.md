@@ -19,8 +19,13 @@ Nits and residual holes to fix later. Do not block product tickets on these. The
 - **Single-command / retry guidance is prompt-only.** The harness does not enforce one command per Bash call.
 - **Indirect requires until code exists.** A listed module that nothing imports yet stays `// indirect` after the pre-impl fetch; the model cannot run `go mod tidy`.
 
+- **The tests stage does not lint.** W1-3's locked tests had two `errcheck` findings (`defer res.Body.Close()`), so the impl stage could not pass `make ci` without editing locked files. The owner fixed them and re-locked. `gate_red` could run `make lint` on the test files before locking.
+- **The fix round cannot add a regression test to a locked file.** W1-3's fix appended a test to a locked `_test.go` and tripped tests-immutable. Additive changes to locked files in the fix stage could be allowed (no removed lines, named tests unchanged).
+- **`fetch_deps` misses zip hashes for modules a new dependency bumps.** W1-5: Caddy raised `go-viper/mapstructure/v2` and `santhosh-tekuri/jsonschema/v6`, which `internal/policy` already imports; only their `/go.mod` hashes were recorded, so `go vet ./...` failed. The owner ran `go mod download` for them. Fetch could run `go list -deps ./...` over the whole module, not only the stub.
+
 ## Closed in recent tickets
 
+- The words gate no longer scans `go.mod` and `go.sum`; module paths such as `golang.org/x/crypto/x509roots/fallback` (a Caddy requirement) are not our words.
 - Letter-suffix ticket IDs (W0-6).
 - Per-session allow-list override of protected-path Edit denies; `.claude/` and `scripts/ticket` stay guarded (W0-6).
 - `plan_blocked` on `new_dependencies` already in the ticket or an accepted ADR; real ADR status lines (`- **Status:** Accepted`) (W0-6, W0-7).

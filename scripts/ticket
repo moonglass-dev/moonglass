@@ -462,7 +462,7 @@ gate_words() {
 	local hits
 	hits=$(git -C "$WT" diff "${GD[@]}" --no-renames -U0 --no-color "$BASE" HEAD | awk '
 		/^\+\+\+ / { file = substr($2, 3); next }
-		/^\+/ && file !~ /\.md$/ && tolower($0) ~ /(^|[^a-z])(todo|fixme|fallback|legacy)([^a-z]|$)/ { print file ": " substr($0, 2) }')
+		/^\+/ && file !~ /\.md$/ && file != "go.mod" && file != "go.sum" && tolower($0) ~ /(^|[^a-z])(todo|fixme|fallback|legacy)([^a-z]|$)/ { print file ": " substr($0, 2) }')
 	[ -z "$hits" ] || { printf 'TODO, FIXME, fallback and legacy are not allowed in added lines:\n%s\n' "$hits" | gate_fail words; return 1; }
 }
 

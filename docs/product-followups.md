@@ -18,6 +18,16 @@ The major finding (the application role is not allowed to be a superuser, have `
 
 - **`github.com/jackc/pgx/v5` and `modernc.org/sqlite` are `// indirect` in `go.mod`** even though `internal/store/pg` and `internal/store/sqlite` import them. `go mod tidy` would promote them; a later tidy must not drop them.
 
+### W1-3 (Opus review minors, not fixed in the one product-bug round)
+
+The blocker (the token was spent before the data dir was proven writable) was fixed in #16. These remain:
+
+- **`moonglass server` creates an org only with `--print-enroll-token`, keyed off a `DIR/org` side file** rather than "if the store has no orgs" as the spec says. Losing `DIR/org` creates a second org. `server.Run`, `firstOrg` and `runServer` have no test.
+- **Re-enrolling a data dir that already holds keys to the same control plane** hits the duplicate-key path, spends the new token and reports `TOKEN_INVALID`, which tells the operator to get a new token that can never work. Report "key already registered" instead.
+- **The agent accepts a plain `http://` URL to any host.** The spec says plain HTTP is for loopback only, but nothing enforces it, and a pin taken over clear text outlives W1-4's TLS. Reject non-loopback `http://` until W1-4.
+- **`--print-enroll-token` prints the live bearer to stdout,** which is the journal under systemd. Warn in the spec, or write it to a 0600 file.
+- **`agent enroll` uses `http.DefaultClient` and `context.Background()`:** no timeout and no signal handling, so a black-holed URL hangs forever.
+
 ## Owner decisions (do not close in a ticket)
 
 - **W1-1 open questions 6 and 7** (`pid`/`ipc` `container:` cross-project; `service:` inheriting host networking). Left as-is; owner is deciding.
