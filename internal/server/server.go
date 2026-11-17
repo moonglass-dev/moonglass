@@ -102,8 +102,9 @@ func (s *Server) IssueEnrolToken(ctx context.Context, orgID string) (string, err
 }
 
 // Run opens dataDir/server.db, creates an org if there is none, and serves
-// until ctx ends. With printEnrolToken it issues one token and prints it to stdout.
-func Run(ctx context.Context, dataDir, listen string, printEnrolToken bool, stdout io.Writer) error {
+// until ctx ends: enrolment over HTTP on listen and agents over TLS 1.3 WSS on
+// agentListen. With printEnrolToken it issues one token and prints it to stdout.
+func Run(ctx context.Context, dataDir, listen, agentListen string, printEnrolToken bool, stdout io.Writer) error {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fmt.Errorf("create data dir %s: %w", dataDir, err)
 	}
@@ -132,7 +133,24 @@ func Run(ctx context.Context, dataDir, listen string, printEnrolToken bool, stdo
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", listen, err)
 	}
-	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	agentLn, err := net.Listen("tcp", agentListen)
+	if err != nil {
+		_ = ln.Close()
+		return fmt.Errorf("listen for agents on %s: %w", agentListen, err)
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errs := make(chan error, 2)
+	go func() { errs <- s.ServeAgents(ctx, agentLn) }()
+	go func() { errs <- serveEnrol(ctx, s.Handler(), ln, listen) }()
+	first := <-errs
+	cancel()
+	return errors.Join(first, <-errs)
+}
+
+// serveEnrol serves the plain HTTP enrolment API on ln until ctx ends.
+func serveEnrol(ctx context.Context, handler http.Handler, ln net.Listener, listen string) error {
+	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	done := make(chan struct{})
 	go func() {
 		select {
@@ -143,7 +161,7 @@ func Run(ctx context.Context, dataDir, listen string, printEnrolToken bool, stdo
 		case <-done:
 		}
 	}()
-	err = srv.Serve(ln)
+	err := srv.Serve(ln)
 	close(done)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil

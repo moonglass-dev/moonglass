@@ -30,6 +30,7 @@ linters:
             - github.com/jackc/pgx/v5
             - modernc.org/sqlite
             - github.com/caddyserver/caddy/v2
+            - github.com/coder/websocket
         proxy-deps:
           # Caddy is imported only by internal/proxy. cmd/ calls proxy.Run.
           list-mode: lax
@@ -42,6 +43,19 @@ linters:
           deny:
             - pkg: github.com/caddyserver/caddy/v2
               desc: only internal/proxy may import Caddy
+        websocket-deps:
+          # coder/websocket is imported only by internal/agent and internal/server.
+          # cmd/ calls into those packages.
+          list-mode: lax
+          files:
+            - "**/cmd/**/*.go"
+            - "**/internal/protocol/**/*.go"
+            - "**/internal/policy/**/*.go"
+            - "**/internal/keys/**/*.go"
+            - "**/internal/store/**/*.go"
+          deny:
+            - pkg: github.com/coder/websocket
+              desc: only internal/agent and internal/server may import coder/websocket
         policy-deps:
           # Restrict these modules outside internal/policy. depguard file
           # exclusions of internal/policy itself were not applied, so this
@@ -99,6 +113,16 @@ linters:
         linters:
           - errcheck
         text: "rows.Close"
+      # Waiting on a done channel of errors in a locked W1-4 test.
+      - path: (internal/agent/connect_test|internal/server/agent_test)\.go
+        linters:
+          - errcheck
+        text: "Error return value is not checked"
+      # gosec does not run on tests, so nolint:gosec in them is "unused".
+      - path: _test\.go
+        linters:
+          - nolintlint
+        text: "unused for linter \"gosec\""
 
 formatters:
   enable:
@@ -107,6 +131,7 @@ formatters:
   exclusions:
     paths:
       - internal/policy/compose_test.go
+      - internal/agent/connect_test.go
   settings:
     goimports:
       local-prefixes:

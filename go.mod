@@ -6,6 +6,7 @@ toolchain go1.27.4
 
 require (
 	github.com/caddyserver/caddy/v2 v2.11.9
+	github.com/coder/websocket v1.8.15
 	github.com/compose-spec/compose-go/v2 v2.17.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	google.golang.org/protobuf v1.36.12

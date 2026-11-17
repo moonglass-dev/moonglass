@@ -26,9 +26,10 @@ const usage = `Usage: moonglass <command>
 
 Commands:
   version                                                  Print the version, commit and build date
-  server [--data-dir DIR] [--listen ADDR] [--print-enroll-token]
+  server [--data-dir DIR] [--listen ADDR] [--agent-listen ADDR] [--print-enroll-token]
                                                            Run the control plane
   agent enroll [--data-dir DIR] --url URL TOKEN            Enrol this machine and print its fingerprint
+  agent connect [--data-dir DIR] --url URL                 Connect to the control plane over WSS and send heartbeats
   proxy --data-dir DIR                                     Run the proxy (Caddy) with its admin API on a Unix socket in DIR
 `
 
@@ -44,6 +45,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runServer(args[1:], stdout, stderr)
 	case len(args) >= 2 && args[0] == "agent" && args[1] == "enroll":
 		return runAgentEnroll(args[2:], stdout, stderr)
+	case len(args) >= 2 && args[0] == "agent" && args[1] == "connect":
+		return runAgentConnect(args[2:], stderr)
 	case len(args) >= 1 && args[0] == "proxy":
 		return runProxy(args[1:], stderr)
 	}
@@ -68,7 +71,8 @@ func newFlags(name string) *flag.FlagSet {
 func runServer(args []string, stdout, stderr io.Writer) int {
 	fs := newFlags("server")
 	dataDir := fs.String("data-dir", "/var/lib/moonglass", "server data directory")
-	listen := fs.String("listen", "127.0.0.1:8080", "listen address")
+	listen := fs.String("listen", "127.0.0.1:8080", "enrolment listen address (plain HTTP)")
+	agentListen := fs.String("agent-listen", "127.0.0.1:8443", "agent listen address (TLS 1.3 WSS)")
 	printToken := fs.Bool("print-enroll-token", false, "issue one enrolment token and print it")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
 		_, _ = io.WriteString(stderr, usage)
@@ -76,8 +80,29 @@ func runServer(args []string, stdout, stderr io.Writer) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := server.Run(ctx, *dataDir, *listen, *printToken, stdout); err != nil {
+	if err := server.Run(ctx, *dataDir, *listen, *agentListen, *printToken, stdout); err != nil {
 		_, _ = fmt.Fprintf(stderr, "moonglass: server: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func runAgentConnect(args []string, stderr io.Writer) int {
+	fs := newFlags("agent connect")
+	dataDir := fs.String("data-dir", "/var/lib/moonglass/agent", "agent data directory")
+	url := fs.String("url", "", "control-plane URL")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *url == "" {
+		_, _ = io.WriteString(stderr, usage)
+		return 2
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	opts := agent.ConnectOptions{
+		AgentVersion: version,
+		OnError:      func(err error) { _, _ = fmt.Fprintf(stderr, "moonglass: %v\n", err) },
+	}
+	if err := agent.Connect(ctx, *dataDir, *url, opts); err != nil {
+		_, _ = fmt.Fprintf(stderr, "moonglass: %v\n", err)
 		return 1
 	}
 	return 0

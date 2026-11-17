@@ -17,6 +17,7 @@ Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milest
 | [0009](0009-policy-dependencies.md) | `compose-go/v2 v2.17.0` and `go-toml/v2 v2.4.3`, imported only by `internal/policy`, for Compose resolution and strict `agent.toml` parsing |
 | [0010](0010-storage-dependencies.md) | `pgx/v5 v5.13.0` and `modernc.org/sqlite v1.62.0`, imported only by `internal/store`, for the Postgres and SQLite backends |
 | [0011](0011-proxy-dependencies.md) | `caddy/v2 v2.11.9`, imported only by `internal/proxy`, for the embedded proxy; a proxy upgrade is a drained restart until SPIKE-1 |
+| [0012](0012-connection-dependencies.md) | `coder/websocket v1.8.15`, imported only by `internal/agent` and `internal/server`, for the agent's outbound WSS connection |
 
 
 ## Changing a decision
