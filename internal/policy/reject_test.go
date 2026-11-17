@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -131,5 +132,50 @@ func TestRejectionHasNoEnvironmentValues(t *testing.T) {
 		if strings.Contains(err.Error(), env[k]) {
 			t.Errorf("error = %q, must not contain the value of %s (%q)", err.Error(), k, env[k])
 		}
+	}
+}
+
+func TestRejectionOmitsEnvironmentValues(t *testing.T) {
+	l := newLayout(t)
+	p := mustParse(t, l.Env, "")
+	build := func() Spec {
+		s := baseSpec()
+		s.Labels = map[string]string{"app.tier": "web", "dev.moonglass.project": "x"}
+		s.Env = map[string]string{"TIER_KEY": "app.tier", "DB_PASSWORD": "s3cr3t-pw-9"}
+		return s
+	}
+	tests := []struct {
+		name string
+		spec Spec
+	}{
+		{"reserved label", build()},
+		{"malformed restart policy", func() Spec { s := build(); s.RestartPolicy = "always"; return s }()},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := p.Check(tc.spec)
+			var r *Rejection
+			if !errors.As(err, &r) {
+				t.Fatalf("Check(%+v) error = %v, want *Rejection", tc.spec, err)
+			}
+			msg := err.Error()
+			for _, needle := range []string{"app.tier", "s3cr3t-pw-9"} {
+				if strings.Contains(msg, needle) {
+					t.Errorf("Rejection.Error() = %q, must not contain %q", msg, needle)
+				}
+				for _, v := range r.Violations {
+					fields := []struct{ name, value string }{
+						{"Field", v.Field},
+						{"Key", v.Key},
+						{"Value", v.Value},
+					}
+					for _, f := range fields {
+						if strings.Contains(f.value, needle) {
+							t.Errorf("Violation.%s = %q, must not contain %q", f.name, f.value, needle)
+						}
+					}
+				}
+			}
+		})
 	}
 }

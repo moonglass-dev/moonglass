@@ -337,3 +337,31 @@ func FuzzParse(f *testing.F) {
 		_, _ = p.Check(s)
 	})
 }
+
+func TestParseRejectsAgentLabelsAllowKey(t *testing.T) {
+	l := newLayout(t)
+	tests := []struct{ name, body string }{
+		{"true", "pid_host = true\nagent_labels = true"},
+		{"false", "pid_host = true\nagent_labels = false"},
+		{"string", "pid_host = true\nagent_labels = \"dev.moonglass.project\""},
+		{"list", "pid_host = true\nagent_labels = [\"dev.moonglass.project\"]"},
+		{"only key", "agent_labels = true"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			toml := blockTOML(tc.body)
+			p, err := Parse([]byte(toml), l.Env)
+			if err == nil {
+				t.Fatalf("Parse(%q) = %+v, nil; want an error", toml, p)
+			}
+			if p != nil {
+				t.Errorf("Parse(%q) policy = %+v, want nil", toml, p)
+			}
+			for _, want := range []string{"containers.allow[0]", "agent_labels", "can never be allowed"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("Parse(%q) error = %q, want it to contain %q", toml, err.Error(), want)
+				}
+			}
+		})
+	}
+}

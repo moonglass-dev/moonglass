@@ -43,6 +43,7 @@ var deniedCases = map[string]func(layout) Spec{
 	"runtime: non-default":                  mut(func(_ layout, s *Spec) { s.Runtime = "runsc" }),
 	"build.entitlements: security.insecure": buildSpec("security.insecure"),
 	"build.entitlements: network.host":      buildSpec("network.host"),
+	"labels: dev.moonglass. namespace":      mut(func(_ layout, s *Spec) { s.Labels = map[string]string{"dev.moonglass.project": "x"} }),
 }
 
 func buildSpec(ent string) func(layout) Spec {
@@ -248,5 +249,192 @@ func TestCheckMalformedSpec(t *testing.T) {
 		{name: "project not an element", spec: with(func(s *Spec) { s.Project = "a/b" }), want: []string{"-"}, field: "spec"},
 		{name: "relative bind source", spec: bindSpec("rel/path", "/x", false), want: []string{"-"}, field: "spec"},
 		{name: "unknown mount type", spec: with(func(s *Spec) { s.Mounts = []Mount{{Type: "weird", Source: "x", Target: "/x"}} }), want: []string{"-"}, field: "spec"},
+	})
+}
+
+func TestCheckCopiesPassThroughFields(t *testing.T) {
+	l := newLayout(t)
+	p := mustParse(t, l.Env, "")
+	tests := []struct {
+		name string
+		edit func(s *Spec)
+	}{
+		{name: "cmd", edit: func(s *Spec) { s.Cmd = []string{"migrate", "--up"} }},
+		{name: "env", edit: func(s *Spec) { s.Env = map[string]string{"A": "1"} }},
+		{name: "labels", edit: func(s *Spec) { s.Labels = map[string]string{"app.tier": "web"} }},
+		{name: "agent labels", edit: func(s *Spec) {
+			s.AgentLabels = map[string]string{"dev.moonglass.project": "monitoring", "dev.moonglass.managed": "true"}
+		}},
+		{name: "networks", edit: func(s *Spec) { s.Networks = []string{"mg-monitoring"} }},
+		{name: "empty restart policy", edit: func(s *Spec) { s.RestartPolicy = "" }},
+		{name: "restart policy no", edit: func(s *Spec) { s.RestartPolicy = "no" }},
+		{name: "restart policy on-failure", edit: func(s *Spec) { s.RestartPolicy = "on-failure" }},
+		{name: "restart policy unless-stopped", edit: func(s *Spec) { s.RestartPolicy = "unless-stopped" }},
+		{name: "log driver", edit: func(s *Spec) { s.LogConfig = LogConfig{Driver: "json-file"} }},
+		{name: "log driver and options", edit: func(s *Spec) {
+			s.LogConfig = LogConfig{Driver: "json-file", Options: map[string]string{"max-size": "10m"}}
+		}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := baseSpec()
+			tc.edit(&s)
+			c, err := p.Check(s)
+			if err != nil {
+				t.Fatalf("Check(%+v) error = %v, want nil", s, err)
+			}
+			if got, want := c.Spec(), s; !reflect.DeepEqual(got, want) {
+				t.Errorf("Checked.Spec() = %+v, want %+v", got, want)
+			}
+		})
+	}
+
+	allFields := func() Spec {
+		s := baseSpec()
+		s.Cmd = []string{"migrate", "--up"}
+		s.Env = map[string]string{"A": "1"}
+		s.Labels = map[string]string{"app.tier": "web"}
+		s.AgentLabels = map[string]string{"dev.moonglass.project": "monitoring"}
+		s.Networks = []string{"mg-monitoring"}
+		s.RestartPolicy = "on-failure"
+		s.LogConfig = LogConfig{Driver: "json-file", Options: map[string]string{"max-size": "10m"}}
+		return s
+	}
+	s := allFields()
+	c, err := p.Check(s)
+	if err != nil {
+		t.Fatalf("Check(all pass-through fields) error = %v, want nil", err)
+	}
+	if got, want := c.Spec(), allFields(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("Checked.Spec() = %+v, want %+v", got, want)
+	}
+	s.Cmd[0] = "tampered"
+	s.Env["TAMPERED"] = "1"
+	s.Labels["tampered"] = "1"
+	s.AgentLabels["dev.moonglass.tampered"] = "1"
+	s.Networks[0] = "tampered"
+	s.LogConfig.Options["max-size"] = "tampered"
+	first := c.Spec()
+	first.Cmd[0] = "leaked"
+	first.Env["LEAKED"] = "1"
+	first.Labels["leaked"] = "1"
+	first.AgentLabels["dev.moonglass.leaked"] = "1"
+	first.Networks[0] = "leaked"
+	first.LogConfig.Options["max-size"] = "leaked"
+	if got, want := c.Spec(), allFields(); !reflect.DeepEqual(got, want) {
+		t.Errorf("Checked.Spec() after mutating the input and an earlier result = %+v, want %+v", got, want)
+	}
+}
+
+func TestCheckRejectsUserLabelInAgentNamespace(t *testing.T) {
+	l := newLayout(t)
+	blocks := map[string]string{
+		"no policy":      "",
+		"matching block": blockTOML("pid_host = true"),
+	}
+	for _, label := range []string{"dev.moonglass.project", "dev.moonglass.managed"} {
+		for bname, block := range blocks {
+			t.Run(label+"/"+bname, func(t *testing.T) {
+				p := mustParse(t, l.Env, block)
+				s := baseSpec()
+				s.Labels = map[string]string{label: "x"}
+				c, err := p.Check(s)
+				var r *Rejection
+				if !errors.As(err, &r) {
+					t.Fatalf("Check(Labels{%q: \"x\"}) error = %v, want *Rejection", label, err)
+				}
+				if got, want := keysOf(err), []string{"agent_labels"}; !reflect.DeepEqual(got, want) {
+					t.Errorf("violation keys = %v, want %v (error: %v)", got, want, err)
+				}
+				if !reflect.DeepEqual(c, Checked{}) {
+					t.Errorf("Checked = %+v, want the zero value after a rejection", c)
+				}
+				msg := err.Error()
+				for _, want := range []string{label, "only the agent sets labels in the dev.moonglass. namespace"} {
+					if !strings.Contains(msg, want) {
+						t.Errorf("error = %q, want it to contain %q", msg, want)
+					}
+				}
+				if strings.Contains(msg, "[[containers.allow]]") {
+					t.Errorf("error = %q, want no [[containers.allow]] snippet for a label no block can allow", msg)
+				}
+			})
+		}
+	}
+
+	t.Run("both reserved labels", func(t *testing.T) {
+		p := mustParse(t, l.Env, "")
+		s := baseSpec()
+		s.Labels = map[string]string{"dev.moonglass.project": "x", "dev.moonglass.managed": "true"}
+		_, err := p.Check(s)
+		if got, want := keysOf(err), []string{"agent_labels", "agent_labels"}; !reflect.DeepEqual(got, want) {
+			t.Fatalf("violation keys = %v, want %v (error: %v)", got, want, err)
+		}
+		for _, key := range []string{"dev.moonglass.project", "dev.moonglass.managed"} {
+			if !strings.Contains(err.Error(), key) {
+				t.Errorf("error = %q, want it to name %q", err.Error(), key)
+			}
+		}
+	})
+
+	tests := []struct{ name, label string }{
+		{"similar namespace", "moonglass.dev/x"},
+		{"ordinary label", "app.tier"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := mustParse(t, l.Env, "")
+			s := baseSpec()
+			s.Labels = map[string]string{tc.label: "web"}
+			c, err := p.Check(s)
+			if err != nil {
+				t.Fatalf("Check(Labels{%q: \"web\"}) error = %v, want nil", tc.label, err)
+			}
+			if got, want := c.Spec(), s; !reflect.DeepEqual(got, want) {
+				t.Errorf("Checked.Spec() = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
+func TestCheckRejectsAgentLabelOutsideNamespace(t *testing.T) {
+	l := newLayout(t)
+	p := mustParse(t, l.Env, "")
+	tests := []struct{ name, key string }{
+		{"ordinary label", "app.tier"},
+		{"similar namespace", "dev.moonglassx"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := baseSpec()
+			s.AgentLabels = map[string]string{tc.key: "web"}
+			_, err := p.Check(s)
+			var r *Rejection
+			if !errors.As(err, &r) {
+				t.Fatalf("Check(AgentLabels{%q: \"web\"}) error = %v, want *Rejection", tc.key, err)
+			}
+			want := []Violation{{Field: "spec", Key: "", Value: ""}}
+			if !reflect.DeepEqual(r.Violations, want) {
+				t.Errorf("Violations = %+v, want exactly %+v", r.Violations, want)
+			}
+		})
+	}
+}
+
+func TestCheckRejectsMalformedRestartPolicyAndLogConfig(t *testing.T) {
+	l := newLayout(t)
+	restart := func(v string) Spec { s := baseSpec(); s.RestartPolicy = v; return s }
+	logConfig := func(driver string, options map[string]string) Spec {
+		s := baseSpec()
+		s.LogConfig = LogConfig{Driver: driver, Options: options}
+		return s
+	}
+	runCheckCases(t, l, []checkCase{
+		{name: "restart always", spec: restart("always"), want: []string{"-"}, field: "spec"},
+		{name: "restart on-failure:3", spec: restart("on-failure:3"), want: []string{"-"}, field: "spec"},
+		{name: "restart No", spec: restart("No"), want: []string{"-"}, field: "spec"},
+		{name: "log options without a driver", spec: logConfig("", map[string]string{"max-size": "1m"}), want: []string{"-"}, field: "spec"},
+		{name: "log driver without options", spec: logConfig("local", nil)},
+		{name: "log driver and options", spec: logConfig("local", map[string]string{"max-size": "1m"})},
 	})
 }

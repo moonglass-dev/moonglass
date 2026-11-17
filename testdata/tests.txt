@@ -42,13 +42,18 @@ moonglass.dev/moonglass/internal/policy TestAllowUnitesMatchingBlocks
 moonglass.dev/moonglass/internal/policy TestCheckAllowsBenignSpec
 moonglass.dev/moonglass/internal/policy TestCheckBuildEntitlements
 moonglass.dev/moonglass/internal/policy TestCheckComposeBuildNetworkHostIsEntitlement
+moonglass.dev/moonglass/internal/policy TestCheckComposeFillsLabelsOnly
 moonglass.dev/moonglass/internal/policy TestCheckComposeNamedVolumeOverlayOptsAreBinds
 moonglass.dev/moonglass/internal/policy TestCheckComposeRejectsVolumesFrom
+moonglass.dev/moonglass/internal/policy TestCheckCopiesPassThroughFields
 moonglass.dev/moonglass/internal/policy TestCheckDeniesEveryField
 moonglass.dev/moonglass/internal/policy TestCheckHostSysctlNeverAllowed
 moonglass.dev/moonglass/internal/policy TestCheckMalformedSpec
 moonglass.dev/moonglass/internal/policy TestCheckNetworkModeContainerSameProject
 moonglass.dev/moonglass/internal/policy TestCheckRejectsAbsolutePathDisguisedAsVolume
+moonglass.dev/moonglass/internal/policy TestCheckRejectsAgentLabelOutsideNamespace
+moonglass.dev/moonglass/internal/policy TestCheckRejectsMalformedRestartPolicyAndLogConfig
+moonglass.dev/moonglass/internal/policy TestCheckRejectsUserLabelInAgentNamespace
 moonglass.dev/moonglass/internal/policy TestCheckSecurityOptDisablesConfinement
 moonglass.dev/moonglass/internal/policy TestCheckSysctlAllowList
 moonglass.dev/moonglass/internal/policy TestComposeBenignProjectPasses
@@ -63,6 +68,7 @@ moonglass.dev/moonglass/internal/policy TestEscapeSuiteCoversEveryDeniedField
 moonglass.dev/moonglass/internal/policy TestLoadFileAbsentIsEmptyConfig
 moonglass.dev/moonglass/internal/policy TestLoadFileRejectsUnsafeFile
 moonglass.dev/moonglass/internal/policy TestParseFullExample
+moonglass.dev/moonglass/internal/policy TestParseRejectsAgentLabelsAllowKey
 moonglass.dev/moonglass/internal/policy TestParseRejectsBlockOverProtectedOrMountsPath
 moonglass.dev/moonglass/internal/policy TestParseRejectsHostSysctlBlock
 moonglass.dev/moonglass/internal/policy TestParseRejectsInvalidAllowBlocks
@@ -72,6 +78,7 @@ moonglass.dev/moonglass/internal/policy TestParseRejectsUnknownKeys
 moonglass.dev/moonglass/internal/policy TestRejectNeverStrips
 moonglass.dev/moonglass/internal/policy TestRejectionHasNoEnvironmentValues
 moonglass.dev/moonglass/internal/policy TestRejectionNamesFieldAndAllowLines
+moonglass.dev/moonglass/internal/policy TestRejectionOmitsEnvironmentValues
 moonglass.dev/moonglass/internal/policy TestSocketAndDataRootAliasesRejected
 moonglass.dev/moonglass/internal/protocol FuzzEnvelopeDecode
 moonglass.dev/moonglass/internal/protocol TestDeployMessagesRejectUnknownType

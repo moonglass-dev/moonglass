@@ -3,6 +3,7 @@ package policy
 import (
 	"context"
 	"errors"
+	"maps"
 	"path/filepath"
 	"strings"
 
@@ -108,6 +109,10 @@ func serviceToSpec(in ComposeInput, proj *types.Project, svc types.ServiceConfig
 		for k, v := range svc.Sysctls {
 			s.Sysctls[k] = v
 		}
+	}
+	// Compose labels are user labels. AgentLabels is never filled from a Compose file.
+	if len(svc.Labels) > 0 {
+		s.Labels = maps.Clone(map[string]string(svc.Labels))
 	}
 	for _, d := range svc.Devices {
 		s.Devices = append(s.Devices, formatDevice(d))

@@ -2,6 +2,11 @@
 // Compose project against the deny-by-default rules in ADR-0004.
 package policy
 
+import (
+	"maps"
+	"slices"
+)
+
 // Paths are the host locations the mount check is evaluated against.
 type Paths struct {
 	MountsRoot        string
@@ -25,28 +30,48 @@ type Mount struct {
 	ReadOnly bool
 }
 
+// LogConfig is the container's log driver and its options.
+type LogConfig struct {
+	Options map[string]string
+	Driver  string
+}
+
 // Spec is the neutral description of one container or build the agent is about to create.
 type Spec struct {
-	Sysctls           map[string]string
-	CgroupParent      string
-	Runtime           string
-	Service           string
-	Kind              string
-	NetworkMode       string
-	PID               string
-	IPC               string
-	UTS               string
-	Environment       string
-	UserNS            string
-	Image             string
-	Project           string
+	Sysctls map[string]string
+	// Env is the container's environment.
+	Env map[string]string
+	// Labels are the user-supplied labels; a key in the dev.moonglass. namespace is rejected.
+	Labels map[string]string
+	// AgentLabels are the labels agent code sets; every key is in the dev.moonglass. namespace.
+	AgentLabels map[string]string
+	// LogConfig is the log driver and its options.
+	LogConfig    LogConfig
+	CgroupParent string
+	Runtime      string
+	Service      string
+	Kind         string
+	NetworkMode  string
+	PID          string
+	IPC          string
+	UTS          string
+	Environment  string
+	UserNS       string
+	Image        string
+	Project      string
+	// RestartPolicy is no, on-failure or unless-stopped; empty means no.
+	RestartPolicy     string
 	CapAdd            []string
 	Devices           []string
 	DeviceCgroupRules []string
 	SecurityOpt       []string
 	BuildEntitlements []string
 	Mounts            []Mount
-	Privileged        bool
+	// Cmd is an exec argv that replaces the image's command. It is never joined or passed to a shell.
+	Cmd []string
+	// Networks are the Docker networks the container is attached to.
+	Networks   []string
+	Privileged bool
 }
 
 // Config is the non-allow part of agent.toml. Enforcing ForbidCommands and
@@ -120,6 +145,7 @@ var DeniedFields = []DeniedField{
 	{Field: "runtime: non-default", Key: "runtime"},
 	{Field: "build.entitlements: security.insecure", Key: "build_entitlements"},
 	{Field: "build.entitlements: network.host", Key: "build_entitlements"},
+	{Field: "labels: dev.moonglass. namespace", Key: "agent_labels"},
 }
 
 func (s Spec) clone() Spec {
@@ -130,6 +156,12 @@ func (s Spec) clone() Spec {
 	out.DeviceCgroupRules = append([]string(nil), s.DeviceCgroupRules...)
 	out.SecurityOpt = append([]string(nil), s.SecurityOpt...)
 	out.BuildEntitlements = append([]string(nil), s.BuildEntitlements...)
+	out.Cmd = slices.Clone(s.Cmd)
+	out.Networks = slices.Clone(s.Networks)
+	out.Env = maps.Clone(s.Env)
+	out.Labels = maps.Clone(s.Labels)
+	out.AgentLabels = maps.Clone(s.AgentLabels)
+	out.LogConfig.Options = maps.Clone(s.LogConfig.Options)
 	if s.Sysctls != nil {
 		out.Sysctls = make(map[string]string, len(s.Sysctls))
 		for k, v := range s.Sysctls {

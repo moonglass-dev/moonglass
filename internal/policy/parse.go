@@ -56,6 +56,9 @@ type rawAllow struct {
 	IPCHost           *bool    `toml:"ipc_host"`
 	UTSHost           *bool    `toml:"uts_host"`
 	UserNSHost        *bool    `toml:"userns_host"`
+	CgroupParent      *string  `toml:"cgroup_parent"`
+	Runtime           *string  `toml:"runtime"`
+	AgentLabels       any      `toml:"agent_labels"`
 	BindMounts        []string `toml:"bind_mounts"`
 	DataDirs          []string `toml:"data_dirs"`
 	CapAdd            []string `toml:"cap_add"`
@@ -63,8 +66,6 @@ type rawAllow struct {
 	DeviceCgroupRules []string `toml:"device_cgroup_rules"`
 	SecurityOpt       []string `toml:"security_opt"`
 	Sysctls           []string `toml:"sysctls"`
-	CgroupParent      *string  `toml:"cgroup_parent"`
-	Runtime           *string  `toml:"runtime"`
 	BuildEntitlements []string `toml:"build_entitlements"`
 }
 
@@ -234,6 +235,9 @@ func compileBlock(env Env, index int, rb rawAllow) (allowBlock, error) {
 	}
 	if rb.Service != nil && *rb.Service == "" {
 		return fail("service", "service is empty")
+	}
+	if rb.AgentLabels != nil {
+		return fail("agent_labels", "labels in the dev.moonglass. namespace are set only by the agent; agent_labels can never be allowed")
 	}
 	b := allowBlock{
 		project:     rb.Project,

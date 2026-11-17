@@ -3,8 +3,12 @@ package policy
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 )
+
+// agentLabelPrefix is the label namespace only agent code writes to.
+const agentLabelPrefix = "dev.moonglass."
 
 // Check reports whether s is allowed. On success it returns a Checked wrapping
 // a deep copy of s. On denial it returns the zero Checked and a *Rejection.
@@ -23,6 +27,8 @@ func (p *Policy) check(s Spec, composeServices map[string]bool) (Checked, error)
 		vs = append(vs, Violation{Field: "spec", Key: "", Value: ""})
 		return Checked{}, &Rejection{Violations: vs, spec: s}
 	}
+	// A label in the agent's namespace is rejected whatever blocks match.
+	vs = append(vs, reservedLabels(s.Labels)...)
 	matched := p.matchingBlocks(s)
 
 	if s.Privileged && !boolAllowed(matched, "privileged") {
@@ -143,7 +149,41 @@ func specWellFormed(s Spec) error {
 			return fmt.Errorf("unknown mount type")
 		}
 	}
+	for k := range s.AgentLabels {
+		if !strings.HasPrefix(k, agentLabelPrefix) {
+			return fmt.Errorf("agent label %q is outside the %s namespace", k, agentLabelPrefix)
+		}
+	}
+	switch s.RestartPolicy {
+	case "", "no", "on-failure", "unless-stopped":
+	default:
+		return fmt.Errorf("restart policy %q is not no, on-failure or unless-stopped", s.RestartPolicy)
+	}
+	if s.LogConfig.Driver == "" && len(s.LogConfig.Options) > 0 {
+		return fmt.Errorf("log config options need a driver")
+	}
 	return nil
+}
+
+// reservedLabels returns one violation per user label in the agent's namespace.
+// The values are never read, and no block can allow the result.
+func reservedLabels(labels map[string]string) []Violation {
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		if strings.HasPrefix(k, agentLabelPrefix) {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys)
+	var vs []Violation
+	for _, k := range keys {
+		vs = append(vs, Violation{
+			Field: fmt.Sprintf("labels: %q (only the agent sets labels in the %s namespace; no block can allow)", k, agentLabelPrefix),
+			Key:   "agent_labels",
+			Value: "",
+		})
+	}
+	return vs
 }
 
 func (p *Policy) checkBind(s Spec, m Mount, matched []allowBlock) []Violation {

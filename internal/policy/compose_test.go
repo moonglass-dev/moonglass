@@ -23,6 +23,7 @@ var requiredFixtures = []string{
 	"datadir-other-image", "agent-state", "allow-wrong-key", "allow-pid-host", "block-wrong-environment",
 	"block-wrong-service", "block-wrong-image", "network-service", "allow-docker-socket-exact",
 	"allow-docker-socket-parent",
+	"user-agent-label",
 }
 
 func readFixture(t *testing.T, l layout, name string) (dir string, expect []string, env map[string]string, toml string, hasTOML bool) {
@@ -277,5 +278,45 @@ func TestEscapeSuiteCoversEveryDeniedField(t *testing.T) {
 		if !inTable && !fixtureKeys[row.Key] {
 			t.Errorf("denied field %q (key %q) has no row in TestCheckDeniesEveryField and no fixture expecting that key", row.Field, row.Key)
 		}
+	}
+}
+
+func TestCheckComposeFillsLabelsOnly(t *testing.T) {
+	l := newLayout(t)
+	want := map[string]string{"app.tier": "web", "team": "core"}
+	tests := map[string]string{
+		"map form": `services:
+  web:
+    image: ` + imgA + `
+    labels:
+      app.tier: web
+      team: core
+`,
+		"list form": `services:
+  web:
+    image: ` + imgA + `
+    labels:
+      - app.tier=web
+      - team=core
+`,
+	}
+	p := mustParse(t, l.Env, "")
+	for name, yaml := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := p.CheckCompose(context.Background(), composeIn(writeCompose(t, yaml), nil))
+			if err != nil {
+				t.Fatalf("CheckCompose() error = %v, want nil", err)
+			}
+			if len(got) != 1 {
+				t.Fatalf("CheckCompose() returned %d specs, want 1", len(got))
+			}
+			s := got[0].Spec()
+			if !reflect.DeepEqual(s.Labels, want) {
+				t.Errorf("Spec().Labels = %v, want %v", s.Labels, want)
+			}
+			if len(s.AgentLabels) != 0 {
+				t.Errorf("Spec().AgentLabels = %v, want empty", s.AgentLabels)
+			}
+		})
 	}
 }

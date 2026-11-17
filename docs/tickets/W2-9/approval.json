@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All seven named tests are in package policy and assert the acceptance criteria through Check, Parse, and CheckCompose. The diff only adds lines, under internal/policy and testdata/escape. The user-agent-label fixture expects exactly agent_labels, and every new case uses a temp layout. Extra cases for both reserved labels, and for agent_labels set to false, a string, or the only allow key, follow the plan."
+}
