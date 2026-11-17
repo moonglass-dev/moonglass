@@ -807,13 +807,44 @@ EOF
 
 rm_fetch_stub() { rm -rf "$WT/$FETCH_STUB_DIR"; }
 
+# fetch_check_unlisted: with the stub already removed and the network off, fail if a package
+# outside the main module cannot be resolved (an import the ticket did not list). Missing
+# packages under the main module (tests written before impl creates them) are ignored.
+# Offline go mod tidy is not used here: tidy also walks test files of listed modules and
+# would need their test-only dependencies, and it treats missing local packages as a fetch.
+fetch_check_unlisted() {
+	local dest mod path err bad=""
+	dest=$(mktemp "${TMPDIR:-/tmp}/fetch-unlisted.XXXXXX") || return 1
+	mod=$(awk "/^module / { print \$2; exit }" "$WT/go.mod")
+	FETCH_PROXY=off go_fetch_capture "$dest" list -e -test -deps -f '{{if .Error}}{{.ImportPath}}{{"\t"}}{{.Error.Err}}{{end}}' ./... || true
+	while IFS=$'\t' read -r path err; do
+		[ -n "$path" ] || continue
+		case "$path" in
+		"$mod" | "$mod"/*) continue ;;
+		esac
+		case "$err" in
+		*"cannot find module"* | *"module lookup disabled"* | *"no required module provides"*)
+			bad="$bad $path"
+			;;
+		esac
+	done <"$dest"
+	rm -f "$dest"
+	[ -z "$bad" ] || { R_REASON="go get or go mod tidy failed for ${DEP_SPECS[*]} (a module that is imported but not in the ticket's dependencies cannot be fetched):$bad; no model session was started; see .ticket/$ID/deps.log"; return 1; }
+}
+
+fetch_listed_packages() {
+	local s m
+	for s in "${DEP_SPECS[@]}"; do
+		m=${s%@*}
+		go_fetch get "$m/..." || return 1
+	done
+}
+
 # fetch_deps: the harness, not the model, adds the ticket's `dependencies` to go.mod and go.sum before the impl session. Nothing is committed.
-# After go get, a temporary package imports the listed modules so go mod tidy fills transitive go.sum entries that lazy
+# After go get, a temporary package imports the listed modules so `go list -deps` fills transitive go.sum entries that lazy
 # loading would otherwise omit (an impl session under GOFLAGS=-mod=readonly cannot add them). The stub is then deleted
 # and go get is run again; tidy is not run after the stub is gone, or those transitives would be pruned.
-# tidy drops a module that nothing imports yet, so the second go get puts it back for the session to use.
-# Tidy runs offline, after go mod download has cached the modules already required: it can resolve what the listed modules bring and nothing else.
-# An import of a module that is not listed (and not already in go.mod) fails there instead of being looked up at latest.
+# An import of a module that is not listed (and not already in go.mod) is rejected by an offline go list, not by tidy.
 # go and toolchain lines are snapshotted and must not change (a listed module must not bump the language version).
 fetch_deps() {
 	[ -n "$T_DEPS" ] || return 0
@@ -824,8 +855,16 @@ fetch_deps() {
 	local go_lines
 	go_lines=$(grep -E '^(go|toolchain) ' "$WT/go.mod" || true)
 	rm_fetch_stub
-	if ! { go_fetch get "${DEP_SPECS[@]}" && write_fetch_stub && go_fetch list "./$FETCH_STUB_DIR" && go_fetch mod download && FETCH_PROXY=off go_fetch mod tidy && rm_fetch_stub && go_fetch get "${DEP_SPECS[@]}"; }; then
+	# go get module/... records checksums for every package in a listed module, not just the root
+	# (pgx's stdlib and pgxpool pull github.com/jackc/puddle/v2; a stub that only imports the root misses it).
+	if ! { go_fetch get "${DEP_SPECS[@]}" && fetch_listed_packages && write_fetch_stub && go_fetch list -deps "./$FETCH_STUB_DIR" && go_fetch mod download; }; then
 		rm_fetch_stub
+		R_REASON="go get or go mod tidy failed for ${DEP_SPECS[*]} (a module that is imported but not in the ticket's dependencies cannot be fetched); no model session was started; see .ticket/$ID/deps.log: $(tail -n 3 "$TD/deps.log" | tr '\n' ' ' | cut -c1-300)"
+		return 1
+	fi
+	rm_fetch_stub
+	fetch_check_unlisted || return 1
+	if ! go_fetch get "${DEP_SPECS[@]}"; then
 		R_REASON="go get or go mod tidy failed for ${DEP_SPECS[*]} (a module that is imported but not in the ticket's dependencies cannot be fetched); no model session was started; see .ticket/$ID/deps.log: $(tail -n 3 "$TD/deps.log" | tr '\n' ' ' | cut -c1-300)"
 		return 1
 	fi
