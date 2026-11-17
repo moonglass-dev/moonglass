@@ -31,6 +31,9 @@ func TestUsageOnMissingOrUnknownCommand(t *testing.T) {
 		{"no arguments", nil},
 		{"unknown subcommand", []string{"deploy"}},
 		{"version with an extra argument", []string{"version", "extra"}},
+		{"proxy without --data-dir", []string{"proxy"}},
+		{"proxy with an empty --data-dir", []string{"proxy", "--data-dir", ""}},
+		{"proxy with an extra argument", []string{"proxy", "--data-dir", "/tmp/x", "extra"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

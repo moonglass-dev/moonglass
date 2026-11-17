@@ -29,6 +29,19 @@ linters:
             - github.com/pelletier/go-toml/v2
             - github.com/jackc/pgx/v5
             - modernc.org/sqlite
+            - github.com/caddyserver/caddy/v2
+        proxy-deps:
+          # Caddy is imported only by internal/proxy. cmd/ calls proxy.Run.
+          list-mode: lax
+          files:
+            - "**/cmd/**/*.go"
+            - "**/internal/agent/**/*.go"
+            - "**/internal/keys/**/*.go"
+            - "**/internal/protocol/**/*.go"
+            - "**/internal/policy/**/*.go"
+          deny:
+            - pkg: github.com/caddyserver/caddy/v2
+              desc: only internal/proxy may import Caddy
         policy-deps:
           # Restrict these modules outside internal/policy. depguard file
           # exclusions of internal/policy itself were not applied, so this

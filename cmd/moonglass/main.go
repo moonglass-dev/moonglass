@@ -29,6 +29,7 @@ Commands:
   server [--data-dir DIR] [--listen ADDR] [--print-enroll-token]
                                                            Run the control plane
   agent enroll [--data-dir DIR] --url URL TOKEN            Enrol this machine and print its fingerprint
+  proxy --data-dir DIR                                     Run the proxy (Caddy) with its admin API on a Unix socket in DIR
 `
 
 func main() {
@@ -43,6 +44,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runServer(args[1:], stdout, stderr)
 	case len(args) >= 2 && args[0] == "agent" && args[1] == "enroll":
 		return runAgentEnroll(args[2:], stdout, stderr)
+	case len(args) >= 1 && args[0] == "proxy":
+		return runProxy(args[1:], stderr)
 	}
 	_, _ = io.WriteString(stderr, usage)
 	return 2
