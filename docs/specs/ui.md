@@ -207,7 +207,7 @@ Streams are authorised like any other read. When a stream reconnects, the UI fet
 
 ## 10. Performance budgets
 
-W2-S measures them in CI against the built output.
+W2-S measures the two size budgets in CI against the built output (ADR-0016). The route-change and layout-shift budgets need a browser; until a ticket adds one under its own ADR, they are checked in the weekly demo.
 
 | Budget | Value |
 |---|---|

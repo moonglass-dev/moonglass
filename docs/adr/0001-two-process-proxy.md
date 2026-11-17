@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
+- **Amended:** 2026-11-17, decision 3: who can reach the admin socket (owner decision D10, weeks 2–3 preflight)
 
 ## Context
 
@@ -11,7 +12,10 @@ The server side is authoritative for runtime: routing and certificates must keep
 
 1. `moonglass agent` and `moonglass proxy` are separate processes from the same static binary, each under its own systemd unit and memory limit (S rule 1, S§3.3).
 2. The proxy embeds Caddy 2.11.9 as a library. The agent role never loads Caddy. We never fork or patch Caddy.
-3. The agent pushes a complete JSON config to Caddy's admin API, bound to a Unix socket readable only by the Moonglass service user. There is no TCP admin port, no Caddyfile, no labels and no templating.
+3. The agent pushes a complete JSON config to Caddy's admin API over a Unix socket. There is no TCP admin port, no Caddyfile, no labels and no templating. The agent (user `moonglass`) and the proxy (user `moonglass-proxy`) are different users (`docs/specs/install.md`), so access to the socket is by group:
+   - The socket is `/run/moonglass-proxy/admin.sock`, mode 0660, in the systemd runtime directory `/run/moonglass-proxy`, mode 0750. Both are owned by `moonglass-proxy` with the group `moonglass-proxy-admin`.
+   - `moonglass-proxy-admin` is a system group with no members in `/etc/group`. The proxy unit runs with it as its primary group, and the agent unit adds it as a supplementary group. No other user is given it.
+   - The proxy's data directory, certificates and Caddy's own inner admin socket stay in `/var/lib/moonglass/proxy`, mode 0700, readable by the proxy only.
 4. Our only Caddy extension is one small module that counts requests, status classes and latency per release. The agent reads those counters over the same socket (S§3.3, S§5.4).
 5. Only the agent holds the Docker socket. The proxy reaches the network, containers by their bridge IP, and its own certificate store (S§3.3, S§3.6).
 6. Caddy owns certificates end to end; private keys stay on the server (S§3.4).

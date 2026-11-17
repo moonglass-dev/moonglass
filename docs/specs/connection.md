@@ -30,9 +30,42 @@ The agent closes the connection, and reconnects through backoff, on a text messa
 
 After a connection ends or a dial fails, the agent waits `random(0, min(30s, 1s * 2^attempt))` (full jitter) and dials again. `attempt` starts at 0, increases after each wait, and resets to 0 once a connection has completed at least one Heartbeat / HeartbeatAck exchange. The random source and the sleep are injectable. The agent runs until its context is cancelled.
 
+## Command channel (W2-10)
+
+Specified by the weeks 2–3 preflight (owner decision D7). From W2-10 the connection also carries the deploy commands and their `CommandResult`s (`docs/specs/protocol.md`). "Bad frames" above is narrowed accordingly: each side accepts the types listed here and closes on anything else.
+
+### Control plane
+
+- The server keeps at most one live connection per enrolled server. A new connection authenticated by the same key replaces the old one, which is closed.
+- One control-plane node holds every connection. Routing commands between nodes through `LISTEN/NOTIFY` (ADR-0002 decision 6) is not built here.
+- The server sends `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK` and `RUN_PRE_DEPLOY` (and `BUILD` from W3-4) to the server that runs the service, and accepts `HEARTBEAT` and `COMMAND_RESULT`.
+- **Request ids for commands** are `c` followed by 32 lowercase hex characters from 128 random bits, minted by the server. The id is stored with the release step it belongs to (`docs/specs/storage.md`) before the command is sent.
+- **One command at a time per app.** The server sends the next command for an app only after the previous one has a result.
+- **Timeouts** for a result, counted from sending: `DEPLOY` 20 minutes, `BUILD` 30 minutes, `RUN_PRE_DEPLOY` 20 minutes, `SWITCH_RELEASE` 3 minutes, `ROLLBACK` 3 minutes. On timeout the server closes the connection; the command is re-sent once the agent reconnects (below). The release step fails only when the re-sent command also times out.
+- **Re-sending.** After the agent reconnects, the server re-sends every command that has no result yet, with its original request id. After the server itself restarts, the `deploy` and `rollback` operations re-send the step recorded in `releases.request_id` and `rollbacks.request_id` (W2-5, `docs/specs/storage.md`).
+- A `CommandResult` whose request id the server did not send, or already has a result for, closes the connection.
+
+### Agent
+
+- The agent accepts `HEARTBEAT_ACK` and the command types above, and sends `HEARTBEAT` and `COMMAND_RESULT`. Anything else closes the connection, as before.
+- Commands for different apps run concurrently. Commands for one app run one at a time, in the order they arrived.
+- At start, before connecting, the agent loads `agent.toml` with `policy.LoadFile` from `--policy FILE` (default `/etc/moonglass/agent.toml`, owner uid 0), with `policy.Env` from the Docker Engine (`DockerRootDir`, the default runtime, read through `internal/deploy`, because only it may import the Docker client: ADR-0014) and `ContainerProject` from the `dev.moonglass.project` label. A file that does not load stops the agent with the policy error. An absent file is the empty policy (`docs/specs/container-policy.md`).
+- It opens its state database (`docs/specs/agent-state.md`) and checks the Engine API version (ADR-0014) before connecting.
+
+### Each request id runs once
+
+Owner condition on D7: a command re-sent after a reconnect must never run twice.
+
+1. The agent records every executed command's request id in agent state (`commands`, `docs/specs/agent-state.md`), together with the `CommandResult` it produced. The record and the release-state change it made are written in one transaction, before the result is sent.
+2. A command whose request id has a stored record is not run again. The agent sends the stored `CommandResult` unchanged.
+3. A command whose request id is still running (re-sent after a reconnect, while the first run continues) is not started again. Its one result is sent on whichever connection is live when it finishes.
+4. Records are kept for 7 days, longer than any re-send can arrive.
+
+W2-10 must name a test that sends a `DEPLOY`, drops the connection after the agent has acted, reconnects, re-sends the same envelope, and asserts that the stored result comes back and that the Engine saw exactly one container create. `TestResentCommandReturnsStoredResult` is that test's name.
+
 ## Commands
 
-- `moonglass agent connect [--data-dir DIR] --url URL` — `URL` is `https://` or `wss://`; `http://` is refused. The path `/v1/agent` is joined to it. Connection errors go to stderr.
+- `moonglass agent connect [--data-dir DIR] [--policy FILE] [--proxy-socket PATH] --url URL` — `URL` is `https://` or `wss://`; `http://` is refused. The path `/v1/agent` is joined to it. Connection errors go to stderr. `--policy` and `--proxy-socket` arrive with W2-10 and W2-4.
 - `moonglass server --agent-listen ADDR`.
 
 ## Route registration
@@ -41,4 +74,4 @@ The operation registry does not exist yet, so `/v1/agent` is mounted beside its 
 
 ## Out of scope
 
-Deploy, SwitchRelease, Rollback, RunPreDeploy (W2-2). Install scripts and units (W1-6). Live logs (W4-4). Moving enrolment onto TLS. Revocation.
+The commands' execution (W2-3, W2-4, W2-6). Install scripts and units (W1-6). Live logs (W4-4). Moving enrolment onto TLS. Revocation.

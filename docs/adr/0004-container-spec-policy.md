@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
+- **Amended:** 2026-11-17, new decisions 10 to 12 (owner decision D8, weeks 2–3 preflight)
 
 ## Context
 
@@ -31,6 +32,9 @@ Docker socket access is root-equivalent (S§2). A typed protocol is not enough o
 7. **Compose is checked after resolution:** after `compose-go` has resolved interpolation, `extends` and profiles.
 8. **The same file holds command policy:** it can forbid classes of command outright, such as container exec and deletes, and restrict deploys to listed repositories or registries (S§3.1).
 9. **The check and its escape suite are written in week 1, before any `Deploy` exists** (S§3.2, B W1-1). The suite has a fixture for every denied field, each sysctl entry, a host sysctl, a tag in place of a digest, the agent's own state, a symlink out of `mounts/` and another project's subtree.
+10. **The checked spec is the whole request** (2026-11-17). The fields the deny list does not judge (command, environment, labels, networks, restart policy, log configuration) are carried in the spec too and pass through unchanged, so the Engine request is built from the checked value and nothing else (`docs/specs/container-policy.md`).
+11. **Only the agent sets Moonglass labels** (2026-11-17). Labels in the `dev.moonglass.` namespace mark what the agent manages, so the agent and its clean-up trust them. A user-supplied label in that namespace is rejected, and no block can allow it. The agent sets its own labels through a separate field that no protocol message or Compose file reaches.
+12. **Environment values stay out of every record** (2026-11-17). Environment variable values are never logged and never written into an error, a rejection, a command result or an audit record. Names may be.
 
 **`agent.toml` schema,** implemented by W1-1. `[update] channel` is `stable` or `canary`. `[commands] forbid` takes the classes `delete` (any command that carries out a destructive operation) and `exec` (container exec, v1). `[sources]` lists glob patterns; when present, deploys come only from them. Any other key or value stops the agent.
 
@@ -60,6 +64,8 @@ bind_mounts = ["/proc:/host/proc:ro", "/sys:/host/sys:ro"]
 - Not covered: a kernel or container-runtime escape, a malicious image acting inside its sandbox, an app leaking its own secrets (S§3.2).
 
 ## Alternatives rejected
+
+- **Adding agent-owned fields after the check:** the request sent would no longer be the spec that was checked (threat-model checklist item 2).
 
 - **Relying on the typed protocol alone:** the root shell above (S§3.2).
 - **Silently stripping denied fields:** nothing is silently stripped; the deploy fails and says why (S§3.2).

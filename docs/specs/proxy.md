@@ -10,7 +10,7 @@ The proxy links only the Caddy packages it serves with: the http app with `rever
 
 ## Admin API
 
-Caddy's admin API is bound to a Unix socket, `<data-dir>/proxy-admin.sock`, mode 0600, in a data dir of mode 0700. There is no TCP admin port. Configuration is a complete JSON document pushed to that API (`POST /load`). No Caddyfile, no labels, no templating.
+Caddy's admin API is bound to a Unix socket. Until W2-12 it is `<data-dir>/proxy-admin.sock`, mode 0600, in a data dir of mode 0700. From W2-12 (ADR-0001 decision 3 as amended) the agent-facing socket is `--admin-socket PATH`, default `/run/moonglass-proxy/admin.sock`, mode 0660, group `moonglass-proxy-admin`, in a directory of mode 0750; tests pass a temp path. Caddy's own inner socket stays in the data dir, mode 0600. There is no TCP admin port. Configuration is a complete JSON document pushed to that API (`POST /load`). No Caddyfile, no labels, no templating.
 
 On start the proxy loads a minimal config: the admin socket, file-system storage under `<data-dir>/caddy`, and log level WARN. It also keeps Caddy's autosave file at `<data-dir>/caddy-autosave.json`, not in the user's home. Every config pushed afterwards is complete and must repeat `admin` (exactly `{"listen": proxy.AdminListenAddress}`) and `storage` (exactly the file_system module at `proxy.StorageDir`). The proxy enforces this: the agent-facing socket `<data-dir>/proxy-admin.sock` is a guard in front of Caddy's own admin socket `<data-dir>/proxy-caddy.sock`. It forwards GET and HEAD, accepts only `POST /load` with a config that passes the check (otherwise 400 with the reason), and refuses every other mutation (403).
 

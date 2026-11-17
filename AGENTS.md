@@ -68,7 +68,7 @@ One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and th
 - Write the failing test first.
 - Table-driven tests, with failure messages that show the expected and actual values.
 - Never delete, skip, weaken or hard-code a test to get green. If an unrelated test fails, fix it properly or block.
-- Integration tests use a real Docker Engine, not mocks of its API.
+- Integration tests use a real Docker Engine, not mocks of its API. With no Engine they skip, except under `CI`, where they fail. Images are imported, not pulled (`docs/specs/deploy-suite.md`).
 - Tests are safe to run in two worktrees at once: ports from `:0`, temp directories, Docker resources labelled per run and removed afterwards.
 
 ## Security rules

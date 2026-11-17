@@ -18,6 +18,44 @@ An operation is a `Spec` and a handler, registered with `registry.Register`.
 
 `registry.Operations()` lists the shipped specs; W2-1 ships `servers.list` (`GET /v1/servers`, viewer, not destructive).
 
+### Operations added in weeks 2 and 3
+
+Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry operations are a contract (ADR-0006 decision 9): each ticket adds exactly the operations listed for it, regenerates the OpenAPI file and the CLI, and adds authz-matrix rows.
+
+**Targets.** Inputs name projects, environments and services by name. The handler resolves them in the caller's org; the scope check uses their ids. An operation's target is the project and environment it acts on: empty for org-level operations, the project with an empty environment for project-level ones.
+
+| Ticket | Name | Method, path | `MinRole` | Destructive | Target |
+|---|---|---|---|---|---|
+| W2-11 | `projects.create` | `POST /v1/projects` | member | no | org |
+| W2-11 | `projects.list` | `GET /v1/projects` | viewer | no | org |
+| W2-11 | `environments.create` | `POST /v1/environments` | member | no | project |
+| W2-11 | `environments.list` | `GET /v1/environments` | viewer | no | project |
+| W2-11 | `services.create` | `POST /v1/services` | member | no | project, environment |
+| W2-11 | `services.list` | `GET /v1/services` | viewer | no | project, environment |
+| W2-5 | `deploy` | `POST /v1/deploys` | member | no | project, environment |
+| W2-5 | `rollback` | `POST /v1/rollbacks` | member | no | project, environment |
+| W2-5 | `releases.list` | `GET /v1/releases` | viewer | no | project, environment |
+| W3-8 | `servers.deploy-key` | `GET /v1/servers/deploy-key` | viewer | no | org |
+| W3-2 | `keys.recovery.add` | `POST /v1/keys/recovery` | owner | no | org |
+| W3-2 | `environments.key.create` | `POST /v1/environments/key` | member | no | project, environment |
+| W3-2 | `secrets.set` | `PUT /v1/secrets` | member | no | project, environment |
+| W3-2 | `secrets.list` | `GET /v1/secrets` | viewer | no | project, environment |
+
+- `services.create` takes `project`, `environment`, `name` and `server` (a server id of the caller's org).
+- `environments.list` returns each environment's `public_key` once it has one, which the CLI pins (`docs/specs/secrets.md`).
+- **`deploy`** takes `project`, `environment`, `service`, exactly one of `image` (a reference) or `git` (`<owner>/<repo>@<40-hex commit>`, from W3-4), and optional `port`, `health_path`, `domain` (repeated), `pre_deploy` (repeated, the argv) and `pre_deploy_reversible`. The rules of `docs/specs/protocol.md` apply to each. It mints the release id, then:
+  - **One deploy per service.** At most one release per service is `running` and at most one `queued`. A new request while one is queued marks the queued one `superseded` (its caller gets that status) and queues itself. Rollbacks are not queued behind deploys.
+  - The server drives the steps: `BUILD` for a git source (W3-4), then `DEPLOY`, then `RUN_PRE_DEPLOY` when `pre_deploy` is set, then `SWITCH_RELEASE`. Each waits for its `CommandResult` (`docs/specs/connection.md`). A step that is not `SUCCEEDED` ends the release as `failed` or `rejected` with the agent's `detail`.
+  - The call returns when the release reaches a final status, and returns that release.
+  - For `git`, `image` sent to the agent's `DEPLOY` is the `moonglass.local/<project>/<service>:<release_id>` reference the build produced (`docs/specs/build.md`).
+  - A service whose server is not connected fails at once with `server <id> is offline`.
+- **`rollback`** takes `project`, `environment`, `service`, sends `ROLLBACK`, and returns when its result arrives. Under the G2 conditions it finishes in under 5 seconds (`docs/specs/release.md`). It is audited like every call.
+- **`releases.list`** returns the service's releases, newest first, at most 50: id, status, `image_ref` or git source, `image_id`, `repo_digest`, `detail`, times, and which are current and previous. For a tag, `repo_digest` is the digest that actually ran.
+- **`servers.deploy-key`** takes `server` and returns its deploy public key (`docs/specs/build.md`), or a 404 that says the server has not reported one yet.
+- **`keys.recovery.add`** takes an age recipient. It succeeds only while the org has no recovery recipient and no environment key; otherwise it is refused with a message that adding another recovery key is a recipient change that needs step-up (ADR-0003 decision 12).
+- **`environments.key.create`** takes the environment, its `public_key` and one wrapped copy per recovery recipient on record. It is refused when the environment already has a key, or when the wrapped copies do not name exactly the recovery recipients on record.
+- **`secrets.set`** takes `kind`, `name` and `ciphertext`, and replaces an existing value of that name. **`secrets.list`** returns kinds, names and times, never ciphertext. Values are never read back through the API (`docs/specs/secrets.md`).
+
 ## Authorisation
 
 `registry.Invoke` allows a call only when all of these pass, in this order:
@@ -27,6 +65,8 @@ An operation is a `Spec` and a handler, registered with `registry.Register`.
 3. **Destructive gate.** A destructive call by an agent identity (`Principal.Agent`) returns `ErrPendingApproval` and does not run. W2-1 mints no agent identities and has no approval flow; protected-environment and secret-recipient gates are added by the tickets that build them.
 
 A denied call does not run the handler. Authorisation lives only in `Invoke`; no middleware and no caller-set flag changes it.
+
+Secret reveal, grant, rotate and every other secret-recipient change also need the step-up of ADR-0005 decision 3. They are not added until W4-1 builds it (ADR-0003 decision 11).
 
 ## Tokens
 

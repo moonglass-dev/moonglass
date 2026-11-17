@@ -68,7 +68,7 @@ Also sensitive, and never held by the control plane: agent keys, the owner recov
 | **B1** client → control plane | Every call is a registry operation, or a route on the fixed non-operation list, with its authorisation declared beside it; authorisation and audit happen in the registry (S§3.12, ADR-0006). An operation declares its lowest role and `destructive`, with no default. **Three separate things each require a sign-in fresher than ten minutes**, checked on the server at approval: approving a protected deploy, approving a destructive operation, and changing secret recipients. A `destructive` flag is not a substitute for either of the other two. `secrets reveal` also requires it. On self-hosted the fresh sign-in is a new `server login-link`. A destructive call by an agent identity returns "pending approval" |
 | **B2** control plane → database | Only the storage package writes SQL. Every row outside the lookup tables carries `org_id`; on Postgres each transaction sets `app.org_id` and RLS refuses other orgs' rows (S§3.7). The application connects as a role that does not own the tables and cannot bypass RLS; migrations run as a separate role, from numbered SQL files applied by `internal/store`. The only tables without `org_id` and RLS are the listed lookup tables, which hold a lookup key, IDs, an expiry and a revoked marker, nothing else (ADR-0002). The database never holds a readable secret, an unwrapped key or a server credential (S§4) |
 | **B3** control plane ↔ agent | Outbound only, TLS 1.3, the control plane's public key pinned at enrolment, one Ed25519 identity per agent (S§2, S§3.1). The agent treats the control plane as able to be hostile: it accepts typed messages only and applies local policy and the sanitizer to each one. Malformed, oversized and out-of-order messages are rejected (S§7) |
-| **B4** agent → proxy | Caddy's admin API on a Unix socket readable only by the Moonglass service user. A complete JSON config; no TCP admin port (S§3.3). The proxy has no Docker access |
+| **B4** agent → proxy | Caddy's admin API on a Unix socket reachable only by the agent and the proxy, through the group `moonglass-proxy-admin` that only their units hold (ADR-0001 decision 3). A complete JSON config; no TCP admin port (S§3.3). The proxy has no Docker access |
 | **B5** agent → Docker Engine | The socket is root-equivalent. Nothing reaches it without passing the sanitizer (S§3.2) |
 | **B6** Docker Engine → containers | Containers run untrusted user code inside the default Docker sandbox plus the deny list in §6. They hold their environment's plaintext secrets |
 | **B7** agent → bucket | Only age ciphertext leaves the server (S§3.9) |
@@ -130,6 +130,7 @@ How exceptions are scoped:
 - The agent-managed data directory is `/var/lib/moonglass/mounts/<project>/<name>`, created by the agent, holding no agent state, and mountable only through a block's `data_dirs` by that block's image. The path is resolved first; a symlink, `..` or a path outside `mounts/<project>/` is rejected.
 - An unknown key or invalid block stops the agent. The file is owned by root and is not writable by the service user. It is read once, at start-up; a change takes effect on restart only. Enrolment state lives under `/var/lib/moonglass`, never in this file.
 - A rejected spec fails the deploy with an error naming the field and showing the `agent.toml` lines that would allow it. Nothing is silently stripped.
+- Labels in the `dev.moonglass.` namespace are set only by the agent; a user-supplied one is rejected and can never be allowed. Environment values never appear in a log, an error, a result or an audit record (ADR-0004 decisions 11 and 12).
 - Compose files are checked after `compose-go` has resolved interpolation, `extends` and profiles.
 - The escape suite covers every denied field, every alias of the Docker socket and every Compose trick that could smuggle one in. It is never red (S§7).
 
@@ -165,11 +166,12 @@ Ask every question of every diff. Report a finding with file:line, what breaks a
 - Does the diff add or change anything in a `.proto` file? Was the contract change approved first (B§8)?
 - Can any field carry a shell string, a host command line, a host path, or text the agent hands to a host program?
 - Does the agent check size, order and type before acting? Is there a protocol-abuse test, and a fuzz target for each new parser?
-- Could the message return plaintext or an unwrapped key to the control plane? Do agents still refuse `RewrapEnvKey` for protected environments?
+- Could the message return plaintext or an unwrapped key to the control plane? Do agents still refuse `RewrapEnvKey` for protected environments, deciding from the key record they unwrapped themselves (`docs/specs/secrets.md`)?
+- Can a re-sent command run twice? Each request id runs once (`docs/specs/connection.md`).
 
 **2. Policy or sanitizer bypass**
 - Is there any path to the Docker Engine that creates a container, build or exec without passing `internal/policy`?
-- Is the spec that was checked the exact spec that is sent, after Compose resolution, with nothing changed in between?
+- Is the spec that was checked the exact spec that is sent, after Compose resolution, with nothing changed in between, including its command, environment, labels and networks?
 - Is a denied field rejected with an error, rather than stripped or defaulted?
 - Can anything except a human editing the file change `agent.toml`, or widen what it allows? Does an unknown key still stop the agent? Does any block allow a field it does not list, match by tag, or reach a path outside its project's `mounts/` subtree? Is the file read anywhere but at start-up?
 - Does a new deny rule or allow key come with escape-suite fixtures?
@@ -177,6 +179,7 @@ Ask every question of every diff. Report a finding with file:line, what breaks a
 **3. Secret plaintext**
 - Can a secret value, token, key or recovery key reach a log line, an error string, an audit event, a live stream, an API response, the database or a temp file?
 - Does the control plane ever receive a plaintext value or an unwrapped environment key?
+- Does any grant, rotation, reveal or recipient change skip step-up because the caller holds the recovery key (ADR-0003 decision 11)? Does anything put key material in the agent database (ADR-0010)?
 - Is `secrets reveal` still the only read path, re-encrypting to a one-time CLI key? Is it still owner-only, behind step-up, and refused to agent identities?
 - Is an environment key pair ever generated or unwrapped outside the owner's CLI or an agent? Can an unprotected-environment rotation wrap to a recipient named in the request rather than one already stored? Does rotation keep the old key's recovery-wrapped copy and delete its agent-wrapped copies?
 - Are bucket credentials stored anywhere but as an environment secret?

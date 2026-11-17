@@ -64,7 +64,7 @@ No field is a host shell command.
 
 ## Deploy commands (W2-2)
 
-Four commands, each a protobuf type carried in the envelope. None has a field that is a host shell command or a host path. They have no response or result types: a failure travels in the existing `ERROR` envelope, and outcomes of execution belong to later tickets. The legal order of these commands for one app is `docs/specs/release.md`.
+Four commands, each a protobuf type carried in the envelope. None has a field that is a host shell command or a host path. W2-2 gave them no response type. W2-8 adds `CommandResult` (below): an `ERROR` envelope reports a message that could not be accepted at all, and a `CommandResult` reports what happened when the agent acted on one. The legal order of these commands for one app is `docs/specs/release.md`.
 
 An identifier (`app_id`, `release_id`) is 1 to 64 bytes of `[A-Za-z0-9._-]`. Violations are rejected with `ErrMalformed` when the payload is opened, before any later code acts.
 
@@ -80,6 +80,62 @@ An identifier (`app_id`, `release_id`) is 1 to 64 bytes of `[A-Za-z0-9._-]`. Vio
 `args` is an exec argv: 1 to 32 entries, each 1 to 1024 bytes with no NUL. Every entry, including the first, must be non-empty. Entries are never joined and never passed to a host shell. `reversible` says whether the pre-deploy step can be undone (S§3.13); it is carried as sent and does not change the release transitions.
 
 `RunPreDeploy` does not repeat the image: the executor takes it from the `Deploy` with the same `release_id`.
+
+## Deploy identity, service settings and results (W2-8)
+
+Specified by the weeks 2–3 preflight (owner decisions D1, D7, D9). W2-8 adds these to the `.proto`, validates them in `internal/protocol`, and regenerates the Go. Until W2-8 merges, they are not on the wire.
+
+### Deploy gains
+
+| Field | Type | Rule |
+|---|---|---|
+| `project`, `environment`, `service` | `string` | Required. Each a name: 1 to 63 bytes of `[a-z0-9-]`, starting and ending with a letter or digit. The same format the control plane uses (`docs/specs/storage.md`), and a valid path element for `agent.toml` blocks. |
+| `port` | `uint32` | Optional. 0 means none; otherwise 1 to 65535. The port the container listens on. |
+| `health_path` | `string` | Optional. Requires `port`. 1 to 256 bytes, starts with `/`, only `[A-Za-z0-9._~/-]`. |
+| `domains` | `repeated string` | Optional, 0 to 16 entries. Requires `port`. Each a lowercase DNS name: at least two labels, each 1 to 63 bytes of `[a-z0-9-]` not starting or ending with `-`, at most 253 bytes, no wildcard, no trailing dot. No duplicates. |
+| `has_pre_deploy` | `bool` | Whether a `RunPreDeploy` for this release follows. It is the `hasPreDeploy` input of `release.State.Deploy`. |
+
+**Identity binding.** `SwitchRelease`, `Rollback` and `RunPreDeploy` stay keyed by `app_id` and do not repeat the names. The agent binds an `app_id` to its `project`, `environment` and `service` at the first `Deploy` for it and stores the binding (`docs/specs/agent-state.md`). A later `Deploy` for that `app_id` that names a different project, environment or service is answered `REJECTED`, naming the stored triple, and nothing is done. A control plane cannot move an app into another project's `agent.toml` blocks.
+
+**Without a port** there is no route and no HTTP health check. The service counts as healthy once its container has been running for 10 seconds without a restart (`docs/specs/release.md`). This covers worker services and the databases of W6-1. There is no `UpdateRoutes` message: changing a domain needs a redeploy.
+
+### CommandResult
+
+A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` is the `request_id` of the command it answers. The agent sends exactly one per command envelope it accepted: `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, and from W3-7 `BUILD`.
+
+| Field | Type | Rule |
+|---|---|---|
+| `outcome` | `CommandOutcome` | `SUCCEEDED`; `FAILED` (the agent tried and could not finish); or `REJECTED` (refused before acting: an illegal transition, an identity mismatch, a policy rejection, a disk refusal). `UNSPECIFIED` and unknown values are rejected. |
+| `detail` | `string` | At most 4096 bytes. Empty on success. Plain text for a person, such as a rendered policy `Rejection`. Never an environment value, a secret or a credential. |
+| `app` | `AppState` | The app's release state after the command: `current_release_id`, `previous_release_id`, `candidate_release_id` (each empty or an identifier) and `phase` (`NONE`, `PENDING` or `READY`). |
+| `image_id` | `string` | For `DEPLOY` and `BUILD`: the image ID the release runs (`sha256:` plus 64 hex). Empty otherwise. |
+| `repo_digest` | `string` | For `DEPLOY`: the registry digest the reference resolved to (`<repository>@sha256:<64 hex>`). Empty for an image built on the server. |
+
+**Direction.** Commands travel from the control plane to the agent only; `Heartbeat` and `CommandResult` from the agent to the control plane only. Either side closes the connection on a message travelling the wrong way (`docs/specs/connection.md`).
+
+## Builds and server reports (W3-7)
+
+Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds them to the `.proto`.
+
+`Build`, a new type `BUILD`:
+
+| Field | Type | Rule |
+|---|---|---|
+| `app_id`, `release_id` | identifiers | As for `Deploy`. The built image is tagged for this release. |
+| `project`, `environment`, `service` | names | As for `Deploy`, under the same binding rule. |
+| `repository` | `string` | A GitHub repository as `<owner>/<repo>`. `owner` is 1 to 39 bytes of `[A-Za-z0-9-]` not starting with `-`. `repo` is 1 to 100 bytes of `[A-Za-z0-9._-]`, not `.` or `..`, not starting with `-` or `.`. No scheme, host or path: the agent builds the clone URL itself (`docs/specs/build.md`). |
+| `commit` | `string` | Exactly 40 lowercase hex characters. No branch or tag names. |
+
+`Heartbeat` gains:
+
+| Field | Type | Rule |
+|---|---|---|
+| `disk` | `DiskReport` | `data_root_free_bytes`, `data_root_total_bytes`, `agent_dir_free_bytes`, `agent_dir_total_bytes` (`uint64`), and `level`: `OK`, `LOW` or `CRITICAL` (`docs/specs/disk.md`). |
+| `deploy_key` | `string` | The server's SSH deploy public key as one OpenSSH line, `ssh-ed25519 <base64> moonglass-deploy`, at most 256 bytes; empty until the key exists (`docs/specs/build.md`). It is a public key, not a secret. |
+
+## Secret delivery (W4-8) and reveal (W4-9)
+
+Those messages are specified in `docs/specs/secrets.md` and added to the `.proto` by those tickets.
 
 ## Error codes
 

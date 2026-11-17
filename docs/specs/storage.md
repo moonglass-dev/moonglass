@@ -41,6 +41,36 @@ A person is a stable `user_id` minted when their first `user_identities` row is 
 
 Identifiers are 16 random bytes encoded as 32 lowercase hex characters, stored as `TEXT`. Timestamps are UTC RFC3339 text with a `Z`. These are the portable defaults; do not introduce UUID extensions or `timestamptz`.
 
+### Projects, environments, services and releases (W2-11)
+
+Specified by the weeks 2–3 preflight (owner decisions D6, D18). All are row-level tables with `org_id`.
+
+- `projects` — `org_id`, `id`, `name`, `created_at`; unique `(org_id, name)`.
+- `environments` — `org_id`, `id`, `project_id`, `name`, `created_at`; unique `(org_id, project_id, name)`. The protected flag and resource limits are W4-2; the environment key is W3-2.
+- `services` — `org_id`, `id`, `project_id`, `environment_id`, `name`, `server_id`, `current_release_id`, `previous_release_id` (nullable), `created_at`; unique `(org_id, environment_id, name)`. A service runs on exactly one server, chosen when it is created. The service `id` is the protocol's `app_id`. The two release columns copy the `app` state of the latest `CommandResult`.
+- `releases` — `org_id`, `id` (the protocol's `release_id`), `service_id`, `image_ref` (or empty for a git source), `git_repository`, `git_commit` (empty for an image; W3-4), `port`, `health_path`, `domains` (JSON array), `pre_deploy` (JSON argv, empty for none), `pre_deploy_reversible`, `status`, `step`, `request_id`, `image_id`, `repo_digest`, `detail`, `created_at`, `finished_at`.
+  - `status` is `queued`, `running`, `succeeded`, `failed`, `rejected` or `superseded`.
+  - `step` is the command in flight (`build`, `deploy`, `pre_deploy`, `switch`) and `request_id` its envelope id (`docs/specs/connection.md`), so a restarted server can re-send it.
+  - `image_id` and `repo_digest` come from the `CommandResult`, so the history shows what actually ran (owner condition on D4).
+- `rollbacks` — `org_id`, `id`, `service_id`, `request_id`, `status` (`running`, `succeeded`, `failed`, `rejected`), `detail`, `created_at`, `finished_at`.
+
+**Names** of projects, environments and services are 1 to 63 bytes of `[a-z0-9-]`, starting and ending with a letter or digit: the protocol's name format (`docs/specs/protocol.md`). They are never renamed, because the agent binds an app to them (owner decision D1). Identifiers and timestamps follow the rules below.
+
+The conformance suite gains: create a project, an environment and a service on a server of the same org; reject a service on another org's server; reject duplicate names; record a release and its result; a second org sees none of them.
+
+### Recovery recipients, environment keys and secrets (W3-2)
+
+Specified by the weeks 2–3 preflight (`docs/specs/secrets.md`). Row-level tables; they hold public keys and ciphertext only.
+
+- `recovery_recipients` — `org_id`, `id`, `recipient` (an age X25519 recipient, `age1…`), `created_at`. W3-2 allows one per org (ADR-0003 decision 12).
+- `environment_keys` — `org_id`, `environment_id` (unique), `public_key` (`age1…`), `created_at`.
+- `wrapped_environment_keys` — `org_id`, `environment_id`, `recipient_kind` (`recovery`, or `agent` from W4-8), `recipient_id` (a `recovery_recipients.id` or a `server_id`), `ciphertext` (an age file), `created_at`; unique `(org_id, environment_id, recipient_kind, recipient_id)`.
+- `secrets` — `org_id`, `environment_id`, `kind` (`env` or `registry`), `name`, `ciphertext` (an age file), `updated_at`; unique `(org_id, environment_id, kind, name)`.
+
+### Server deploy keys (W3-8)
+
+`servers` gains `deploy_key`: the server's SSH deploy public key from its latest `Heartbeat` (`docs/specs/protocol.md`), or empty. It is a public key.
+
 ## Transactions and isolation
 
 Every request that reads or writes an RLS table runs in a transaction that has set `app.org_id` to that org (Postgres). Store methods that take an org run that way. Lookups that exist to find the org (a token hash, an agent public key, an external identity, a user's orgs) do not require `app.org_id` and do not return a secret.

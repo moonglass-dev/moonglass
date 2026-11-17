@@ -63,6 +63,7 @@ The neutral description of one container or build the agent is about to create. 
 | `Sysctls` | `map[string]string`. |
 | `CgroupParent`, `Runtime` | Strings. |
 | `BuildEntitlements` | BuildKit entitlements for a build. |
+| `Cmd`, `Env`, `Labels`, `AgentLabels`, `Networks`, `RestartPolicy`, `LogConfig` | Pass-through fields (W2-9). See "Pass-through fields and agent labels". |
 
 A `Spec` with an empty `Project`, a relative bind source or an unknown `Mount.Type` is rejected as malformed (a violation with field `spec`), not defaulted.
 
@@ -93,6 +94,7 @@ ADR-0004 decisions 1 and 2. Every row is denied unless a matching allow block al
 | `runtime` other than the default runtime | `runtime` |
 | BuildKit entitlement `security.insecure` | `build_entitlements` |
 | BuildKit entitlement `network.host` | `build_entitlements` |
+| A `Labels` key in the `dev.moonglass.` namespace (never allowable) | `agent_labels` |
 
 `DeniedFields` is an exported, ordered list of these rows. The escape suite iterates it (see "Escape suite").
 
@@ -134,6 +136,31 @@ A non-default runtime is any `Runtime` that is not empty and not `Env.DefaultRun
 ### Build entitlements
 
 `security.insecure` and `network.host` are denied at build time the same way as the rows above. Compose `build.entitlements` maps to `BuildEntitlements`, and `build.privileged: true` is treated as `security.insecure`. A build has no digest image, so no block can currently match it (see "Open questions").
+
+## Pass-through fields and agent labels (W2-9)
+
+ADR-0004 decisions 10 to 12. The Engine request is built from `Checked` and nothing else, so every field the executor sends is in the `Spec`. The fields below are not judged by the deny list. `Check` copies them into `Checked` unchanged, except for the two label rules.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `Cmd` | `[]string` | Exec argv that replaces the image's command (a pre-deploy step). Empty means the image's own. Never joined, never passed to a shell. |
+| `Env` | `map[string]string` | Environment variables for the container. |
+| `Labels` | `map[string]string` | User-supplied labels (Compose `labels`). |
+| `AgentLabels` | `map[string]string` | Labels the agent sets. Filled only by agent code, never from a protocol message or a Compose file. |
+| `Networks` | `[]string` | Docker networks to attach. The executor sets the project network `mg-<Project>` (`docs/specs/release.md`). |
+| `RestartPolicy` | `string` | `no`, `on-failure` or `unless-stopped`; empty is `no`. |
+| `LogConfig` | `Driver string`, `Options map[string]string` | The log driver and its options. |
+
+Rules:
+
+- A key of `Labels` that starts with `dev.moonglass.` is a violation with key `agent_labels`. **No block can allow it**: a block that names `agent_labels` is invalid, like a sysctl that is not namespaced, and the rejection gives no snippet. The message says that only the agent sets labels in that namespace.
+- Every key of `AgentLabels` must start with `dev.moonglass.`. Any other key makes the spec malformed (field `spec`).
+- The Engine request's labels are `Labels` plus `AgentLabels`. They cannot collide, by the two rules above.
+- `CheckCompose` fills `Labels` from each service's `labels` and never fills `AgentLabels`.
+- **Environment values are never logged and never written into an error, a `Rejection`, a `Violation`, a command result or an audit record.** Names may be. A test sets a value that is also a field name elsewhere in the spec and asserts that it appears nowhere in the rejection text.
+- `RestartPolicy` other than the three values, or a `LogConfig` with an empty `Driver` and non-empty `Options`, makes the spec malformed (field `spec`).
+
+The escape suite gains a fixture for a Compose service with a `dev.moonglass.project` label (rejected), and a table row for each pass-through field showing it is copied unchanged.
 
 ## Allow blocks
 
@@ -284,7 +311,7 @@ Then restart the agent. The file is read at start-up only.
 - The snippet always names `project` and `image`. The image is the spec's digest form when it has one, and `<name>@sha256:<digest>` otherwise. It never names `environment` or `service`; a narrower block is the operator's choice.
 - Several violations of one spec are merged into one snippet.
 - For a protected mount, a symlink, a `..` or a path outside `mounts/<project>/` the message says exactly that and gives the `data_dirs` or `bind_mounts` form only where one could apply. For a sysctl that is not namespaced, it says no block can allow it and gives no snippet.
-- Errors contain field names, paths, image references and sysctl names. They never contain environment values.
+- Errors contain field names, paths, image references, sysctl names and environment variable names. They never contain environment values.
 - `CheckCompose` returns one `*Rejection` listing every failing service.
 
 ## Escape suite
@@ -353,6 +380,8 @@ Each needs an owner decision before a ticket builds on it. None blocks W1-1; W1-
 
 6. **`pid: container:<id>` and `ipc: container:<id>`.** ADR-0004 decision 1 names `pid: host`, `ipc: host`, and only `network_mode: container:<id>` as a cross-project check. A spec that joins another project's PID or IPC namespace is therefore not denied by this ticket. Whether those forms should be checked the same way as `network_mode` is a later decision, and would amend the ADR.
 7. **`network_mode: service:<name>` inherits the target's network namespace.** The narrower behaviour allows it when the named service is in the same Compose project, with no further check of whether that service itself uses the host network or a cross-project `container:` mode. A later ticket may want to reject or require a block when the joined service would not itself pass without one.
+
+8. **Cross-project `Networks`.** Nothing in the protocol sets `Networks`; the executor attaches only the project's own network. A Compose service that names another project's network (W6-4) is not checked by W2-9. Whether to deny it is a decision for W6-4, with an ADR-0004 amendment.
 
 ## Not covered
 

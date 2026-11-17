@@ -108,7 +108,7 @@ Thresholds are my proposals. Each one says what we do if it fails, so a miss cha
   - One deploy per app at a time.
   - Pre-deploy steps in a sanitized one-off container (S§3.13).
   - **The operation registry** generating REST and the CLI, with owner tokens and hash-chained audit events. It lands here rather than in week 5 so the API is never written twice (build plan W2-1).
-  - In the secondary lane: the UI shell (static build embedded in the binary, design tokens, ⌘K, a "servers online" page).
+  - The UI shell moved to week 4, behind sign-in (W4-1); the preflight of 2026-11-17 decided this, because the UI must not hold a token page script can read.
 - **Demo:**
   - A load generator holds steady traffic through ten consecutive deploys with **zero failed requests**, then `rollback` completes in under five seconds.
   - A failing pre-deploy step leaves the old release serving.
@@ -116,14 +116,12 @@ Thresholds are my proposals. Each one says what we do if it fails, so a miss cha
 
 ### Week 3: git push to live, with secrets and a disk that cannot fill
 - **Build:**
-  - GitHub App connection; deploy key generated on the server.
-  - Builds from a Dockerfile or prebuilt image through BuildKit; the build-in-CI template; private registry pulls.
-  - Environment variables.
-  - **Environment keys, `moonglass keys init`, browser and CLI encryption, `secrets reveal`, `secrets grant`, `secrets rotate`.**
+  - Builds on the server from a GitHub repository and commit, with a deploy key generated on the server (`moonglass deploy --git`); builds of a Dockerfile or prebuilt image through BuildKit; the build-in-CI template. The GitHub App moves to week 4: creating one from a manifest needs a signed-in session (W4-1).
+  - **Environment keys, `moonglass keys init`, and `secrets set` from the CLI.** The control plane stores ciphertext only.
+  - Moved to week 4 because each needs step-up (ADR-0003 decision 11): delivering secrets to servers, environment variables and private registry pulls (which use them), `secrets reveal`, `secrets grant` and `secrets rotate`. Browser encryption (W4-5) arrives with the UI in week 4.
   - Build-cache cap and image cleanup; **disk-full handling** (S§3.13).
 - **Demo:**
-  - `git push` goes live on the 2 GB server. The stored secret is shown to be ciphertext in the control-plane database.
-  - Add a second server to the environment and watch it receive the wrapped key.
+  - `git push` goes live on the 2 GB server, through the build-in-CI template. The stored secret is shown to be ciphertext in the control-plane database.
   - Fill the disk to 95%: the build is refused, the cache is pruned, an alert fires, and the app keeps serving.
 
 ### Week 4: auto-rollback, environments, sign-in, first real UI
@@ -134,7 +132,9 @@ Thresholds are my proposals. Each one says what we do if it fails, so a miss cha
   - **GitHub sign-in, email magic links, sessions list and revoke.**
   - UI for projects, services, deploys and logs.
   - Email and webhook notifications.
+  - From week 3: secret delivery, environment variables and private registries, `secrets grant`, `rotate` and `reveal`, the GitHub App, and the UI shell from week 2.
 - **Demo:**
+  - Add a second server to the environment and watch it receive the wrapped key (moved from week 3).
   - Push a commit that crash-loops. It rolls back automatically inside two minutes, and a notification arrives.
   - Push a commit that raises the 5xx rate. Shadow mode reports "this would have rolled back" with the numbers. Turn the trigger on, push again, and watch it roll back in the UI.
 
