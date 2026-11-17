@@ -695,29 +695,145 @@ EOF
 	[ -z "$bad" ] || { R_REASON="every dependency needs a version, 'module/path v1.2.3' or 'module/path@v1.2.3':$bad"; return 1; }
 }
 
-# go_fetch ARGS: runs go in the worktree with the caller's network settings and without GOFLAGS=-mod=readonly.
-# GOTOOLCHAIN=local: a listed module can never make go download and switch to another toolchain, or raise go.mod's go line.
-# FETCH_PROXY, when set, replaces the caller's GOPROXY for that call.
-go_fetch() {
-	local v fenv=("${ENVB[@]}")
-	for v in $GO_FETCH_VARS; do [ -z "${!v+x}" ] || fenv+=("$v=${!v}"); done
-	fenv+=("GOTOOLCHAIN=local")
-	[ -z "${FETCH_PROXY:-}" ] || fenv+=("GOPROXY=$FETCH_PROXY")
-	(cd "$WT" && with_timeout "$SECS_GO" "${fenv[@]}" go "$@") >>"$TD/deps.log" 2>&1
+# go_ver_norm V: prints a three-part version (1.21 -> 1.21.0) from "go1.26.2", "1.27.0" or "1.21".
+go_ver_norm() {
+	local v=${1#go}
+	case $v in
+	*.*.*) printf '%s' "$v" ;;
+	*.*) printf '%s.0' "$v" ;;
+	*) printf '%s.0.0' "$v" ;;
+	esac
 }
 
+# go_ver_ge A B: succeeds when version A is greater than or equal to version B.
+go_ver_ge() {
+	local a b
+	a=$(go_ver_norm "$1")
+	b=$(go_ver_norm "$2")
+	[ "$a" = "$b" ] && return 0
+	[ "$(printf '%s\n%s\n' "$a" "$b" | sort -V | head -1)" = "$b" ]
+}
+
+# go_fetch_toolchain: GOTOOLCHAIN for this worktree.
+# Use local when the installed go already meets go.mod's `go` line (test fixtures, and machines whose /usr/local/go is new enough).
+# Otherwise use the declared `toolchain` line (go1.27.4 in this repo) so fetch does not stall on an older local go.
+# Last resort is a toolchain named from the `go` line. A listed module still cannot raise the go or toolchain lines:
+# fetch_deps snapshots them and fails if they change.
+go_fetch_toolchain() {
+	local go_line tc localv
+	go_line=$(awk '/^go / { print $2; exit }' "$WT/go.mod")
+	tc=$(awk '/^toolchain / { print $2; exit }' "$WT/go.mod")
+	# go env in the worktree would itself fail when local go is older than go.mod, so run outside any module.
+	localv=$(cd / && "${ENVB[@]}" GOTOOLCHAIN=local go env GOVERSION 2>/dev/null) || localv=""
+	if [ -n "$go_line" ] && [ -n "$localv" ] && go_ver_ge "$localv" "$go_line"; then
+		printf 'local'
+	elif [ -n "$tc" ]; then
+		printf '%s' "$tc"
+	elif [ -n "$go_line" ]; then
+		printf 'go%s' "$(go_ver_norm "$go_line")"
+	else
+		printf 'local'
+	fi
+}
+
+# go_fetch ARGS: runs go in the worktree with the caller's network settings and without GOFLAGS=-mod=readonly.
+# GOTOOLCHAIN is go_fetch_toolchain, not a hard-coded local, so a machine whose installed go is older than go.mod
+# still uses the already-declared toolchain (go1.27.4 here). A listed module cannot switch toolchains or raise the go line.
+# FETCH_PROXY, when set, replaces the caller's GOPROXY for that call.
+go_fetch_env() {
+	local v
+	GO_FETCH_ENV=("${ENVB[@]}")
+	for v in $GO_FETCH_VARS; do [ -z "${!v+x}" ] || GO_FETCH_ENV+=("$v=${!v}"); done
+	GO_FETCH_ENV+=("GOTOOLCHAIN=$(go_fetch_toolchain)")
+	[ -z "${FETCH_PROXY:-}" ] || GO_FETCH_ENV+=("GOPROXY=$FETCH_PROXY")
+}
+
+go_fetch() {
+	local GO_FETCH_ENV
+	go_fetch_env
+	(cd "$WT" && with_timeout "$SECS_GO" "${GO_FETCH_ENV[@]}" go "$@") >>"$TD/deps.log" 2>&1
+}
+
+# go_fetch_capture FILE ARGS: like go_fetch, but writes stdout to FILE (stderr still goes to deps.log).
+go_fetch_capture() {
+	local dest=$1 GO_FETCH_ENV
+	shift
+	go_fetch_env
+	(cd "$WT" && with_timeout "$SECS_GO" "${GO_FETCH_ENV[@]}" go "$@") >"$dest" 2>>"$TD/deps.log"
+}
+
+# Temporary package that imports fetched modules so tidy records their transitive go.sum entries.
+# Directories starting with . or _ are ignored by go list, so this cannot live under a hidden path.
+FETCH_STUB_DIR=ticketfetchdeps
+
+# fetch_pkg MODULE: a package path under MODULE that exists after go get (the module root, or the first package under it).
+fetch_pkg() {
+	local m=$1 out dest
+	dest=$(mktemp "${TMPDIR:-/tmp}/fetch-pkg.XXXXXX") || return 1
+	if go_fetch_capture "$dest" list -e -f '{{if not .Error}}{{.ImportPath}}{{end}}' "$m"; then
+		out=$(tr -d '\r' <"$dest")
+		rm -f "$dest"
+		if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
+	else
+		rm -f "$dest"
+	fi
+	dest=$(mktemp "${TMPDIR:-/tmp}/fetch-pkg.XXXXXX") || return 1
+	if go_fetch_capture "$dest" list -e -f '{{if not .Error}}{{.ImportPath}}{{end}}' "$m/..."; then
+		out=$(awk 'NF { print; exit }' "$dest")
+		rm -f "$dest"
+		if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
+	else
+		rm -f "$dest"
+	fi
+	return 1
+}
+
+write_fetch_stub() {
+	local s m p imports=""
+	mkdir -p "$WT/$FETCH_STUB_DIR"
+	for s in "${DEP_SPECS[@]}"; do
+		m=${s%@*}
+		p=$(fetch_pkg "$m") || { R_REASON="could not list a package under $m after go get; see .ticket/$ID/deps.log"; return 1; }
+		imports="${imports}	_ \"$p\"
+"
+	done
+	cat >"$WT/$FETCH_STUB_DIR/stub.go" <<EOF
+package ticketfetchdeps
+
+import (
+$imports)
+EOF
+}
+
+rm_fetch_stub() { rm -rf "$WT/$FETCH_STUB_DIR"; }
+
 # fetch_deps: the harness, not the model, adds the ticket's `dependencies` to go.mod and go.sum before the impl session. Nothing is committed.
+# After go get, a temporary package imports the listed modules so go mod tidy fills transitive go.sum entries that lazy
+# loading would otherwise omit (an impl session under GOFLAGS=-mod=readonly cannot add them). The stub is then deleted
+# and go get is run again; tidy is not run after the stub is gone, or those transitives would be pruned.
 # tidy drops a module that nothing imports yet, so the second go get puts it back for the session to use.
 # Tidy runs offline, after go mod download has cached the modules already required: it can resolve what the listed modules bring and nothing else.
 # An import of a module that is not listed (and not already in go.mod) fails there instead of being looked up at latest.
+# go and toolchain lines are snapshotted and must not change (a listed module must not bump the language version).
 fetch_deps() {
 	[ -n "$T_DEPS" ] || return 0
 	parse_deps || return 1
 	in_list go.mod "$T_ALLOW" && in_list go.sum "$T_ALLOW" || { R_REASON="a ticket with dependencies must list go.mod and go.sum in allow, or verify rejects the change"; return 1; }
 	: >"$TD/deps.log"
-	log "fetch ${DEP_SPECS[*]}"
-	go_fetch get "${DEP_SPECS[@]}" && go_fetch mod download && FETCH_PROXY=off go_fetch mod tidy && go_fetch get "${DEP_SPECS[@]}" ||
-		{ R_REASON="go get or go mod tidy failed for ${DEP_SPECS[*]} (a module that is imported but not in the ticket's dependencies cannot be fetched); no model session was started; see .ticket/$ID/deps.log: $(tail -n 3 "$TD/deps.log" | tr '\n' ' ' | cut -c1-300)"; return 1; }
+	log "fetch ${DEP_SPECS[*]} (GOTOOLCHAIN=$(go_fetch_toolchain))"
+	local go_lines
+	go_lines=$(grep -E '^(go|toolchain) ' "$WT/go.mod" || true)
+	rm_fetch_stub
+	if ! { go_fetch get "${DEP_SPECS[@]}" && write_fetch_stub && go_fetch list "./$FETCH_STUB_DIR" && go_fetch mod download && FETCH_PROXY=off go_fetch mod tidy && rm_fetch_stub && go_fetch get "${DEP_SPECS[@]}"; }; then
+		rm_fetch_stub
+		R_REASON="go get or go mod tidy failed for ${DEP_SPECS[*]} (a module that is imported but not in the ticket's dependencies cannot be fetched); no model session was started; see .ticket/$ID/deps.log: $(tail -n 3 "$TD/deps.log" | tr '\n' ' ' | cut -c1-300)"
+		return 1
+	fi
+	if [ "$(grep -E '^(go|toolchain) ' "$WT/go.mod" || true)" != "$go_lines" ]; then
+		rm_fetch_stub
+		R_REASON="fetch changed go.mod's go or toolchain line for ${DEP_SPECS[*]}; no model session was started; see .ticket/$ID/deps.log"
+		return 1
+	fi
 }
 
 cmd_tests() {

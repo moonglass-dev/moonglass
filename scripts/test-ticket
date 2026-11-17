@@ -500,18 +500,23 @@ done
 
 # 12. The harness fetches the ticket's dependencies before the impl session; the model never runs go get.
 # A local module proxy stands in for the network. Go settings reach the fetch only through GO_FETCH_VARS.
-mkproxy() { # module version [go version]: writes a one-package module into the file proxy
+mkproxy() { # module version [go version] [require-module require-version]: writes a one-package module into the file proxy
 	local m=$1 v=$2 g=${3:-1.21} d=$TMP/proxy/$1/@v
 	mkdir -p "$d"
 	printf '{"Version":"%s","Time":"2020-01-01T00:00:00Z"}' "$v" >"$d/$v.info"
 	printf 'module %s\n\ngo %s\n' "$m" "$g" >"$d/$v.mod"
+	if [ -n "${4:-}" ]; then printf '\nrequire %s %s\n' "$4" "$5" >>"$d/$v.mod"; fi
 	printf '%s\n' "$v" >"$d/list"
-	python3 -I - "$m" "$v" "$d/$v.zip" "$g" <<'PY'
+	python3 -I - "$m" "$v" "$d/$v.zip" "$g" "${4:-}" "${5:-}" <<'PY'
 import sys, zipfile
-m, v, out, g = sys.argv[1:]
+m, v, out, g = sys.argv[1:5]
+req_m = sys.argv[5] if len(sys.argv) > 5 else ""
+req_v = sys.argv[6] if len(sys.argv) > 6 else ""
+req = f"\nrequire {req_m} {req_v}\n" if req_m else ""
+src = f"package dep\n\nimport _ \"{req_m}\"\n" if req_m else "package dep\n"
 with zipfile.ZipFile(out, "w") as z:
-    z.writestr(f"{m}@{v}/go.mod", f"module {m}\n\ngo {g}\n")
-    z.writestr(f"{m}@{v}/dep.go", "package dep\n")
+    z.writestr(f"{m}@{v}/go.mod", f"module {m}\n\ngo {g}\n{req}")
+    z.writestr(f"{m}@{v}/dep.go", src)
 PY
 }
 mkproxy example.com/dep v1.0.0
@@ -613,6 +618,30 @@ out=$("$TICKET" impl FAKE-6)
 check "a dependency needing a newer go blocks impl" "$fetch_blocked and (.reason | contains(\"go get or go mod tidy failed\"))" "$out"
 [ "$(grep -E '^(go|toolchain) ' "$WT6/go.mod")" = "$G6" ] && echo "PASS the go and toolchain lines are unchanged" || { echo "FAIL go.mod's go or toolchain line changed"; fail=1; }
 [ ! -e "$CLAUDE_FAKE_OUT" ] && echo "PASS no model session for a dependency needing a newer go" || { echo "FAIL a model session ran"; fail=1; }
+
+# After a successful fetch the temporary import stub is gone, so it is never committed.
+[ ! -e "$WT3/ticketfetchdeps/stub.go" ] && [ ! -d "$WT3/ticketfetchdeps" ] && echo "PASS the fetch stub is removed after fetch" || { echo "FAIL the fetch stub was left in the worktree"; fail=1; }
+
+# Transitive go.sum entries are present after fetch, even though nothing in the tree imports the listed module yet.
+# That is what an impl session under GOFLAGS=-mod=readonly needs in order to import the module without go mod tidy.
+mkproxy example.com/leaf v1.0.0
+mkproxy example.com/withtrans v1.0.0 1.21 example.com/leaf v1.0.0
+started FAKE-7 '  - example.com/withtrans v1.0.0' "$GOALLOW"
+WT7=$TMP/repo.worktrees/FAKE-7
+rm -f "$CLAUDE_FAKE_OUT"
+out=$("$TICKET" impl FAKE-7)
+check "fetch of a module with a transitive dependency starts the session" '.state == "impl_blocked" and (.reason | contains("fake stop"))' "$out"
+check "go.sum has the listed module and its transitive dependency" 'contains("example.com/withtrans v1.0.0 h1:") and contains("example.com/leaf v1.0.0 h1:")' "$(jq -Rs . <"$WT7/go.sum")"
+[ ! -d "$WT7/ticketfetchdeps" ] && echo "PASS the transitive-fetch stub is removed" || { echo "FAIL the stub was left after a transitive fetch"; fail=1; }
+# An import of the listed module, under the same readonly flag the impl session uses, must resolve without further tidy.
+printf 'package calc\n\nimport _ "example.com/withtrans"\n' >"$WT7/pkg/calc/use.go"
+if (cd "$WT7" && env -u FETCH_PROXY GOFLAGS=-mod=readonly GOPROXY=off go list ./pkg/calc >/dev/null); then
+	echo "PASS readonly go list succeeds after fetch of transitives"
+else
+	echo "FAIL readonly go list failed after fetch of transitives"
+	fail=1
+fi
+rm -f "$WT7/pkg/calc/use.go"
 
 # A ticket with no dependencies fetches nothing.
 started FAKE-4 '' "$GOALLOW"
