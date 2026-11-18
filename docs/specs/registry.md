@@ -84,7 +84,7 @@ Secret reveal, grant, rotate and every other secret-recipient change also need t
 
 ## Tokens
 
-An owner token is `mg_` plus 52 lowercase unpadded base32 characters, from 256 bits of `crypto/rand`. `MintToken` stores `SHA-256` of the full text in `token_hashes`, and the name, expiry, human owner and last four characters in `tokens`. The plaintext is returned once and never stored or logged. An owner token has exactly one scope row, `* * *`; `MintToken` rejects any other row, a missing name and an expiry that is not in the future. There is no registration endpoint: a token is minted in process (`Server.MintOwnerToken`), and from W3-10 `moonglass server --print-owner-token NAME` prints one (`docs/specs/enrolment.md`).
+An owner token is `mg_` plus 52 lowercase unpadded base32 characters, from 256 bits of `crypto/rand`. `MintToken` stores `SHA-256` of the full text in `token_hashes`, and the name, expiry, human owner and last four characters in `tokens`. The plaintext is returned once and never stored or logged. An owner token has exactly one scope row, `* * *`; `MintToken` rejects any other row, a missing name and an expiry that is not in the future. There is no registration endpoint: a token is minted in process (`Server.MintOwnerToken`), and `moonglass server --print-owner-token NAME` prints one (`docs/specs/enrolment.md`).
 
 `Registry.Authenticate` hashes the bearer text, finds the token and its holder's role, and returns `ErrUnauthenticated` for a malformed, unknown, expired or revoked token.
 

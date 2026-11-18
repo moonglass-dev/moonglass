@@ -28,6 +28,9 @@ const (
 	tokenPrefix         = "mg_"
 	tokenSecretLen      = 52
 	tokenLifetime       = time.Hour
+
+	ownerTokenLifetime = 90 * 24 * time.Hour
+	localOwnerIdentity = "local:owner"
 )
 
 var tokenEncoding = base32.StdEncoding.WithPadding(base32.NoPadding)
@@ -118,6 +121,37 @@ func (s *Server) MintOwnerToken(ctx context.Context, orgID, userID, name string,
 	return registry.MintToken(ctx, s.st, orgID, userID, name, []registry.Scope{{Project: "*", Environment: "*", Operation: "*"}}, expires, s.now())
 }
 
+// IssueOwnerToken creates an owner token named name, expiring 90 days after
+// issue, for the owner of orgID, and returns its text, which is shown only now.
+// When the org has no owner yet it first mints the user behind
+// localOwnerIdentity and gives it the owner role.
+func (s *Server) IssueOwnerToken(ctx context.Context, orgID, name string) (string, error) {
+	if name == "" {
+		return "", errors.New("issue owner token: name is empty: pass --print-owner-token NAME, named after where the token will be used")
+	}
+	members, err := s.st.Memberships(ctx, orgID)
+	if err != nil {
+		return "", fmt.Errorf("issue owner token: list memberships of org %s: %w", orgID, err)
+	}
+	userID := ""
+	for _, m := range members {
+		if m.Role == store.RoleOwner {
+			userID = m.UserID
+			break
+		}
+	}
+	if userID == "" {
+		userID, err = s.st.UserForIdentity(ctx, localOwnerIdentity)
+		if err != nil {
+			return "", fmt.Errorf("issue owner token: create local owner: %w", err)
+		}
+		if err := s.st.AddMembership(ctx, orgID, userID, store.RoleOwner); err != nil {
+			return "", fmt.Errorf("issue owner token: make local owner the owner of org %s: %w", orgID, err)
+		}
+	}
+	return s.MintOwnerToken(ctx, orgID, userID, name, s.now().Add(ownerTokenLifetime))
+}
+
 // IssueEnrolToken creates a one-hour, one-use enrolment token for orgID and
 // returns its text. Only the hash is stored.
 func (s *Server) IssueEnrolToken(ctx context.Context, orgID string) (string, error) {
@@ -134,8 +168,10 @@ func (s *Server) IssueEnrolToken(ctx context.Context, orgID string) (string, err
 
 // Run opens dataDir/server.db, creates an org if there is none, and serves
 // until ctx ends: enrolment over HTTP on listen and agents over TLS 1.3 WSS on
-// agentListen. With printEnrolToken it issues one token and prints it to stdout.
-func Run(ctx context.Context, dataDir, listen, agentListen string, printEnrolToken bool, stdout io.Writer) error {
+// agentListen. With printEnrolToken it issues one token and prints it to stdout;
+// with a non-empty ownerTokenName it also issues one owner token and prints it
+// there. An empty ownerTokenName means no owner token is requested.
+func Run(ctx context.Context, dataDir, listen, agentListen string, printEnrolToken bool, ownerTokenName string, stdout io.Writer) error {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fmt.Errorf("create data dir %s: %w", dataDir, err)
 	}
@@ -148,16 +184,26 @@ func Run(ctx context.Context, dataDir, listen, agentListen string, printEnrolTok
 	if err != nil {
 		return err
 	}
-	if printEnrolToken {
+	if printEnrolToken || ownerTokenName != "" {
 		var orgID, token string
 		if orgID, err = firstOrg(ctx, st, dataDir); err != nil {
 			return err
 		}
-		if token, err = s.IssueEnrolToken(ctx, orgID); err != nil {
-			return err
+		if printEnrolToken {
+			if token, err = s.IssueEnrolToken(ctx, orgID); err != nil {
+				return err
+			}
+			if _, err = fmt.Fprintln(stdout, token); err != nil {
+				return fmt.Errorf("print enrolment token: %w", err)
+			}
 		}
-		if _, err = fmt.Fprintln(stdout, token); err != nil {
-			return fmt.Errorf("print enrolment token: %w", err)
+		if ownerTokenName != "" {
+			if token, err = s.IssueOwnerToken(ctx, orgID, ownerTokenName); err != nil {
+				return err
+			}
+			if _, err = fmt.Fprintln(stdout, token); err != nil {
+				return fmt.Errorf("print owner token: %w", err)
+			}
 		}
 	}
 	ln, err := net.Listen("tcp", listen)

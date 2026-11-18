@@ -4,6 +4,8 @@ moonglass.dev/moonglass/cmd/moonglass TestKeysInitFailures
 moonglass.dev/moonglass/cmd/moonglass TestKeysInitWritesRecoveryKeyFile
 moonglass.dev/moonglass/cmd/moonglass TestProxyAdminSocketDefault
 moonglass.dev/moonglass/cmd/moonglass TestProxyRejectsEmptyAdminSocket
+moonglass.dev/moonglass/cmd/moonglass TestServerOwnerTokenFlagNeedsName
+moonglass.dev/moonglass/cmd/moonglass TestUsageListsOwnerTokenFlag
 moonglass.dev/moonglass/cmd/moonglass TestUsageOnMissingOrUnknownCommand
 moonglass.dev/moonglass/cmd/moonglass TestVersionPrintsVersionCommitAndDate
 moonglass.dev/moonglass/cmd/moonglass TestVersionReportsFailedWrite
@@ -149,8 +151,14 @@ moonglass.dev/moonglass/internal/server TestAgentEndpointRejectsNonGet
 moonglass.dev/moonglass/internal/server TestAgentRoutesMatchTheDeclaredList
 moonglass.dev/moonglass/internal/server TestEnrollRejectsInvalidToken
 moonglass.dev/moonglass/internal/server TestEnrollRejectsReplay
+moonglass.dev/moonglass/internal/server TestIssueOwnerTokenAddsOwnerBesideExistingAdmins
+moonglass.dev/moonglass/internal/server TestIssueOwnerTokenCreatesLocalOwner
+moonglass.dev/moonglass/internal/server TestIssueOwnerTokenRejectsEmptyNameWithoutWrites
+moonglass.dev/moonglass/internal/server TestIssueOwnerTokenUsesExistingOwner
 moonglass.dev/moonglass/internal/server TestRejectsTLSBelow13
 moonglass.dev/moonglass/internal/server TestRejectsUnknownAgent
+moonglass.dev/moonglass/internal/server TestRunPrintsEnrolTokenBeforeOwnerToken
+moonglass.dev/moonglass/internal/server TestRunPrintsOwnerTokenOnce
 moonglass.dev/moonglass/internal/server TestServerClosesOnBadAgentFrame
 moonglass.dev/moonglass/internal/store TestAppRoleCannotBypassRLS
 moonglass.dev/moonglass/internal/store TestConformancePostgres

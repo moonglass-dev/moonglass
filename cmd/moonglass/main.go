@@ -70,13 +70,24 @@ func runServer(args []string, stdout, stderr io.Writer) int {
 	listen := fs.String("listen", "127.0.0.1:8080", "enrolment listen address (plain HTTP)")
 	agentListen := fs.String("agent-listen", "127.0.0.1:8443", "agent listen address (TLS 1.3 WSS)")
 	printToken := fs.Bool("print-enroll-token", false, "issue one enrolment token and print it")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
+	ownerToken := fs.String("print-owner-token", "", "mint one owner token named NAME and print it")
+	if err := fs.Parse(args); err != nil {
+		_, _ = io.WriteString(stderr, usage)
+		return 2
+	}
+	ownerGiven := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "print-owner-token" {
+			ownerGiven = true
+		}
+	})
+	if fs.NArg() != 0 || ownerGiven && *ownerToken == "" {
 		_, _ = io.WriteString(stderr, usage)
 		return 2
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := server.Run(ctx, *dataDir, *listen, *agentListen, *printToken, stdout); err != nil {
+	if err := server.Run(ctx, *dataDir, *listen, *agentListen, *printToken, *ownerToken, stdout); err != nil {
 		_, _ = fmt.Fprintf(stderr, "moonglass: server: %v\n", err)
 		return 1
 	}
