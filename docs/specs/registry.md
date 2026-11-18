@@ -14,15 +14,15 @@ An operation is a `Spec` and a handler, registered with `registry.Register`.
 | `MinRole` | Lowest role that may call it: `viewer`, `member`, `admin` or `owner`. |
 | `Destructive` | `registry.Yes` or `registry.No`. The zero value is `Unset` and `Register` rejects it, so an operation that omits the flag does not register. |
 
-`Register` also rejects an empty or duplicate name, an invalid role, and a destructive operation whose `MinRole` is below admin. Deploy and rollback are not destructive. A handler is `func(ctx, Call, In) (Out, error)`; `Call` carries the org and user ids and has no methods, so a handler cannot write an audit event.
+`Register` also rejects an empty or duplicate name, an invalid role, and a destructive operation whose `MinRole` is below admin. Deploy and rollback are not destructive. A handler is `func(ctx, Call, In) (Out, error)`; `Call` carries the org and user ids and the target's resolved project and environment ids, and has no methods, so a handler cannot write an audit event.
 
-`registry.Operations()` lists the shipped specs; W2-1 ships `servers.list` (`GET /v1/servers`, viewer, not destructive).
+`registry.Operations()` lists the shipped operations, each with its `Spec` and the type of its `In`, which generation reads ("Inputs and errors"); W2-1 ships `servers.list` (`GET /v1/servers`, viewer, not destructive).
 
 ### Operations added in weeks 2 and 3
 
 Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry operations are a contract (ADR-0006 decision 9): each ticket adds exactly the operations listed for it, regenerates the OpenAPI file and the CLI, and adds authz-matrix rows.
 
-**Targets.** Inputs name projects, environments and services by name. The handler resolves them in the caller's org; the scope check uses their ids. An operation's target is the project and environment it acts on: empty for org-level operations, the project with an empty environment for project-level ones.
+**Targets.** Inputs name projects, environments and services by name. `registry.Invoke` resolves the target's names in the caller's org and the scope check uses their ids ("Inputs and errors"); the handler resolves any other name, such as a service, after authorisation. An operation's target is the project and environment it acts on: empty for org-level operations, the project with an empty environment for project-level ones.
 
 | Ticket | Name | Method, path | `MinRole` | Destructive | Target |
 |---|---|---|---|---|---|
@@ -120,8 +120,78 @@ W5-1b adds `agent_id` to the event and the hash, and W5-5 adds `project_id`, `en
 
 `make generate` rewrites `internal/api/openapi.json` (Huma) and `internal/cli/generated.go` from `registry.Operations()`. The tests `TestGeneratedOpenAPIIsCurrent` and `TestGeneratedCLIIsCurrent` run in `make test`, so `make ci` fails when either file is stale.
 
-The generated runner sends `Authorization: Bearer $MOONGLASS_TOKEN` to `$MOONGLASS_URL` and prints the response; a 4xx or 5xx goes to stderr with exit code 1. `cli.Run` exits 2 for an unknown subcommand, or when the local handlers passed to it differ from `registry.LocalCommands`.
+The generated runner sends `Authorization: Bearer $MOONGLASS_TOKEN` to `$MOONGLASS_URL` and prints a success response to stdout; errors are printed as "Generated CLI" says, with exit code 1. `cli.Run` exits 2 for an unknown subcommand, or when the local handlers passed to it differ from `registry.LocalCommands`.
 
-## REST errors
+## Inputs and errors
 
-401 for a missing, unknown, expired or revoked token; 403 for a denied call or a call pending approval; 500 for a store failure, with a message that points to the control-plane logs.
+Owner decision of 2026-11-18 (ADR-0006 decisions 3 and 9). W2-11c builds it; every later operation follows it. Where another spec shows a different command shape, this section wins, and the ticket that builds that command corrects its spec.
+
+### Input fields
+
+An operation's `In` is a Go struct. Each field has a `json` tag in snake_case and a `doc` tag, and is one of four kinds: string, boolean, integer (`int64`, written in decimal) or list of strings. A field is optional when its `json` tag has `omitempty`, and required otherwise; the `required` tag is never used. An input of any other kind, such as a list of objects, is allowed only for an operation whose subcommand is a local command ("Generated CLI").
+
+### Targets, authorisation and audit
+
+- `registry.Target` carries names, `Project` and `Environment`. `internal/api` fills it from the input's `project` and `environment` fields, which every project- and environment-level operation has as required inputs. It never resolves a name itself.
+- `registry.Invoke` resolves the target with one `store.ResolveTarget` call in the caller's org, as the first half of the scope check: after the role check, before the scope rows are matched. A call the role check refuses reads nothing from the store.
+- A name that does not resolve stands for an id that no scope row names, so only a `*` in that column matches it. When no row matches, the call is denied exactly as for a target the token does not cover: 403, outcome `denied`, the same reason. So a scoped token cannot learn which names exist outside its scope.
+- When a row does match, the call is answered 404, `project "<name>" not found` or `environment "<name>" not found in project "<project>"`, and the handler does not run. The event has outcome `error` and reason `not found`.
+- On success the handler gets the ids in `Call.ProjectID` and `Call.EnvironmentID` and never resolves the target's names again. Other names, such as `service` or `server`, are the handler's to resolve in those ids, after authorisation.
+- A request that fails decoding or the input schema (below) is answered 400 by `internal/api` before `Invoke`, so it writes no audit event: no operation was called. Huma checks the shape before the handler authenticates, so a malformed request is 400 even with a bad token. The schema is public in `internal/api/openapi.json`, so this reveals nothing.
+
+### Handler refusals
+
+A handler answers a request it cannot carry out with `registry.Refuse(kind, message)`, where kind is one of `registry.ErrInvalidInput`, `registry.ErrNotFound` or `registry.ErrConflict`. The result matches its kind with `errors.Is`. The message is written for the caller from the inputs and fixed text, such as `project "web" already exists`; it never wraps another error's text.
+
+- A handler maps every store sentinel it can meet to a refusal: `store.ErrInvalidName` to `ErrInvalidInput`, `store.ErrNotFound` to `ErrNotFound`, `store.ErrDuplicate` to `ErrConflict`. Cross-field rules, such as exactly one of `image` or `git` on `deploy`, are `ErrInvalidInput`.
+- Any other handler error, including a store sentinel the handler did not map, is a 500.
+- The audit event of a refusal has outcome `error` and reason `invalid input`, `not found` or `conflict`. Every other handler error keeps the reason `the handler returned an error`.
+
+### REST inputs
+
+- `GET`: every input is a query parameter named as its `json` tag. A list is the parameter repeated, `?domain=a&domain=b` (Huma's `explode` form); a comma is part of a value. A boolean is `true` or `false`.
+- `POST` and `PUT`: every input is a field of one JSON object in the body, sent with `Content-Type: application/json`, and there are no query parameters. A body over Huma's 1 MiB limit is 413.
+- Unknown query parameters and unknown body fields are refused with 400: `RejectUnknownQueryParameters` is set on every operation, and bodies keep Huma's default of no additional properties.
+- An optional input that is absent takes its zero value.
+
+### Errors
+
+| Status | When | `detail` |
+|---|---|---|
+| 400 | The request does not decode or does not match the input schema: a missing required input, a wrong type, an unknown parameter or field | `invalid input for <operation>`, with `errors` listing each `location` (such as `body.name`, `query.project`) and its `message` |
+| 400 | A refusal of kind `ErrInvalidInput` | the refusal's message |
+| 401 | A missing, unknown, expired or revoked token | `the token is missing, unknown, expired or revoked: mint a new one` |
+| 403 | A denied call, or one pending approval | `your role or the token's scope does not allow this operation`, or `this destructive call is pending approval` |
+| 404 | An unknown target within the token's scope, or a refusal of kind `ErrNotFound` | the message above, or the refusal's message |
+| 409 | A refusal of kind `ErrConflict` | the refusal's message |
+| 413 | A body over 1 MiB | Huma's message |
+| 500 | Anything else, such as a store failure | `the control plane could not complete the call; see its logs and retry`, with the error logged and never sent |
+
+- Huma's 422 is never sent: `internal/api` turns every schema failure into the 400 above.
+- Bodies are Huma's `application/problem+json`. An `errors` entry never carries the input `value`, so a ciphertext or other input sent in the wrong place is not echoed back.
+- No message carries a token, a secret value, a ciphertext, or the text of a wrapped error.
+
+### Generated CLI
+
+Each operation's subcommand is its name with dots turned into spaces, followed only by flags.
+
+- **One flag per input field,** named `--` plus the `json` tag with `_` turned into `-`: `--health-path`, `--pre-deploy-reversible`. The one exception is `environment`, whose flag is `--env`. There are no aliases and no short flags, so `--environment` is an unknown flag.
+- **Syntax** is the standard library's `flag` package: `--name value` or `--name=value`. A boolean is `--name` for true or `--name=false`. An integer is decimal, and anything else exits 2 with `--<flag> must be an integer`. A list is the flag repeated, one element each, in order: `--domain a.example --domain b.example`. A value that starts with `-` is written `--name=-v`.
+- **Missing required flags** exit 2 before anything is sent, with `moonglass: <subcommand>: --<flag> is required` for the first one in field order. An optional flag that is not given is not sent.
+- **No positional arguments and no stdin.** An unknown flag or any argument that is not a flag exits 2 with the subcommand's usage, which lists its flags, required ones first, each with its `doc`.
+- **Request.** A `GET` sends the given flags as query parameters; `POST` and `PUT` send one JSON object. The request goes to `$MOONGLASS_URL` with the bearer token, as "Generation" says.
+- **Output.** A 2xx prints the response body to stdout and exits 0. Any other status prints `moonglass: <subcommand>: <detail>` to stderr, then one line `  <location>: <message>` per `errors` entry, and exits 1.
+- **Global flags** of the runner, such as W4-1c's `--step-up`, are not inputs, and no input field may take their name.
+
+A command that needs work on the client, such as reading stdin, a file or a pin, encrypting, or calling more than one operation, is a local command: it is on `registry.LocalCommands` with what it touches (ADR-0006 decision 7). The generator writes no subcommand for an operation whose subcommand name is on that list. The local command calls the operation through the same request and output code as the generated runner, and names its flags for that operation's inputs by the rule above. `make generate` fails, naming the operation and the field, when an operation has an input of a kind with no flag and its subcommand is not a local command. So:
+
+- **W3-2** adds `secrets set` (reads stdin, encrypts, and may first call `environments.list`, `keys.recovery.list` and `environments.key.create`) and `environments key create` (makes the key pair and the wrapped copies) to `registry.LocalCommands`. `keys recovery add` stays generated: `moonglass keys recovery add --recipient age1…`, so `docs/specs/secrets.md` changes its retry line to that form.
+- **W3-4** moves `deploy` to `registry.LocalCommands` when it adds `moonglass.toml`, which the command reads. Until then `deploy` is generated (W2-5).
+
+### Tests (W2-11c)
+
+W2-11c ships no new operation, so these tests register test operations with `registry.Register` and generate from a test list.
+
+- `internal/registry`: `TestInvokeResolvesTargetAfterRoleCheck` (a role denial makes no store call), `TestInvokeUnknownTargetInScopeIsNotFound` (404 error, outcome `error`, reason `not found`, handler not run), `TestInvokeUnknownTargetOutOfScopeIsDenied` (the same error and reason as a known target out of scope), `TestInvokePassesResolvedIDsToHandler`, `TestRefusalKindsAndAuditReasons`, `TestUnmappedStoreErrorIsNotARefusal`.
+- `internal/api`: `TestQueryInputsDecoded` (repeated lists, booleans, integers), `TestBodyInputsDecoded`, `TestUnknownInputsRefused` (query and body, 400), `TestSchemaFailuresAre400` (missing required, wrong type; never 422; no `value` in `errors`), `TestRefusalStatuses` (400, 404, 409 with the refusal's message), `TestUnmappedHandlerErrorIs500`.
+- `internal/cli`: `TestGeneratedFlagNames` (`--env`, hyphens, no aliases), `TestGeneratedFlagsSentAsQueryOrBody`, `TestGeneratedRepeatedBooleanAndIntegerFlags`, `TestGeneratedMissingRequiredFlagExits2` (nothing sent), `TestGeneratedRefusesPositionalAndUnknownFlags`, `TestGeneratedPrintsErrorDetail`, `TestGenerateRefusesInputWithoutFlag`, `TestGenerateSkipsLocalCommands`.

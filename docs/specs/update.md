@@ -393,6 +393,47 @@ A `workflow_dispatch` job in the same file takes the inputs `version` and `chann
 
 The origin's upload credential is a repository secret. It is not a signing key.
 
+### Release origin (owner decision, 2026-11-18)
+
+This closes §10 items 24 and 25.
+
+**The origin.** One Cloudflare R2 bucket, `moonglass-releases`, served at `https://moonglass.dev/releases/`.
+
+- An object's key is its URL path without the leading `/`, so `https://moonglass.dev/releases/v1.2.3/linux-amd64/moonglass` is the object `releases/v1.2.3/linux-amd64/moonglass`. Nothing rewrites the path.
+- The bucket is connected to the R2 custom domain `releases-origin.moonglass.dev`. An origin rule in the `moonglass.dev` zone, for URI paths starting with `/releases/`, overrides the DNS record and rewrites the `Host` header to that hostname. Every other path of `moonglass.dev`, such as the Go import path, is served as before.
+- **No redirects.** A request under `/releases/` is answered `200` with the object, or `404`, and never with a `3xx`. No redirect rule, page rule or trailing-slash rule matches `/releases/*`. The agent and `scripts/install` follow no redirect (§3), so a redirect would fail every download rather than be followed.
+- The `r2.dev` development URL stays disabled. Nothing else writes to the bucket.
+
+**The upload step.** The publish job uploads with the `aws` CLI that GitHub's Ubuntu runners already have, so no action and no new tool is added:
+
+```
+aws s3 cp <file> s3://moonglass-releases/<key> \
+  --endpoint-url https://<account id>.r2.cloudflarestorage.com \
+  --content-type <type> --cache-control <policy>
+```
+
+- One `aws s3 cp` per object, in the order of "Publish" step 3. No `aws s3 sync`, which uploads in an order of its own.
+- `AWS_DEFAULT_REGION` is `auto`. The account id comes from the repository variable `R2_ACCOUNT_ID`; it is not a secret.
+- Content types: `application/octet-stream` for `moonglass`, `application/json` for `moonglass.sbom.json`, and `text/plain; charset=utf-8` for everything else.
+
+**The secret pair.** `R2_RELEASES_ACCESS_KEY_ID` and `R2_RELEASES_SECRET_ACCESS_KEY`: an R2 API token with Object Read & Write on `moonglass-releases` only, and no other bucket or account permission.
+
+- They are secrets of the GitHub environment `release`, not of the whole repository, and only the publish job names that environment. The build, attest and draft-release jobs of W7-6c reference no secret.
+- The upload step alone maps them to `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in its `env`. No step prints them.
+- They can overwrite release objects, but they cannot sign: an object they write that is not signed by a pinned key fails verification on every agent and in `scripts/install` (§3; TM §2).
+
+**Cache-Control.**
+
+| Objects | `Cache-Control` | Why |
+|---|---|---|
+| `releases/<version>/…` | `public, max-age=31536000, immutable` | A version's files never change |
+| `releases/latest/…` | `public, max-age=60` | Replaced on each promotion to stable |
+| `releases/channels/<channel>` and `.sig` | `public, max-age=60` | The pointer moves with each release |
+
+A `latest` directory read during a promotion can mix two versions for up to 60 seconds. The install then fails its checksum or signature check and is rerun; it never installs a mixed set.
+
+**Attestations.** The repository `github.com/moonglass-dev/moonglass` stays private until the first release tag is cut. It is made public before that tag is pushed, because `actions/attest-build-provenance` on a private repository needs GitHub Enterprise Cloud. W7-6c and W7-6g are built and merged while the repository is private; their workflows run only on a tag or a dispatch. Making it public is the owner's step, done by hand, not by any ticket.
+
 ### Promotion to stable
 
 The owner signs a stable pointer and runs the same job with `channel=stable`. The hosted control plane still keeps the stable rollout in `waiting` until §8 allows it.
@@ -400,6 +441,8 @@ The owner signs a stable pointer and runs the same job with `channel=stable`. Th
 ## 10. Owner decisions
 
 Every choice below is one no ADR or existing spec already fixes. One line each, so each can be approved or changed before merge.
+
+**Final, 2026-11-18.** The product name Moonglass, the signing namespace `moonglass-release` and the release origin host `moonglass.dev` are final. Nothing in W7-6c, W7-6d or W7-6e waits on a rename, and those tickets may proceed with the names this spec gives.
 
 1. Signed channel pointers with four lines, binding the version and the two binary SHA-256s.
 2. Agents refuse any version that is not strictly newer; there is no downgrade.
@@ -424,8 +467,8 @@ Every choice below is one no ADR or existing spec already fixes. One line each, 
 21. The SBOM tool and format (syft, SPDX JSON).
 22. The draft GitHub release hand-off, with the tar names of §9.
 23. The publish job verifying with `scripts/install` and the upload order.
-24. The release origin behind `moonglass.dev/releases/` and its upload credential, which no existing decision names.
-25. Attestations on a private repository need GitHub Enterprise Cloud, or a public repository, before W7-6c can run.
+24. The release origin behind `moonglass.dev/releases/` and its upload credential: decided 2026-11-18, the R2 bucket, the `aws s3 cp` upload and the secret pair of §9 "Release origin".
+25. Attestations on a private repository need GitHub Enterprise Cloud, or a public repository, before W7-6c can run: decided 2026-11-18, the repository is made public before the first release tag is pushed (§9 "Release origin").
 26. W7-6e's `allowed_paths` need `cmd/moonglass/`, `internal/registry/` (`LocalCommands` gains `agent update-gate` and `agent revert-check`) and `internal/proxy/`.
 27. The offer checks run in the order of §1, so an older version is `NOT_NEWER` and another channel's version is `NOT_ON_CHANNEL`.
 28. `trial` is one JSON file with `"format": 1`, deleted at the first hour or on the next offer, and a re-sent offer is answered from it rather than from agent state.
