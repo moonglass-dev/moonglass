@@ -117,7 +117,7 @@ A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` 
 
 Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds them to the `.proto`.
 
-`Build`, a new type `BUILD`:
+`Build`, a new type `BUILD` = 11:
 
 | Field | Type | Rule |
 |---|---|---|
@@ -132,6 +132,44 @@ Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds the
 |---|---|---|
 | `disk` | `DiskReport` | `data_root_free_bytes`, `data_root_total_bytes`, `agent_dir_free_bytes`, `agent_dir_total_bytes` (`uint64`), and `level`: `OK`, `LOW` or `CRITICAL` (`docs/specs/disk.md`). |
 | `deploy_key` | `string` | The server's SSH deploy public key as one OpenSSH line, `ssh-ed25519 <base64> moonglass-deploy`, at most 256 bytes; empty until the key exists (`docs/specs/build.md`). It is a public key, not a secret. |
+
+## Log and usage streaming (W4-4)
+
+The owner approved these messages on 2026-11-17.
+
+`LogRequest`, type `LOG_REQUEST` = 12, server to agent. One open log stream per app. A new `LOG_REQUEST` for that app replaces the previous one.
+
+| Field | Type | Rule |
+|---|---|---|
+| `app_id` | identifier | Required. |
+| `release_id` | identifier | Empty means the current release. Otherwise an identifier. |
+| `tail` | `uint32` | 0 to 1000. |
+| `follow` | `bool` | Whether the agent keeps sending after the tail. |
+| `grep` | `string` | Empty, or 1 to 128 bytes with no NUL. A literal substring. |
+
+`LogChunk`, type `LOG_CHUNK` = 13, agent to server, with the same `request_id` as the `LOG_REQUEST` it belongs to.
+
+| Field | Type | Rule |
+|---|---|---|
+| `data` | `bytes` | 1 to 65536 bytes on a non-final chunk. A final chunk may be empty. |
+| `final` | `bool` | The last chunk of this stream. |
+
+When the app has no container, the agent sends one chunk with `final` true and empty `data`. That does not close the connection.
+
+`Usage`, type `USAGE` = 14, agent to server, every 10 seconds, only while that app has a usage subscriber. The counters are cumulative. If the cgroup files are missing, the agent omits the sample. Nothing is written to SQLite.
+
+| Field | Type | Rule |
+|---|---|---|
+| `app_id` | identifier | Required. |
+| `cpu_percent` | `uint32` | |
+| `mem_bytes` | `uint64` | From cgroup v2 `memory.current`. |
+| `mem_limit_bytes` | `uint64` | From cgroup v2 `memory.max`. |
+| `net_rx_bytes` | `uint64` | From the veth counters. |
+| `net_tx_bytes` | `uint64` | From the veth counters. |
+| `disk_read_bytes` | `uint64` | From `io.stat`. |
+| `disk_write_bytes` | `uint64` | From `io.stat`. |
+
+The streams and the SSE routes are `docs/specs/live.md`. What each side sends and accepts is `docs/specs/connection.md`.
 
 ## Secret delivery (W4-8) and reveal (W4-9)
 

@@ -94,7 +94,7 @@ Every `Invoke` by an authenticated principal writes one event after the decision
 
 ## Routes and commands that are not operations
 
-`registry.NonOperationRoutes` is the fixed list of routes outside the registry, with the authorisation each enforces: `GET /v1/agent` (agent listener, Ed25519 challenge) and `POST /v1/enroll` (single-use enrolment token). `registry.LocalCommands` is the fixed list of local-only subcommands (`version`, `server`, `agent enroll`, `agent connect`, `proxy`), each with what it touches. Tests fail when the server mounts a route, or the binary has a subcommand, that is on neither list nor in the registry.
+`registry.NonOperationRoutes` is the fixed list of routes outside the registry, with the authorisation each enforces: `GET /v1/agent` (agent listener, Ed25519 challenge), `POST /v1/enroll` (single-use enrolment token), `GET /v1/logs/stream` (viewer read of that project and environment) and `GET /v1/usage/stream` (viewer read of that project and environment). The two stream routes take `project`, `environment` and `service` (`docs/specs/live.md`). SSE is not a registry operation. `registry.LocalCommands` is the fixed list of local-only subcommands (`version`, `server`, `agent enroll`, `agent connect`, `proxy`), each with what it touches. Tests fail when the server mounts a route, or the binary has a subcommand, that is on neither list nor in the registry.
 
 ## Generation
 

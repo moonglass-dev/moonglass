@@ -108,6 +108,8 @@ What browser-side encryption protects, and what it does not (S§3.11):
 
 Sanitization does not cover a kernel bug or container-runtime escape, a malicious image doing what images can do inside their sandbox, or an app leaking its own secrets (S§3.2). Rotation does not un-leak: a removed server saw plaintext (S§3.11).
 
+A log chunk is relayed and never stored; whoever can read that service's logs can see what the app printed.
+
 ## 6. Container-spec deny list
 
 The agent checks **every** spec it is about to create: apps, Compose services, one-click databases, pre-deploy steps, previews, backup jobs and builds. It rejects the spec unless `agent.toml` allows the exception (S§3.2, ADR-0004).

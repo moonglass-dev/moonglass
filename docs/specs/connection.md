@@ -38,7 +38,7 @@ Specified by the weeks 2–3 preflight (owner decision D7). From W2-10 the conne
 
 - The server keeps at most one live connection per enrolled server. A new connection authenticated by the same key replaces the old one, which is closed.
 - One control-plane node holds every connection. Routing commands between nodes through `LISTEN/NOTIFY` (ADR-0002 decision 6) is not built here.
-- The server sends `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK` and `RUN_PRE_DEPLOY` (and `BUILD` from W3-4) to the server that runs the service, and accepts `HEARTBEAT` and `COMMAND_RESULT`.
+- The server sends `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK` and `RUN_PRE_DEPLOY` (and `BUILD` from W3-4) to the server that runs the service, and accepts `HEARTBEAT` and `COMMAND_RESULT`. From W4-4 it also sends `LOG_REQUEST` and accepts `LOG_CHUNK` and `USAGE`.
 - **Request ids for commands** are `c` followed by 32 lowercase hex characters from 128 random bits, minted by the server. The id is stored with the release step it belongs to (`docs/specs/storage.md`) before the command is sent.
 - **One command at a time per app.** The server sends the next command for an app only after the previous one has a result.
 - **Timeouts** for a result, counted from sending: `DEPLOY` 20 minutes, `BUILD` 30 minutes, `RUN_PRE_DEPLOY` 20 minutes, `SWITCH_RELEASE` 3 minutes, `ROLLBACK` 3 minutes. On timeout the server closes the connection; the command is re-sent once the agent reconnects (below). The release step fails only when the re-sent command also times out.
@@ -47,7 +47,7 @@ Specified by the weeks 2–3 preflight (owner decision D7). From W2-10 the conne
 
 ### Agent
 
-- The agent accepts `HEARTBEAT_ACK` and the command types above, and sends `HEARTBEAT` and `COMMAND_RESULT`. Anything else closes the connection, as before.
+- The agent accepts `HEARTBEAT_ACK`, the command types above and, from W4-4, `LOG_REQUEST`, and sends `HEARTBEAT`, `COMMAND_RESULT` and, from W4-4, `LOG_CHUNK` and `USAGE`. Anything else closes the connection, as before.
 - Commands for different apps run concurrently. Commands for one app run one at a time, in the order they arrived.
 - At start, before connecting, the agent loads `agent.toml` with `policy.LoadFile` from `--policy FILE` (default `/etc/moonglass/agent.toml`, owner uid 0), with `policy.Env` from the Docker Engine (`DockerRootDir`, the default runtime, read through `internal/deploy`, because only it may import the Docker client: ADR-0014) and `ContainerProject` from the `dev.moonglass.project` label. A file that does not load stops the agent with the policy error. An absent file is the empty policy (`docs/specs/container-policy.md`).
 - It opens its state database (`docs/specs/agent-state.md`) and checks the Engine API version (ADR-0014) before connecting.
@@ -62,6 +62,16 @@ Owner condition on D7: a command re-sent after a reconnect must never run twice.
 4. Records are kept for 7 days, longer than any re-send can arrive.
 
 W2-10 must name a test that sends a `DEPLOY`, drops the connection after the agent has acted, reconnects, re-sends the same envelope, and asserts that the stored result comes back and that the Engine saw exactly one container create. `TestResentCommandReturnsStoredResult` is that test's name.
+
+## Log and usage streams (W4-4)
+
+The messages are `docs/specs/protocol.md`. The SSE routes are `docs/specs/live.md`.
+
+- The server sends `LOG_REQUEST`. The agent accepts `LOG_REQUEST`. The agent sends `LOG_CHUNK` and `USAGE`. The server accepts `LOG_CHUNK` and `USAGE`.
+- Stream request ids are `l` followed by 32 lowercase hex characters from 128 random bits, minted by the server. A `LOG_CHUNK` uses the `request_id` of its `LOG_REQUEST`.
+- On agent reconnect, the server re-opens streams that still have SSE subscribers.
+- `Last-Event-ID` is ignored.
+- One `LOG_CHUNK` with `final` true and empty `data`, sent when the app has no container, does not close the connection.
 
 ## Commands
 

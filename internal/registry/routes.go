@@ -11,6 +11,8 @@ type Route struct {
 var NonOperationRoutes = []Route{
 	{"GET", "/v1/agent", "Ed25519 challenge-response with an enrolled agent key, on the agent listener (docs/specs/connection.md)"},
 	{"POST", "/v1/enroll", "single-use enrolment token as a Bearer value (docs/specs/enrolment.md)"},
+	{"GET", "/v1/logs/stream", "viewer read of that project and environment (docs/specs/live.md)"},
+	{"GET", "/v1/usage/stream", "viewer read of that project and environment (docs/specs/live.md)"},
 }
 
 // LocalCommand is a CLI subcommand that runs on this machine and is not an operation.
