@@ -483,6 +483,8 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestOld(t *testing.T) {}\n")
 	writeT(t, dir, "internal/policy/config_test.go", "package policy\nfunc TestOld(t *testing.T) {}\n")
 	writeT(t, dir, "internal/store/projects_conformance_test.go", "package store\nfunc TestOld(t *testing.T) {}\n")
+	writeT(t, dir, "internal/deploy/registry_test.go", "package deploy\nfunc TestOld(t *testing.T) {}\n")
+	writeT(t, dir, "internal/store/releases_conformance_test.go", "package store\nfunc TestOld(t *testing.T) {}\n")
 	mustGit(t, dir, "add", "-A")
 	mustGit(t, dir, "commit", "--quiet", "-m", "base")
 	base, err := git(dir, "rev-parse", "HEAD")
@@ -493,6 +495,8 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestNew(t *testing.T) {}\n")
 	writeT(t, dir, "internal/policy/config_test.go", "package policy\nfunc TestNew(t *testing.T) {}\n")
 	writeT(t, dir, "internal/store/projects_conformance_test.go", "package store\nfunc TestNew(t *testing.T) {}\n")
+	writeT(t, dir, "internal/deploy/registry_test.go", "package deploy\nfunc TestNew(t *testing.T) {}\n")
+	writeT(t, dir, "internal/store/releases_conformance_test.go", "package store\nfunc TestNew(t *testing.T) {}\n")
 	mustGit(t, dir, "add", "-A")
 	mustGit(t, dir, "commit", "--quiet", "-m", "edit")
 	if msg, err := removedTestLines(dir, base, "HEAD", "W2-8"); err != nil || msg == "" || strings.Contains(msg, "deploy_test.go") {
@@ -509,6 +513,48 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	}
 	if msg, err := removedTestLines(dir, base, "HEAD", "FR1-10"); err != nil || msg == "" || strings.Contains(msg, "projects_conformance_test.go") {
 		t.Fatalf("FR1-10 allowance = %q, %v; want projects_conformance_test.go allowed and another test still blocked", msg, err)
+	}
+	if msg, err := removedTestLines(dir, base, "HEAD", "W2-3"); err != nil || msg == "" || strings.Contains(msg, "registry_test.go") {
+		t.Fatalf("W2-3 allowance = %q, %v; want registry_test.go allowed and another test still blocked", msg, err)
+	}
+	if msg, err := removedTestLines(dir, base, "HEAD", "W2-11b"); err != nil || msg == "" || strings.Contains(msg, "releases_conformance_test.go") {
+		t.Fatalf("W2-11b allowance = %q, %v; want releases_conformance_test.go allowed and another test still blocked", msg, err)
+	}
+}
+
+func TestLockedTestsChangedOwnerAllowance(t *testing.T) {
+	dir := t.TempDir()
+	mustGit(t, dir, "init", "--quiet", "-b", "main")
+	mustGit(t, dir, "config", "user.email", "test@example.test")
+	mustGit(t, dir, "config", "user.name", "Pipeline Test")
+	writeT(t, dir, "internal/deploy/registry_test.go", "package deploy\nfunc TestOld(t *testing.T) {}\n")
+	writeT(t, dir, "internal/store/releases_conformance_test.go", "package store\nfunc TestOld(t *testing.T) {}\n")
+	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestOld(t *testing.T) {}\n")
+	regSum, err := fileHash(filepath.Join(dir, "internal/deploy/registry_test.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	relSum, err := fileHash(filepath.Join(dir, "internal/store/releases_conformance_test.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherSum, err := fileHash(filepath.Join(dir, "internal/proxy/other_test.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock := regSum + "  internal/deploy/registry_test.go\n" +
+		relSum + "  internal/store/releases_conformance_test.go\n" +
+		otherSum + "  internal/proxy/other_test.go\n"
+	writeT(t, dir, "docs/tickets/W2-3/tests.lock", lock)
+	writeT(t, dir, "docs/tickets/W2-11b/tests.lock", lock)
+	writeT(t, dir, "internal/deploy/registry_test.go", "package deploy\nfunc TestNew(t *testing.T) {}\n")
+	writeT(t, dir, "internal/store/releases_conformance_test.go", "package store\nfunc TestNew(t *testing.T) {}\n")
+	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestNew(t *testing.T) {}\n")
+	if msg, err := lockedTestsChanged(dir, "W2-3"); err != nil || msg == "" || strings.Contains(msg, "registry_test.go") || !strings.Contains(msg, "other_test.go") {
+		t.Fatalf("W2-3 lock allowance = %q, %v; want registry_test.go allowed and other_test.go still blocked", msg, err)
+	}
+	if msg, err := lockedTestsChanged(dir, "W2-11b"); err != nil || msg == "" || strings.Contains(msg, "releases_conformance_test.go") || !strings.Contains(msg, "other_test.go") {
+		t.Fatalf("W2-11b lock allowance = %q, %v; want releases_conformance_test.go allowed and other_test.go still blocked", msg, err)
 	}
 }
 

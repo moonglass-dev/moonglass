@@ -440,7 +440,7 @@ func fileHash(path string) (string, error) {
 }
 
 // ownerTestEdits are existing test files the owner allowed a ticket to change
-// (W2-8 and W2-12 on 2026-11-17, W3-7 and W5-3a on 2026-11-18, FR1-10 on 2026-11-18). The lines on main no longer match the behaviour those tickets
+// (W2-8 and W2-12 on 2026-11-17, W3-7, W5-3a, FR1-10, W2-3 and W2-11b on 2026-11-18). The lines on main no longer match the behaviour those tickets
 // have to build. Any other test file that existed on main is still untouchable.
 var ownerTestEdits = map[string]map[string]bool{
 	"W2-8": {
@@ -458,6 +458,12 @@ var ownerTestEdits = map[string]map[string]bool{
 	},
 	"FR1-10": {
 		"internal/store/projects_conformance_test.go": true,
+	},
+	"W2-3": {
+		"internal/deploy/registry_test.go": true,
+	},
+	"W2-11b": {
+		"internal/store/releases_conformance_test.go": true,
 	},
 }
 
@@ -650,6 +656,9 @@ func lockedTestsChanged(dir, id string) (string, error) {
 			continue
 		}
 		if got != sum {
+			if ownerAllowsTestEdit(id, f) {
+				continue
+			}
 			bad = append(bad, f)
 		}
 	}

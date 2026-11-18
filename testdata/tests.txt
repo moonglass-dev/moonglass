@@ -210,6 +210,7 @@ moonglass.dev/moonglass/tools/pipeline TestBranchWaitsForUnmergedDependencies
 moonglass.dev/moonglass/tools/pipeline TestDecide
 moonglass.dev/moonglass/tools/pipeline TestGitHubRepo
 moonglass.dev/moonglass/tools/pipeline TestHighRiskTicketsRunOneAtATime
+moonglass.dev/moonglass/tools/pipeline TestLockedTestsChangedOwnerAllowance
 moonglass.dev/moonglass/tools/pipeline TestMergeCatchesUpWhenMainMoved
 moonglass.dev/moonglass/tools/pipeline TestMergeFailureGoesBackToTheWorker
 moonglass.dev/moonglass/tools/pipeline TestMergeWithNoChecksCatchesUpBeforeWaiting
