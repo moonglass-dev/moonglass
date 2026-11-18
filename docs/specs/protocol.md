@@ -117,7 +117,7 @@ A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` 
 
 ## Builds and server reports (W3-7)
 
-Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds them to the `.proto`.
+Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds them to the `.proto`. The owner approved these field numbers on 2026-11-18: `BUILD` = 11; `Build` `app_id` = 1, `release_id` = 2, `project` = 3, `environment` = 4, `service` = 5, `repository` = 6, `commit` = 7; `Heartbeat` `disk` = 2, `deploy_key` = 3; `DiskReport` `data_root_free_bytes` = 1, `data_root_total_bytes` = 2, `agent_dir_free_bytes` = 3, `agent_dir_total_bytes` = 4, `level` = 5; `DiskLevel` `UNSPECIFIED` = 0, `OK` = 1, `LOW` = 2, `CRITICAL` = 3.
 
 `Build`, a new type `BUILD` = 11:
 

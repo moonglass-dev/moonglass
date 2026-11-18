@@ -26,7 +26,7 @@ Write the failing acceptance tests, before any implementation exists.
 ## Rules
 
 - Write only `_test.go` files inside `allowed_paths`, and fixtures under `testdata/` directories.
-- Never change or remove a line of an existing test. The owner allowed two exceptions on 2026-11-17: W2-8 may edit `internal/protocol/deploy_test.go`, and W2-12 may edit `internal/proxy/proxy_test.go` and `internal/proxy/memory_test.go`.
+- Never change or remove a line of an existing test. The owner allowed three exceptions: W2-8 may edit `internal/protocol/deploy_test.go`, and W2-12 may edit `internal/proxy/proxy_test.go` and `internal/proxy/memory_test.go` (2026-11-17); W3-7 may edit `internal/protocol/deploy_test.go`, changing the unknown type `11` to `15` in `TestDeployMessagesRejectUnknownType` (2026-11-18).
 - Never skip a test, hard-code its expected output to match a guess of the implementation, or make it pass trivially.
 - Do not write implementation code, do not run `make test-list`, and do not commit or push. `scripts/verify record` checks your files and commits them.
 

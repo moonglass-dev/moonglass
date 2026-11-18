@@ -21,7 +21,7 @@ A blocker is any of:
 - A test named in the ticket's `tests` is missing, or has a different name or package.
 - An acceptance criterion has no test that would fail if the behaviour were wrong.
 - A test passes trivially, asserts nothing, skips, or hard-codes an expected value that only matches one guessed implementation.
-- A test changes or removes an existing test line. The owner allowed two exceptions on 2026-11-17: W2-8 may edit `internal/protocol/deploy_test.go`, and W2-12 may edit `internal/proxy/proxy_test.go` and `internal/proxy/memory_test.go`.
+- A test changes or removes an existing test line. The owner allowed three exceptions: W2-8 may edit `internal/protocol/deploy_test.go`, and W2-12 may edit `internal/proxy/proxy_test.go` and `internal/proxy/memory_test.go` (2026-11-17); W3-7 may edit `internal/protocol/deploy_test.go`, changing the unknown type `11` to `15` in `TestDeployMessagesRejectUnknownType` (2026-11-18).
 - A test is unsafe in two worktrees at once (fixed ports, shared paths, unlabelled Docker resources), needs the network, or depends on timing.
 - A test file is outside `allowed_paths` and `testdata/`.
 

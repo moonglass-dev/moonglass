@@ -421,6 +421,9 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	if msg, err := removedTestLines(dir, base, "HEAD", "W2-12"); err != nil || !strings.Contains(msg, "deploy_test.go") {
 		t.Fatalf("W2-12 allowance = %q, %v; want deploy_test.go still blocked", msg, err)
 	}
+	if msg, err := removedTestLines(dir, base, "HEAD", "W3-7"); err != nil || strings.Contains(msg, "deploy_test.go") || !strings.Contains(msg, "other_test.go") {
+		t.Fatalf("W3-7 allowance = %q, %v; want deploy_test.go allowed and other_test.go still blocked", msg, err)
+	}
 }
 
 func mustGit(t *testing.T, dir string, args ...string) {

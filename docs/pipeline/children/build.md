@@ -36,7 +36,7 @@ Implement the ticket until every named test passes and `make ci` is green.
 ## Rules
 
 - No placeholders, no fallback paths, no code for later tickets. Errors are wrapped with context and say what to do.
-- Never change a locked test, and never weaken, skip or delete any test. You may add new tests. The owner allowed two exceptions on 2026-11-17: W2-8 may edit `internal/protocol/deploy_test.go`, and W2-12 may edit `internal/proxy/proxy_test.go` and `internal/proxy/memory_test.go`.
+- Never change a locked test, and never weaken, skip or delete any test. You may add new tests. The owner allowed three exceptions: W2-8 may edit `internal/protocol/deploy_test.go`, and W2-12 may edit `internal/proxy/proxy_test.go` and `internal/proxy/memory_test.go` (2026-11-17); W3-7 may edit `internal/protocol/deploy_test.go`, changing the unknown type `11` to `15` in `TestDeployMessagesRejectUnknownType` (2026-11-18).
 - Do not edit `docs/tickets/<ID>.md` or anything under `docs/tickets/<ID>/`.
 - Do not push, rebase or reset. Committing is optional: `scripts/verify record` commits what is left.
 - If the ticket cannot be built as written (a contract or ADR change, a missing spec, a test that contradicts the spec), write `docs/tickets/<ID>/BLOCKED.md` with the reason on its first line and stop.

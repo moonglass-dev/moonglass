@@ -438,7 +438,7 @@ func fileHash(path string) (string, error) {
 }
 
 // ownerTestEdits are existing test files the owner allowed a ticket to change
-// on 2026-11-17. The lines on main no longer match the behaviour those tickets
+// (W2-8 and W2-12 on 2026-11-17, W3-7 on 2026-11-18). The lines on main no longer match the behaviour those tickets
 // have to build. Any other test file that existed on main is still untouchable.
 var ownerTestEdits = map[string]map[string]bool{
 	"W2-8": {
@@ -447,6 +447,9 @@ var ownerTestEdits = map[string]map[string]bool{
 	"W2-12": {
 		"internal/proxy/proxy_test.go":  true,
 		"internal/proxy/memory_test.go": true,
+	},
+	"W3-7": {
+		"internal/protocol/deploy_test.go": true,
 	},
 }
 
