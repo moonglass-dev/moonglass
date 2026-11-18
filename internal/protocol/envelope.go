@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	agentv1 "moonglass.dev/moonglass/internal/protocol/agentv1"
 )
@@ -162,10 +163,32 @@ func Open(env *agentv1.Envelope, msg proto.Message) error {
 	if err := proto.Unmarshal(env.GetPayload(), msg); err != nil {
 		return fmt.Errorf("parse payload: %w", errors.Join(ErrMalformed, err))
 	}
-	if len(msg.ProtoReflect().GetUnknown()) > 0 {
-		return fmt.Errorf("unknown payload fields: %w", ErrMalformed)
+	if err := rejectUnknown(msg.ProtoReflect()); err != nil {
+		return err
 	}
 	return validatePayload(msg)
+}
+
+// rejectUnknown fails when m or any nested message it holds has unknown fields.
+func rejectUnknown(m protoreflect.Message) error {
+	if len(m.GetUnknown()) > 0 {
+		return fmt.Errorf("unknown fields in %s: %w", m.Descriptor().FullName(), ErrMalformed)
+	}
+	var err error
+	m.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+		if fd.Kind() != protoreflect.MessageKind {
+			return true
+		}
+		if fd.IsList() {
+			for i, n := 0, v.List().Len(); i < n && err == nil; i++ {
+				err = rejectUnknown(v.List().Get(i).Message())
+			}
+			return err == nil
+		}
+		err = rejectUnknown(v.Message())
+		return err == nil
+	})
+	return err
 }
 
 func validate(env *agentv1.Envelope) error {
@@ -213,6 +236,8 @@ func validatePayload(msg proto.Message) error {
 		return validateRollback(m)
 	case *agentv1.RunPreDeploy:
 		return validateRunPreDeploy(m)
+	case *agentv1.CommandResult:
+		return validateCommandResult(m)
 	default:
 		return nil
 	}
@@ -228,7 +253,8 @@ func validateType(t agentv1.MessageType) error {
 		agentv1.MessageType_DEPLOY,
 		agentv1.MessageType_SWITCH_RELEASE,
 		agentv1.MessageType_ROLLBACK,
-		agentv1.MessageType_RUN_PRE_DEPLOY:
+		agentv1.MessageType_RUN_PRE_DEPLOY,
+		agentv1.MessageType_COMMAND_RESULT:
 		return nil
 	case agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED:
 		return fmt.Errorf("unspecified message type: %w", ErrMalformed)
@@ -285,6 +311,8 @@ func typeOf(msg proto.Message) (agentv1.MessageType, error) {
 		return agentv1.MessageType_ROLLBACK, nil
 	case *agentv1.RunPreDeploy:
 		return agentv1.MessageType_RUN_PRE_DEPLOY, nil
+	case *agentv1.CommandResult:
+		return agentv1.MessageType_COMMAND_RESULT, nil
 	default:
 		return agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED, fmt.Errorf("unsupported message %T: %w", msg, ErrUnknownType)
 	}

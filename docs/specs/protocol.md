@@ -22,7 +22,7 @@ Every message is wrapped in an envelope before it is sent.
 | `payload` | `bytes` | Encoded payload message for that type, possibly empty. |
 | `error` | `Error` | Required when `type` is `ERROR`, and forbidden on any other type. This is the only place an error travels; it is not also encoded in `payload`. |
 
-`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`.
+`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `COMMAND_RESULT`.
 
 Encode (`Marshal`) and decode (`Unmarshal`) round-trip a well-formed envelope. `Marshal` is deterministic. The on-the-wire encoding is a 4-byte big-endian length of the protobuf payload, followed by that many bytes of protobuf. The length must match the rest of the buffer exactly, so a truncated or trailing-garbage input is rejected.
 
@@ -83,7 +83,9 @@ An identifier (`app_id`, `release_id`) is 1 to 64 bytes of `[A-Za-z0-9._-]`. Vio
 
 ## Deploy identity, service settings and results (W2-8)
 
-Specified by the weeks 2–3 preflight (owner decisions D1, D7, D9). W2-8 adds these to the `.proto`, validates them in `internal/protocol`, and regenerates the Go. Until W2-8 merges, they are not on the wire.
+Specified by the weeks 2–3 preflight (owner decisions D1, D7, D9). W2-8 adds these to the `.proto`, validates them in `internal/protocol`, and regenerates the Go.
+
+Opening a payload rejects unknown fields at every nesting level, including inside `AppState`, before any later code acts.
 
 ### Deploy gains
 
@@ -105,11 +107,11 @@ A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` 
 
 | Field | Type | Rule |
 |---|---|---|
-| `outcome` | `CommandOutcome` | `SUCCEEDED`; `FAILED` (the agent tried and could not finish); or `REJECTED` (refused before acting: an illegal transition, an identity mismatch, a policy rejection, a disk refusal). `UNSPECIFIED` and unknown values are rejected. |
+| `outcome` | `CommandOutcome` | `SUCCEEDED`; `FAILED` (the agent tried and could not finish); or `REJECTED` (refused before acting: an illegal transition, an identity mismatch, a policy rejection, a disk refusal). `UNSPECIFIED` (the zero value) and unknown values are rejected. |
 | `detail` | `string` | At most 4096 bytes. Empty on success. Plain text for a person, such as a rendered policy `Rejection`. Never an environment value, a secret or a credential. |
-| `app` | `AppState` | The app's release state after the command: `current_release_id`, `previous_release_id`, `candidate_release_id` (each empty or an identifier) and `phase` (`NONE`, `PENDING` or `READY`). |
-| `image_id` | `string` | For `DEPLOY` and `BUILD`: the image ID the release runs (`sha256:` plus 64 hex). Empty otherwise. |
-| `repo_digest` | `string` | For `DEPLOY`: the registry digest the reference resolved to (`<repository>@sha256:<64 hex>`). Empty for an image built on the server. |
+| `app` | `AppState` | Required. The app's release state after the command: `current_release_id`, `previous_release_id`, `candidate_release_id` (each empty or an identifier) and `phase` (`NONE`, `PENDING` or `READY`; `UNSPECIFIED` (the zero value) and unknown values are rejected). |
+| `image_id` | `string` | For `DEPLOY` and `BUILD`: the image ID the release runs (`sha256:` plus exactly 64 lowercase hex). Empty otherwise. |
+| `repo_digest` | `string` | For `DEPLOY`: the registry digest the reference resolved to (`<repository>@sha256:<64 lowercase hex>`). Empty for an image built on the server. |
 
 **Direction.** Commands travel from the control plane to the agent only; `Heartbeat` and `CommandResult` from the agent to the control plane only. Either side closes the connection on a message travelling the wrong way (`docs/specs/connection.md`).
 

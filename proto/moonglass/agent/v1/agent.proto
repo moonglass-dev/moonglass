@@ -24,6 +24,7 @@ enum MessageType {
   SWITCH_RELEASE = 7;
   ROLLBACK = 8;
   RUN_PRE_DEPLOY = 9;
+  COMMAND_RESULT = 10;
 }
 
 message Error {
@@ -64,11 +65,18 @@ message Heartbeat {
 
 message HeartbeatAck {}
 
-// Deploy creates a candidate release for an app.
+// Deploy creates a candidate release for an app. project, environment and service select agent.toml blocks; health_path is an HTTP path inside the container, not a host path.
 message Deploy {
   string app_id = 1;
   string release_id = 2;
   string image = 3;
+  string project = 4;
+  string environment = 5;
+  string service = 6;
+  uint32 port = 7;
+  string health_path = 8;
+  repeated string domains = 9;
+  bool has_pre_deploy = 10;
 }
 
 // SwitchRelease promotes a ready candidate release to current.
@@ -88,4 +96,35 @@ message RunPreDeploy {
   string release_id = 2;
   repeated string args = 3;
   bool reversible = 4;
+}
+
+// CommandResult answers the command with the same request_id. detail is plain text for a
+// person and never carries a secret.
+message CommandResult {
+  CommandOutcome outcome = 1;
+  string detail = 2;
+  AppState app = 3;
+  string image_id = 4;
+  string repo_digest = 5;
+}
+
+enum CommandOutcome {
+  COMMAND_OUTCOME_UNSPECIFIED = 0;
+  SUCCEEDED = 1;
+  FAILED = 2;
+  REJECTED = 3;
+}
+
+message AppState {
+  string current_release_id = 1;
+  string previous_release_id = 2;
+  string candidate_release_id = 3;
+  ReleasePhase phase = 4;
+}
+
+enum ReleasePhase {
+  RELEASE_PHASE_UNSPECIFIED = 0;
+  NONE = 1;
+  PENDING = 2;
+  READY = 3;
 }

@@ -91,7 +91,15 @@ moonglass.dev/moonglass/internal/policy TestRejectionNamesFieldAndAllowLines
 moonglass.dev/moonglass/internal/policy TestRejectionOmitsEnvironmentValues
 moonglass.dev/moonglass/internal/policy TestSocketAndDataRootAliasesRejected
 moonglass.dev/moonglass/internal/protocol FuzzEnvelopeDecode
+moonglass.dev/moonglass/internal/protocol FuzzOpenCommandResult
+moonglass.dev/moonglass/internal/protocol FuzzOpenDeploy
+moonglass.dev/moonglass/internal/protocol TestCommandResultProtocolAbuse
+moonglass.dev/moonglass/internal/protocol TestCommandResultRejectsInvalid
+moonglass.dev/moonglass/internal/protocol TestCommandResultRoundTrip
+moonglass.dev/moonglass/internal/protocol TestDeployIdentityRoundTrip
 moonglass.dev/moonglass/internal/protocol TestDeployMessagesRejectUnknownType
+moonglass.dev/moonglass/internal/protocol TestDeployRejectsBadIdentity
+moonglass.dev/moonglass/internal/protocol TestDeployRejectsBadServiceSettings
 moonglass.dev/moonglass/internal/protocol TestDeployRoundTrip
 moonglass.dev/moonglass/internal/protocol TestEnrollRoundTrip
 moonglass.dev/moonglass/internal/protocol TestEnvelopeRejectsMalformed

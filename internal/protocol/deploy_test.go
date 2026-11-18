@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"errors"
+	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -52,9 +54,9 @@ func TestDeployRoundTrip(t *testing.T) {
 	assertNoShellStringFields(t, (&agentv1.Deploy{}).ProtoReflect().Descriptor())
 
 	valid := []*agentv1.Deploy{
-		{AppId: "app-1", ReleaseId: "rel_1.0", Image: "registry.example.com/app:1.2"},
-		{AppId: strings.Repeat("a", 64), ReleaseId: strings.Repeat("Z", 64), Image: strings.Repeat("i", 512)},
-		{AppId: "a", ReleaseId: "r", Image: "app@sha256:abcdef"},
+		{AppId: "app-1", ReleaseId: "rel_1.0", Image: "registry.example.com/app:1.2", Project: "web", Environment: "prod", Service: "api"},
+		{AppId: strings.Repeat("a", 64), ReleaseId: strings.Repeat("Z", 64), Image: strings.Repeat("i", 512), Project: "web", Environment: "prod", Service: "api"},
+		{AppId: "a", ReleaseId: "r", Image: "app@sha256:abcdef", Project: "web", Environment: "prod", Service: "api"},
 	}
 	for _, m := range valid {
 		t.Run("valid/"+m.GetAppId()[:1], func(t *testing.T) {
@@ -67,18 +69,18 @@ func TestDeployRoundTrip(t *testing.T) {
 		name string
 		msg  *agentv1.Deploy
 	}{
-		{"empty app id", &agentv1.Deploy{AppId: "", ReleaseId: "r", Image: "img"}},
-		{"65 byte app id", &agentv1.Deploy{AppId: strings.Repeat("a", 65), ReleaseId: "r", Image: "img"}},
-		{"app id with slash", &agentv1.Deploy{AppId: "a/b", ReleaseId: "r", Image: "img"}},
-		{"release id with slash", &agentv1.Deploy{AppId: "a", ReleaseId: "r/1", Image: "img"}},
-		{"release id with space", &agentv1.Deploy{AppId: "a", ReleaseId: "r 1", Image: "img"}},
-		{"empty release id", &agentv1.Deploy{AppId: "a", ReleaseId: "", Image: "img"}},
-		{"empty image", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: ""}},
-		{"513 byte image", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: strings.Repeat("i", 513)}},
-		{"image with space", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "img name"}},
-		{"image with newline", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "img\nname"}},
-		{"image with control char", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "img\x01"}},
-		{"image with leading dash", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "-img"}},
+		{"empty app id", &agentv1.Deploy{AppId: "", ReleaseId: "r", Image: "img", Project: "web", Environment: "prod", Service: "api"}},
+		{"65 byte app id", &agentv1.Deploy{AppId: strings.Repeat("a", 65), ReleaseId: "r", Image: "img", Project: "web", Environment: "prod", Service: "api"}},
+		{"app id with slash", &agentv1.Deploy{AppId: "a/b", ReleaseId: "r", Image: "img", Project: "web", Environment: "prod", Service: "api"}},
+		{"release id with slash", &agentv1.Deploy{AppId: "a", ReleaseId: "r/1", Image: "img", Project: "web", Environment: "prod", Service: "api"}},
+		{"release id with space", &agentv1.Deploy{AppId: "a", ReleaseId: "r 1", Image: "img", Project: "web", Environment: "prod", Service: "api"}},
+		{"empty release id", &agentv1.Deploy{AppId: "a", ReleaseId: "", Image: "img", Project: "web", Environment: "prod", Service: "api"}},
+		{"empty image", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "", Project: "web", Environment: "prod", Service: "api"}},
+		{"513 byte image", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: strings.Repeat("i", 513), Project: "web", Environment: "prod", Service: "api"}},
+		{"image with space", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "img name", Project: "web", Environment: "prod", Service: "api"}},
+		{"image with newline", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "img\nname", Project: "web", Environment: "prod", Service: "api"}},
+		{"image with control char", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "img\x01", Project: "web", Environment: "prod", Service: "api"}},
+		{"image with leading dash", &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "-img", Project: "web", Environment: "prod", Service: "api"}},
 	}
 	for _, tt := range invalid {
 		t.Run(tt.name, func(t *testing.T) {
@@ -192,7 +194,7 @@ func TestRunPreDeployRoundTrip(t *testing.T) {
 func TestDeployMessagesRejectUnknownType(t *testing.T) {
 	t.Parallel()
 
-	for _, mt := range []agentv1.MessageType{agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED, 10, 99} {
+	for _, mt := range []agentv1.MessageType{agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED, 11, 99} {
 		t.Run(mt.String(), func(t *testing.T) {
 			t.Parallel()
 			env := &agentv1.Envelope{Version: Version, Type: mt, RequestId: "r"}
@@ -205,7 +207,7 @@ func TestDeployMessagesRejectUnknownType(t *testing.T) {
 		})
 	}
 
-	deploy := &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "img"}
+	deploy := &agentv1.Deploy{AppId: "a", ReleaseId: "r", Image: "img", Project: "web", Environment: "prod", Service: "api"}
 	sw := &agentv1.SwitchRelease{AppId: "a", ReleaseId: "r"}
 	rb := &agentv1.Rollback{AppId: "a"}
 	pre := &agentv1.RunPreDeploy{AppId: "a", ReleaseId: "r", Args: []string{"x"}}
@@ -254,4 +256,207 @@ func TestDeployMessagesRejectUnknownType(t *testing.T) {
 			t.Fatalf("Open with unknown field: expected ErrMalformed, got %v", err)
 		}
 	})
+}
+
+// validDeployMessage returns a Deploy with a valid identity and no service settings.
+func validDeployMessage() *agentv1.Deploy {
+	return &agentv1.Deploy{
+		AppId:       "app-1",
+		ReleaseId:   "rel-1",
+		Image:       "registry.example.com/app:1",
+		Project:     "web",
+		Environment: "prod",
+		Service:     "api",
+	}
+}
+
+// domain253 returns a valid 253-byte domain with three 63-byte labels and a 61-byte label.
+func domain253() string {
+	return strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 61)
+}
+
+// sixteenDomains returns 16 distinct valid domains, including a 253-byte one and a 63-byte label.
+func sixteenDomains() []string {
+	domains := []string{domain253(), strings.Repeat("b", 63) + ".example.com"}
+	for i := 3; i <= 16; i++ {
+		domains = append(domains, fmt.Sprintf("d%d.example.com", i))
+	}
+	return domains
+}
+
+func TestDeployIdentityRoundTrip(t *testing.T) {
+	t.Parallel()
+	assertNoShellStringFields(t, (&agentv1.Deploy{}).ProtoReflect().Descriptor())
+
+	tests := []struct {
+		msg  *agentv1.Deploy
+		name string
+	}{
+		{
+			name: "every field at its maximum",
+			msg: &agentv1.Deploy{
+				AppId:        "app-1",
+				ReleaseId:    "rel-1",
+				Image:        "registry.example.com/app:1",
+				Project:      strings.Repeat("p", 63),
+				Environment:  strings.Repeat("e", 63),
+				Service:      strings.Repeat("s", 63),
+				Port:         1,
+				HealthPath:   "/" + strings.Repeat("a", 255),
+				Domains:      sixteenDomains(),
+				HasPreDeploy: true,
+			},
+		},
+		{
+			name: "single character names and maximum port",
+			msg: &agentv1.Deploy{
+				AppId:        "app-1",
+				ReleaseId:    "rel-1",
+				Image:        "registry.example.com/app:1",
+				Project:      "p",
+				Environment:  "e",
+				Service:      "s",
+				Port:         65535,
+				Domains:      []string{domain253(), strings.Repeat("b", 63) + ".example.com"},
+				HasPreDeploy: false,
+			},
+		},
+		{
+			name: "no port",
+			msg: &agentv1.Deploy{
+				AppId:        "app-1",
+				ReleaseId:    "rel-1",
+				Image:        "registry.example.com/app:1",
+				Project:      "web",
+				Environment:  "prod",
+				Service:      "api",
+				Port:         0,
+				HasPreDeploy: true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			roundTrip(t, agentv1.MessageType_DEPLOY, tt.msg, &agentv1.Deploy{})
+		})
+	}
+}
+
+func TestDeployRejectsBadIdentity(t *testing.T) {
+	t.Parallel()
+
+	badValues := []struct {
+		name  string
+		value string
+	}{
+		{"empty", ""},
+		{"64 bytes", strings.Repeat("a", 64)},
+		{"uppercase", "Web"},
+		{"underscore", "a_b"},
+		{"dot", "a.b"},
+		{"space", "a b"},
+		{"non-ASCII byte", "aéb"},
+		{"leading dash", "-a"},
+		{"trailing dash", "a-"},
+	}
+	fields := []string{"project", "environment", "service"}
+
+	for _, field := range fields {
+		for _, bad := range badValues {
+			t.Run(field+"/"+bad.name, func(t *testing.T) {
+				t.Parallel()
+				m := validDeployMessage()
+				switch field {
+				case "project":
+					m.Project = bad.value
+				case "environment":
+					m.Environment = bad.value
+				case "service":
+					m.Service = bad.value
+				}
+				env, err := Wrap(agentv1.MessageType_DEPLOY, "req-1", m)
+				if err != nil {
+					t.Fatalf("Wrap error = %v", err)
+				}
+				err = Open(env, &agentv1.Deploy{})
+				if !errors.Is(err, ErrMalformed) {
+					t.Fatalf("Open(%s=%q): expected ErrMalformed, got %v", field, bad.value, err)
+				}
+				if !strings.Contains(err.Error(), field) {
+					t.Fatalf("Open(%s=%q) error = %q, expected it to name field %q", field, bad.value, err, field)
+				}
+			})
+		}
+	}
+}
+
+func TestDeployRejectsBadServiceSettings(t *testing.T) {
+	t.Parallel()
+
+	seventeenDomains := make([]string, 17)
+	for i := range seventeenDomains {
+		seventeenDomains[i] = fmt.Sprintf("d%d.example.com", i+1)
+	}
+	// 63 + 1 + 63 + 1 + 63 + 1 + 62 = 254 bytes.
+	domain254 := strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 62)
+
+	withDomain := func(domain string) func(*agentv1.Deploy) {
+		return func(d *agentv1.Deploy) {
+			d.Port = 8080
+			d.Domains = []string{domain}
+		}
+	}
+	withHealthPath := func(path string) func(*agentv1.Deploy) {
+		return func(d *agentv1.Deploy) {
+			d.Port = 8080
+			d.HealthPath = path
+		}
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*agentv1.Deploy)
+	}{
+		{"port 65536", func(d *agentv1.Deploy) { d.Port = 65536 }},
+		{"port max uint32", func(d *agentv1.Deploy) { d.Port = math.MaxUint32 }},
+		{"health path without port", func(d *agentv1.Deploy) { d.HealthPath = "/healthz" }},
+		{"health path without leading slash", withHealthPath("healthz")},
+		{"health path 257 bytes", withHealthPath("/" + strings.Repeat("a", 256))},
+		{"health path with question mark", withHealthPath("/he?alth")},
+		{"health path with percent", withHealthPath("/he%alth")},
+		{"health path with space", withHealthPath("/health z")},
+		{"health path with hash", withHealthPath("/health#z")},
+		{"health path with NUL", withHealthPath("/health\x00z")},
+		{"domains without port", func(d *agentv1.Deploy) { d.Domains = []string{"example.com"} }},
+		{"17 domains", func(d *agentv1.Deploy) { d.Port = 8080; d.Domains = seventeenDomains }},
+		{"duplicate domain", func(d *agentv1.Deploy) {
+			d.Port = 8080
+			d.Domains = []string{"example.com", "example.com"}
+		}},
+		{"single label domain", withDomain("localhost")},
+		{"wildcard domain", withDomain("*.example.com")},
+		{"trailing dot domain", withDomain("example.com.")},
+		{"uppercase domain", withDomain("Example.com")},
+		{"empty domain entry", withDomain("")},
+		{"empty label", withDomain("a..com")},
+		{"64 byte label", withDomain(strings.Repeat("a", 64) + ".com")},
+		{"label with leading dash", withDomain("-a.com")},
+		{"label with trailing dash", withDomain("a-.com")},
+		{"254 byte domain", withDomain(domain254)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := validDeployMessage()
+			tt.mutate(m)
+			env, err := Wrap(agentv1.MessageType_DEPLOY, "req-1", m)
+			if err != nil {
+				t.Fatalf("Wrap(%s) error = %v", tt.name, err)
+			}
+			if err := Open(env, &agentv1.Deploy{}); !errors.Is(err, ErrMalformed) {
+				t.Fatalf("Open(%s): expected ErrMalformed, got %v", tt.name, err)
+			}
+		})
+	}
 }
