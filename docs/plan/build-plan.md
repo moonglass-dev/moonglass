@@ -115,7 +115,7 @@ The preflight moved W2-S, W3-3 and W3-5 here and added W4-8 to W4-10. Their IDs 
 - **W3-5** Private registries and environment variables — pull with the environment's registry credentials, which never enter a container; pass env secrets to services and pre-deploy steps at deploy · depends_on: W3-4, W4-8 · risk: standard · paths: internal/deploy/, internal/build/
 - **W4-10** GitHub App — created from a manifest in a signed-in session; a push webhook deploys the pushed commit; the server's deploy key is added to the repository (`docs/specs/build.md`) · depends_on: W4-1, W3-4 · risk: high · paths: internal/github/, internal/registry/, internal/server/, internal/store/
 - **W2-S** UI shell — SvelteKit static build embedded in the binary (ADR-0016), design tokens, layout, a ⌘K palette of registry operations, a "servers online" page, no other business logic · depends_on: W0-2, W2-1, W4-1 · risk: high · paths: ui/, internal/ui/, cmd/moonglass/, internal/server/, internal/registry/, Makefile, .github/workflows/ci.yml, .gitignore
-- **W4-2** Environments — protected flag, resource limits · depends_on: W2-1 · risk: standard · paths: internal/registry/, internal/store/
+- **W4-2** Environments — the protected flag, environments.set-protected, the flag in environments.list; until W5-2 a deploy to a protected environment runs and is audited; resource limits deferred to v1 · depends_on: W2-11 · risk: high · paths: internal/registry/, internal/store/, internal/api/, internal/cli/, docs/specs/storage.md, docs/specs/registry.md, docs/specs/secrets.md
 - **W4-3** Auto-rollback — crash and health triggers on by default; the error-rate trigger in shadow mode with "mark right or wrong" (S§5.4) · depends_on: W2-4 · risk: standard · paths: internal/rollback/
 - **W4-4** Live logs and current usage — agent to server to SSE · depends_on: W1-4 · risk: standard · paths: internal/agent/, internal/server/
 - **W4-5** Browser secret encryption — values are write-only; CSP is enforced; age in TypeScript · depends_on: W3-2, W2-S · risk: high · paths: ui/
@@ -123,8 +123,8 @@ The preflight moved W2-S, W3-3 and W3-5 here and added W4-8 to W4-10. Their IDs 
 - **W4-7** Notifications — email and signed webhooks · depends_on: W4-3 · risk: standard · paths: internal/notify/
 - **W4-E** Week 4 end-to-end — the G4 path in CI: crash-loop rollback within 2 min, the shadow-mode report, sign-in and session revoke, core screens driven from the keyboard, and a second server receives the wrapped key · depends_on: W4-1, W4-2, W4-5, W4-6, W4-7, W3-3 · risk: standard · paths: test/e2e/
 
-**For the week 4 preflight** (left open on purpose by the owner, 2026-11-17):
-- An org's first environment starts protected (ADR-0006 decision 4), and a protected deploy needs an approval, but approvals arrive in W5-2. Once W4-2 lands, deploys to every first environment would be blocked, including W4-E's.
+**For the week 4 preflight** (the protected-flag item was decided by the owner on 2026-11-17; the other two stay open):
+- W4-2 stores the protected flag and does not gate deploys. W5-2 adds that gate. Until then a deploy to a protected environment runs and is audited, so W4-E is not stalled. The org's first environment is created protected and later ones are not. There is no plan-cap check in the open build. Resource limits are deferred to v1, and there is no W4-11 ticket.
 - W4-10's GitHub App private key and webhook secret are credentials the control plane would hold; ADR-0003 decision 10 says it holds none after setup.
 - The servers screen (W2-S, W4-6) needs online state and the disk report, which `servers.list` does not return yet.
 

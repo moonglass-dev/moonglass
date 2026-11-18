@@ -127,7 +127,7 @@ Thresholds are my proposals. Each one says what we do if it fails, so a miss cha
 ### Week 4: auto-rollback, environments, sign-in, first real UI
 - **Build:**
   - Auto-rollback with shadow mode for the error-rate trigger (S§5.4).
-  - Environments with a protected flag; resource limits.
+  - Environments with a protected flag. The org's first environment is created protected and later ones are not. Until W5-2, a deploy to a protected environment runs and is audited. Resource limits are deferred to v1.
   - Live logs and current resource usage.
   - **GitHub sign-in, email magic links, sessions list and revoke.**
   - UI for projects, services, deploys and logs.
@@ -218,7 +218,7 @@ Thresholds are my proposals. Each one says what we do if it fails, so a miss cha
 | Pre-deploy steps (migrations) | Yes; failures abort the deploy; irreversible by default |
 | Environments | Yes, with a protected flag |
 | Deployment diffs and approvals | Single approver, with a diff and step-up |
-| Resource limits, deployment history | Yes |
+| Resource limits, deployment history | Deployment history yes; resource limits deferred to v1 |
 | Image and container cleanup, Docker cleanup | Yes, including the build cache, plus disk-full handling |
 | Network management | One isolated network per project |
 | Control-plane backup and recovery | Yes |
@@ -244,6 +244,7 @@ Thresholds are my proposals. Each one says what we do if it fails, so a miss cha
 | Zero-downtime Compose | Blue/green for swappable services, sized by the week 6 classifier check |
 | Railpack zero-config builds | Through its CLI and BuildKit frontend, pinned, behind canary |
 | Metrics charts | From the samples the agent already collects |
+| Resource limits | Deferred from week 4 |
 | Managed subdomains | Pro and Team; needs the PSL entry or a Let's Encrypt adjustment |
 | Live hosted ↔ self-hosted migration without restart, and its demo | Tested on every release from here |
 | Agent-verified approvals | Closes the gap in S§4 for protected environments |

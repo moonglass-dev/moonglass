@@ -42,7 +42,7 @@ Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry 
 | W3-2 | `secrets.list` | `GET /v1/secrets` | viewer | no | project, environment |
 
 - `services.create` takes `project`, `environment`, `name` and `server` (a server id of the caller's org).
-- `environments.list` returns each environment's `public_key` once it has one, which the CLI pins (`docs/specs/secrets.md`).
+- `environments.list` returns each environment's `public_key` once it has one, which the CLI pins (`docs/specs/secrets.md`). From W4-2 it also returns `protected`.
 - **`deploy`** takes `project`, `environment`, `service`, exactly one of `image` (a reference) or `git` (`<owner>/<repo>@<40-hex commit>`, from W3-4), and optional `port`, `health_path`, `domain` (repeated), `pre_deploy` (repeated, the argv) and `pre_deploy_reversible`. The rules of `docs/specs/protocol.md` apply to each. It mints the release id, then:
   - **One deploy per service.** At most one release per service is `running` and at most one `queued`. A new request while one is queued marks the queued one `superseded` (its caller gets that status) and queues itself. Rollbacks are not queued behind deploys.
   - The server drives the steps: `BUILD` for a git source (W3-4), then `DEPLOY`, then `RUN_PRE_DEPLOY` when `pre_deploy` is set, then `SWITCH_RELEASE`. Each waits for its `CommandResult` (`docs/specs/connection.md`). A step that is not `SUCCEEDED` ends the release as `failed` or `rejected` with the agent's `detail`.
@@ -56,13 +56,25 @@ Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry 
 - **`environments.key.create`** takes the environment, its `public_key` and one wrapped copy per recovery recipient on record. It is refused when the environment already has a key, or when the wrapped copies do not name exactly the recovery recipients on record.
 - **`secrets.set`** takes `kind`, `name` and `ciphertext`, and replaces an existing value of that name. **`secrets.list`** returns kinds, names and times, never ciphertext. Values are never read back through the API (`docs/specs/secrets.md`).
 
+### Protected flag (W4-2)
+
+W4-2 stores `environments.protected` and does not gate deploys. W5-2 adds that gate. Until then a deploy to a protected environment runs and is audited. There is no plan-cap check in the open build. Resource limits are deferred to v1.
+
+| Ticket | Name | Method, path | `MinRole` | Destructive | Target |
+|---|---|---|---|---|---|
+| W4-2 | `environments.set-protected` | `POST /v1/environments/protected` | member | no | project, environment |
+
+- **`environments.set-protected`** takes `project`, `environment` and `protected` (bool).
+- **`environments.create`** sets `protected` true for the org's first environment and false for later ones. The column is `NOT NULL` (`docs/specs/storage.md`).
+- **`deploy`** is not gated on `protected` until W5-2. Until then a deploy to a protected environment runs and is audited like every other call.
+
 ## Authorisation
 
 `registry.Invoke` allows a call only when all of these pass, in this order:
 
 1. **Role.** The caller's role in the org ranks at least `MinRole` (owner > admin > member > viewer).
 2. **Scope.** One of the token's scope rows matches the operation, project and environment. `*` matches anything. An org-level call has an empty target, so only a `*` row matches it.
-3. **Destructive gate.** A destructive call by an agent identity (`Principal.Agent`) returns `ErrPendingApproval` and does not run. W2-1 mints no agent identities and has no approval flow; protected-environment and secret-recipient gates are added by the tickets that build them.
+3. **Destructive gate.** A destructive call by an agent identity (`Principal.Agent`) returns `ErrPendingApproval` and does not run. W2-1 mints no agent identities and has no approval flow. W4-2 does not add a protected-environment deploy gate; W5-2 does. Until W5-2 a deploy to a protected environment runs and is audited. Secret-recipient gates are added by the tickets that build them.
 
 A denied call does not run the handler. Authorisation lives only in `Invoke`; no middleware and no caller-set flag changes it.
 

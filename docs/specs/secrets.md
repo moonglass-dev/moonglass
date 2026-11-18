@@ -26,8 +26,7 @@ The plaintext of every wrapped environment key, to an agent or to a recovery rec
 - `v` is 1. Any other value, an unknown field or a missing field is an error.
 - An agent decides whether an environment is protected from the record it unwrapped itself, never from a field in a request. The control plane holds only ciphertext and cannot change a record, because age authenticates its payload.
 - A record whose `environment_id` differs from the environment it was delivered for is refused.
-- Turning protection off takes effect at once. Turning it on takes effect for an agent only when `secrets rotate` (W3-3) writes new records; until then that agent's old copy still says unprotected. The UI and the CLI say so when protection is switched on.
-- Until W4-2 adds the protected flag, records are written with `protected: false`.
+- From W4-2, each new record the CLI creates copies the environment's current flag. An existing record changes only when `secrets rotate` (W3-3) writes a new one. Until that write, the copy an agent already holds is unchanged, and the UI and the CLI say so.
 
 ## Kinds of secret
 
