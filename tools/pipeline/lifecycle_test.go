@@ -482,6 +482,7 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	writeT(t, dir, "internal/protocol/deploy_test.go", "package protocol\nfunc TestOld(t *testing.T) {}\n")
 	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestOld(t *testing.T) {}\n")
 	writeT(t, dir, "internal/policy/config_test.go", "package policy\nfunc TestOld(t *testing.T) {}\n")
+	writeT(t, dir, "internal/store/projects_conformance_test.go", "package store\nfunc TestOld(t *testing.T) {}\n")
 	mustGit(t, dir, "add", "-A")
 	mustGit(t, dir, "commit", "--quiet", "-m", "base")
 	base, err := git(dir, "rev-parse", "HEAD")
@@ -491,6 +492,7 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	writeT(t, dir, "internal/protocol/deploy_test.go", "package protocol\nfunc TestNew(t *testing.T) {}\n")
 	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestNew(t *testing.T) {}\n")
 	writeT(t, dir, "internal/policy/config_test.go", "package policy\nfunc TestNew(t *testing.T) {}\n")
+	writeT(t, dir, "internal/store/projects_conformance_test.go", "package store\nfunc TestNew(t *testing.T) {}\n")
 	mustGit(t, dir, "add", "-A")
 	mustGit(t, dir, "commit", "--quiet", "-m", "edit")
 	if msg, err := removedTestLines(dir, base, "HEAD", "W2-8"); err != nil || msg == "" || strings.Contains(msg, "deploy_test.go") {
@@ -504,6 +506,9 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	}
 	if msg, err := removedTestLines(dir, base, "HEAD", "W5-3a"); err != nil || msg == "" || strings.Contains(msg, "config_test.go") {
 		t.Fatalf("W5-3a allowance = %q, %v; want config_test.go allowed and another test still blocked", msg, err)
+	}
+	if msg, err := removedTestLines(dir, base, "HEAD", "FR1-10"); err != nil || msg == "" || strings.Contains(msg, "projects_conformance_test.go") {
+		t.Fatalf("FR1-10 allowance = %q, %v; want projects_conformance_test.go allowed and another test still blocked", msg, err)
 	}
 }
 
