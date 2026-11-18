@@ -151,6 +151,14 @@ moonglass.dev/moonglass/internal/store TestTokenAuditTablesHaveRLS
 moonglass.dev/moonglass/internal/store TestTokensAndAuditSQLite
 moonglass.dev/moonglass/internal/store TestTokensAuditConformancePostgres
 moonglass.dev/moonglass/internal/store TestTokensAuditConformanceSQLite
+moonglass.dev/moonglass/internal/update FuzzParseSignature
+moonglass.dev/moonglass/internal/update TestParseSignerAcceptsOnlyPinnedForm
+moonglass.dev/moonglass/internal/update TestVerifyAcceptsEitherPinnedKey
+moonglass.dev/moonglass/internal/update TestVerifyRejectsMalformedEncoding
+moonglass.dev/moonglass/internal/update TestVerifyRejectsTamperedSignature
+moonglass.dev/moonglass/internal/update TestVerifyRejectsUnpinnedKey
+moonglass.dev/moonglass/internal/update TestVerifyRejectsWrongEnvelope
+moonglass.dev/moonglass/internal/update TestVerifyRequiresExactFlags
 moonglass.dev/moonglass/tools/pipeline TestBlockedChildStopsOnlyItsTicketAndResumes
 moonglass.dev/moonglass/tools/pipeline TestDecide
 moonglass.dev/moonglass/tools/pipeline TestGitHubRepo

@@ -1,0 +1,17 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "0128546ddf3db91697613247413d8712303f1238",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/update/verify.go",
+      "line": 80,
+      "issue": "The n \u003c 0 guard in wire.take is unreachable: every caller passes a constant 6, 4 or 1.",
+      "scenario": "No input reaches it; it is an untested branch in trusted core, not a failure."
+    }
+  ]
+}
