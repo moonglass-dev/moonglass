@@ -26,7 +26,7 @@ One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and th
 
 | Command | Does |
 |---|---|
-| `make ci` | The one gate: `fmt-check`, `lint`, `proto-check`, `test`, `check-test-list`, `build-all` |
+| `make ci` | The one gate: `fmt-check`, `mod-check`, `lint`, `proto-check`, `test`, `check-test-list`, `build-all` |
 | `make test` | Every test, uncached, shuffled, with the race detector; writes `coverage.out` |
 | `make test-one PKG=./cmd/moonglass NAME=TestName` | One test |
 | `make fmt` | Apply gofumpt and goimports |
