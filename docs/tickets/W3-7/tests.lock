@@ -1,0 +1,4 @@
+# base 36b488f994f7e76f8b99e0fbf3796a925b45a9be
+b1e7815f5315d903a121e171ea86cd282ad884f6ba67b2e3d6112bcddcbd6923  internal/protocol/build_test.go
+bf510e0be7c8de0153710522f96e7cf2a691398cc1d37163f7cc88ce047edfe4  internal/protocol/deploy_test.go
+157ac17494f8bb28427198393a0d62429f930c86932b2d08105ba2b639f5351b  internal/protocol/heartbeat_reports_test.go

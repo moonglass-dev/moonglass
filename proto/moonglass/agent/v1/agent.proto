@@ -25,6 +25,7 @@ enum MessageType {
   ROLLBACK = 8;
   RUN_PRE_DEPLOY = 9;
   COMMAND_RESULT = 10;
+  BUILD = 11;
 }
 
 message Error {
@@ -59,11 +60,33 @@ enum EnrollResult {
   TOKEN_USED = 3;
 }
 
+// Heartbeat reports what the agent knows about itself and its server. disk absent
+// means not measured. deploy_key is the server's public SSH deploy key, empty
+// until it exists.
 message Heartbeat {
   string agent_version = 1;
+  DiskReport disk = 2;
+  string deploy_key = 3;
 }
 
 message HeartbeatAck {}
+
+// DiskReport is one disk sample. Each free value is at most its total; nothing
+// relates the numbers to level.
+message DiskReport {
+  uint64 data_root_free_bytes = 1;
+  uint64 data_root_total_bytes = 2;
+  uint64 agent_dir_free_bytes = 3;
+  uint64 agent_dir_total_bytes = 4;
+  DiskLevel level = 5;
+}
+
+enum DiskLevel {
+  DISK_LEVEL_UNSPECIFIED = 0;
+  OK = 1;
+  LOW = 2;
+  CRITICAL = 3;
+}
 
 // Deploy creates a candidate release for an app. project, environment and service select agent.toml blocks; health_path is an HTTP path inside the container, not a host path.
 message Deploy {
@@ -77,6 +100,20 @@ message Deploy {
   string health_path = 8;
   repeated string domains = 9;
   bool has_pre_deploy = 10;
+}
+
+// Build builds a GitHub commit on the server and tags the image for this release.
+// repository and commit are validated fields from which the agent builds the
+// clone URL itself: repository is <owner>/<repo> and commit is 40 lowercase hex
+// characters. Neither is a URL, a git option or a shell string.
+message Build {
+  string app_id = 1;
+  string release_id = 2;
+  string project = 3;
+  string environment = 4;
+  string service = 5;
+  string repository = 6;
+  string commit = 7;
 }
 
 // SwitchRelease promotes a ready candidate release to current.

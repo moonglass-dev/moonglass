@@ -238,6 +238,10 @@ func validatePayload(msg proto.Message) error {
 		return validateRunPreDeploy(m)
 	case *agentv1.CommandResult:
 		return validateCommandResult(m)
+	case *agentv1.Build:
+		return validateBuild(m)
+	case *agentv1.Heartbeat:
+		return validateHeartbeat(m)
 	default:
 		return nil
 	}
@@ -254,7 +258,8 @@ func validateType(t agentv1.MessageType) error {
 		agentv1.MessageType_SWITCH_RELEASE,
 		agentv1.MessageType_ROLLBACK,
 		agentv1.MessageType_RUN_PRE_DEPLOY,
-		agentv1.MessageType_COMMAND_RESULT:
+		agentv1.MessageType_COMMAND_RESULT,
+		agentv1.MessageType_BUILD:
 		return nil
 	case agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED:
 		return fmt.Errorf("unspecified message type: %w", ErrMalformed)
@@ -313,6 +318,8 @@ func typeOf(msg proto.Message) (agentv1.MessageType, error) {
 		return agentv1.MessageType_RUN_PRE_DEPLOY, nil
 	case *agentv1.CommandResult:
 		return agentv1.MessageType_COMMAND_RESULT, nil
+	case *agentv1.Build:
+		return agentv1.MessageType_BUILD, nil
 	default:
 		return agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED, fmt.Errorf("unsupported message %T: %w", msg, ErrUnknownType)
 	}

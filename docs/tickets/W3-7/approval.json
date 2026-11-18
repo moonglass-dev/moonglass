@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All nine tests are in package protocol and assert through Wrap, Marshal, Unmarshal and Open, including proto.Equal round trips, ErrMalformed with the field name, unknown fields inside DiskReport, type mismatches, and a BUILD envelope that carries error. Both fuzz targets re-wrap an accepted payload and require proto.Equal; FuzzOpenHeartbeat also checks free ≤ total and a known level. They do not compile yet, because Build, DiskReport, DiskLevel, BUILD, validateBuild and validateHeartbeat are not in the tree. The only existing test line changed is the owner-allowed 11 to 15 in TestDeployMessagesRejectUnknownType. An interior newline in the base64 is also rejected by the decoder's length check, so that extra case does not by itself force the alphabet check to run first; the required trailing-newline case still does."
+}

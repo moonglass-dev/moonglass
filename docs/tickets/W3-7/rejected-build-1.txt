@@ -1,0 +1,14 @@
+Rejected build round 1.
+
+Problems:
+- docs/tickets/W3-7/check.json is outside what the build step may write
+
+Changed files (discarded):
+- docs/specs/protocol.md
+- docs/tickets/W3-7/check.json
+- internal/protocol/agentv1/agent.pb.go
+- internal/protocol/build.go
+- internal/protocol/envelope.go
+- internal/protocol/heartbeat.go
+- proto/moonglass/agent/v1/agent.proto
+- testdata/tests.txt

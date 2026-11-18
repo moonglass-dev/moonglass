@@ -22,7 +22,7 @@ Every message is wrapped in an envelope before it is sent.
 | `payload` | `bytes` | Encoded payload message for that type, possibly empty. |
 | `error` | `Error` | Required when `type` is `ERROR`, and forbidden on any other type. This is the only place an error travels; it is not also encoded in `payload`. |
 
-`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `COMMAND_RESULT`.
+`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `COMMAND_RESULT`, `BUILD`.
 
 Encode (`Marshal`) and decode (`Unmarshal`) round-trip a well-formed envelope. `Marshal` is deterministic. The on-the-wire encoding is a 4-byte big-endian length of the protobuf payload, followed by that many bytes of protobuf. The length must match the rest of the buffer exactly, so a truncated or trailing-garbage input is rejected.
 
@@ -132,8 +132,14 @@ Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds the
 
 | Field | Type | Rule |
 |---|---|---|
-| `disk` | `DiskReport` | Optional (owner decision D25): absent means not measured. When present, `data_root_free_bytes`, `data_root_total_bytes`, `agent_dir_free_bytes`, `agent_dir_total_bytes` (`uint64`), each free value at most its total, and `level`: `OK`, `LOW` or `CRITICAL` (`docs/specs/disk.md`); `UNSPECIFIED` and unknown levels are rejected. From W3-6 the agent always sends it. |
+| `disk` | `DiskReport` | Optional (owner decision D25): absent means not measured. When present, `data_root_free_bytes`, `data_root_total_bytes`, `agent_dir_free_bytes`, `agent_dir_total_bytes` (`uint64`), each free value at most its total, and `level`: `OK`, `LOW` or `CRITICAL` (`docs/specs/disk.md`); `UNSPECIFIED` (0) and unknown levels are rejected. From W3-6 the agent always sends it. |
 | `deploy_key` | `string` | The server's SSH deploy public key as one OpenSSH line, `ssh-ed25519 <base64> moonglass-deploy`, at most 256 bytes; empty until the key exists (`docs/specs/build.md`). It is a public key, not a secret. |
+
+Free at most total, for each of the two filesystem pairs, is the only rule relating the numbers. Zero totals are allowed when the matching free value is also zero. Nothing ties `level` to the byte counts, because the hysteresis that computes it (W3-6) means one sample cannot give it.
+
+`deploy_key` is exactly `ssh-ed25519`, one single space, non-empty padded standard base64 (RFC 4648 §4, strict, no CR or LF), one single space, `moonglass-deploy`. No newline, no other key type, no other comment. The protocol checks the line's shape only; whether the base64 decodes to a well-formed Ed25519 wire key is W3-8, in `internal/keys`.
+
+Opening a payload rejects unknown fields at every nesting level, including inside `DiskReport`.
 
 ## Log and usage streaming (W4-4)
 

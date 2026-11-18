@@ -194,7 +194,7 @@ func TestRunPreDeployRoundTrip(t *testing.T) {
 func TestDeployMessagesRejectUnknownType(t *testing.T) {
 	t.Parallel()
 
-	for _, mt := range []agentv1.MessageType{agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED, 11, 99} {
+	for _, mt := range []agentv1.MessageType{agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED, 15, 99} {
 		t.Run(mt.String(), func(t *testing.T) {
 			t.Parallel()
 			env := &agentv1.Envelope{Version: Version, Type: mt, RequestId: "r"}

@@ -35,6 +35,7 @@ const (
 	MessageType_ROLLBACK                 MessageType = 8
 	MessageType_RUN_PRE_DEPLOY           MessageType = 9
 	MessageType_COMMAND_RESULT           MessageType = 10
+	MessageType_BUILD                    MessageType = 11
 )
 
 // Enum value maps for MessageType.
@@ -51,6 +52,7 @@ var (
 		8:  "ROLLBACK",
 		9:  "RUN_PRE_DEPLOY",
 		10: "COMMAND_RESULT",
+		11: "BUILD",
 	}
 	MessageType_value = map[string]int32{
 		"MESSAGE_TYPE_UNSPECIFIED": 0,
@@ -64,6 +66,7 @@ var (
 		"ROLLBACK":                 8,
 		"RUN_PRE_DEPLOY":           9,
 		"COMMAND_RESULT":           10,
+		"BUILD":                    11,
 	}
 )
 
@@ -204,6 +207,58 @@ func (EnrollResult) EnumDescriptor() ([]byte, []int) {
 	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{2}
 }
 
+type DiskLevel int32
+
+const (
+	DiskLevel_DISK_LEVEL_UNSPECIFIED DiskLevel = 0
+	DiskLevel_OK                     DiskLevel = 1
+	DiskLevel_LOW                    DiskLevel = 2
+	DiskLevel_CRITICAL               DiskLevel = 3
+)
+
+// Enum value maps for DiskLevel.
+var (
+	DiskLevel_name = map[int32]string{
+		0: "DISK_LEVEL_UNSPECIFIED",
+		1: "OK",
+		2: "LOW",
+		3: "CRITICAL",
+	}
+	DiskLevel_value = map[string]int32{
+		"DISK_LEVEL_UNSPECIFIED": 0,
+		"OK":                     1,
+		"LOW":                    2,
+		"CRITICAL":               3,
+	}
+)
+
+func (x DiskLevel) Enum() *DiskLevel {
+	p := new(DiskLevel)
+	*p = x
+	return p
+}
+
+func (x DiskLevel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DiskLevel) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_moonglass_agent_v1_agent_proto_enumTypes[3].Descriptor()
+}
+
+func (DiskLevel) Type() protoreflect.EnumType {
+	return &file_proto_moonglass_agent_v1_agent_proto_enumTypes[3]
+}
+
+func (x DiskLevel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DiskLevel.Descriptor instead.
+func (DiskLevel) EnumDescriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{3}
+}
+
 type CommandOutcome int32
 
 const (
@@ -240,11 +295,11 @@ func (x CommandOutcome) String() string {
 }
 
 func (CommandOutcome) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_moonglass_agent_v1_agent_proto_enumTypes[3].Descriptor()
+	return file_proto_moonglass_agent_v1_agent_proto_enumTypes[4].Descriptor()
 }
 
 func (CommandOutcome) Type() protoreflect.EnumType {
-	return &file_proto_moonglass_agent_v1_agent_proto_enumTypes[3]
+	return &file_proto_moonglass_agent_v1_agent_proto_enumTypes[4]
 }
 
 func (x CommandOutcome) Number() protoreflect.EnumNumber {
@@ -253,7 +308,7 @@ func (x CommandOutcome) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CommandOutcome.Descriptor instead.
 func (CommandOutcome) EnumDescriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{3}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{4}
 }
 
 type ReleasePhase int32
@@ -292,11 +347,11 @@ func (x ReleasePhase) String() string {
 }
 
 func (ReleasePhase) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_moonglass_agent_v1_agent_proto_enumTypes[4].Descriptor()
+	return file_proto_moonglass_agent_v1_agent_proto_enumTypes[5].Descriptor()
 }
 
 func (ReleasePhase) Type() protoreflect.EnumType {
-	return &file_proto_moonglass_agent_v1_agent_proto_enumTypes[4]
+	return &file_proto_moonglass_agent_v1_agent_proto_enumTypes[5]
 }
 
 func (x ReleasePhase) Number() protoreflect.EnumNumber {
@@ -305,7 +360,7 @@ func (x ReleasePhase) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ReleasePhase.Descriptor instead.
 func (ReleasePhase) EnumDescriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{4}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{5}
 }
 
 // Envelope wraps every agent ↔ control-plane message.
@@ -549,9 +604,14 @@ func (x *EnrollResponse) GetResult() EnrollResult {
 	return EnrollResult_ENROLL_RESULT_UNSPECIFIED
 }
 
+// Heartbeat reports what the agent knows about itself and its server. disk absent
+// means not measured. deploy_key is the server's public SSH deploy key, empty
+// until it exists.
 type Heartbeat struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AgentVersion  string                 `protobuf:"bytes,1,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
+	Disk          *DiskReport            `protobuf:"bytes,2,opt,name=disk,proto3" json:"disk,omitempty"`
+	DeployKey     string                 `protobuf:"bytes,3,opt,name=deploy_key,json=deployKey,proto3" json:"deploy_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -593,6 +653,20 @@ func (x *Heartbeat) GetAgentVersion() string {
 	return ""
 }
 
+func (x *Heartbeat) GetDisk() *DiskReport {
+	if x != nil {
+		return x.Disk
+	}
+	return nil
+}
+
+func (x *Heartbeat) GetDeployKey() string {
+	if x != nil {
+		return x.DeployKey
+	}
+	return ""
+}
+
 type HeartbeatAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -629,6 +703,84 @@ func (*HeartbeatAck) Descriptor() ([]byte, []int) {
 	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{5}
 }
 
+// DiskReport is one disk sample. Each free value is at most its total; nothing
+// relates the numbers to level.
+type DiskReport struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	DataRootFreeBytes  uint64                 `protobuf:"varint,1,opt,name=data_root_free_bytes,json=dataRootFreeBytes,proto3" json:"data_root_free_bytes,omitempty"`
+	DataRootTotalBytes uint64                 `protobuf:"varint,2,opt,name=data_root_total_bytes,json=dataRootTotalBytes,proto3" json:"data_root_total_bytes,omitempty"`
+	AgentDirFreeBytes  uint64                 `protobuf:"varint,3,opt,name=agent_dir_free_bytes,json=agentDirFreeBytes,proto3" json:"agent_dir_free_bytes,omitempty"`
+	AgentDirTotalBytes uint64                 `protobuf:"varint,4,opt,name=agent_dir_total_bytes,json=agentDirTotalBytes,proto3" json:"agent_dir_total_bytes,omitempty"`
+	Level              DiskLevel              `protobuf:"varint,5,opt,name=level,proto3,enum=moonglass.agent.v1.DiskLevel" json:"level,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *DiskReport) Reset() {
+	*x = DiskReport{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiskReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiskReport) ProtoMessage() {}
+
+func (x *DiskReport) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiskReport.ProtoReflect.Descriptor instead.
+func (*DiskReport) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *DiskReport) GetDataRootFreeBytes() uint64 {
+	if x != nil {
+		return x.DataRootFreeBytes
+	}
+	return 0
+}
+
+func (x *DiskReport) GetDataRootTotalBytes() uint64 {
+	if x != nil {
+		return x.DataRootTotalBytes
+	}
+	return 0
+}
+
+func (x *DiskReport) GetAgentDirFreeBytes() uint64 {
+	if x != nil {
+		return x.AgentDirFreeBytes
+	}
+	return 0
+}
+
+func (x *DiskReport) GetAgentDirTotalBytes() uint64 {
+	if x != nil {
+		return x.AgentDirTotalBytes
+	}
+	return 0
+}
+
+func (x *DiskReport) GetLevel() DiskLevel {
+	if x != nil {
+		return x.Level
+	}
+	return DiskLevel_DISK_LEVEL_UNSPECIFIED
+}
+
 // Deploy creates a candidate release for an app. project, environment and service select agent.toml blocks; health_path is an HTTP path inside the container, not a host path.
 type Deploy struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -648,7 +800,7 @@ type Deploy struct {
 
 func (x *Deploy) Reset() {
 	*x = Deploy{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[6]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +812,7 @@ func (x *Deploy) String() string {
 func (*Deploy) ProtoMessage() {}
 
 func (x *Deploy) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[6]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +825,7 @@ func (x *Deploy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Deploy.ProtoReflect.Descriptor instead.
 func (*Deploy) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{6}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Deploy) GetAppId() string {
@@ -746,6 +898,102 @@ func (x *Deploy) GetHasPreDeploy() bool {
 	return false
 }
 
+// Build builds a GitHub commit on the server and tags the image for this release.
+// repository and commit are validated fields from which the agent builds the
+// clone URL itself: repository is <owner>/<repo> and commit is 40 lowercase hex
+// characters. Neither is a URL, a git option or a shell string.
+type Build struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	ReleaseId     string                 `protobuf:"bytes,2,opt,name=release_id,json=releaseId,proto3" json:"release_id,omitempty"`
+	Project       string                 `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
+	Environment   string                 `protobuf:"bytes,4,opt,name=environment,proto3" json:"environment,omitempty"`
+	Service       string                 `protobuf:"bytes,5,opt,name=service,proto3" json:"service,omitempty"`
+	Repository    string                 `protobuf:"bytes,6,opt,name=repository,proto3" json:"repository,omitempty"`
+	Commit        string                 `protobuf:"bytes,7,opt,name=commit,proto3" json:"commit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Build) Reset() {
+	*x = Build{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Build) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Build) ProtoMessage() {}
+
+func (x *Build) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Build.ProtoReflect.Descriptor instead.
+func (*Build) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Build) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *Build) GetReleaseId() string {
+	if x != nil {
+		return x.ReleaseId
+	}
+	return ""
+}
+
+func (x *Build) GetProject() string {
+	if x != nil {
+		return x.Project
+	}
+	return ""
+}
+
+func (x *Build) GetEnvironment() string {
+	if x != nil {
+		return x.Environment
+	}
+	return ""
+}
+
+func (x *Build) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+func (x *Build) GetRepository() string {
+	if x != nil {
+		return x.Repository
+	}
+	return ""
+}
+
+func (x *Build) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
 // SwitchRelease promotes a ready candidate release to current.
 type SwitchRelease struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -757,7 +1005,7 @@ type SwitchRelease struct {
 
 func (x *SwitchRelease) Reset() {
 	*x = SwitchRelease{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[7]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -769,7 +1017,7 @@ func (x *SwitchRelease) String() string {
 func (*SwitchRelease) ProtoMessage() {}
 
 func (x *SwitchRelease) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[7]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -782,7 +1030,7 @@ func (x *SwitchRelease) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SwitchRelease.ProtoReflect.Descriptor instead.
 func (*SwitchRelease) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{7}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SwitchRelease) GetAppId() string {
@@ -809,7 +1057,7 @@ type Rollback struct {
 
 func (x *Rollback) Reset() {
 	*x = Rollback{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[8]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -821,7 +1069,7 @@ func (x *Rollback) String() string {
 func (*Rollback) ProtoMessage() {}
 
 func (x *Rollback) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[8]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -834,7 +1082,7 @@ func (x *Rollback) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rollback.ProtoReflect.Descriptor instead.
 func (*Rollback) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{8}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Rollback) GetAppId() string {
@@ -857,7 +1105,7 @@ type RunPreDeploy struct {
 
 func (x *RunPreDeploy) Reset() {
 	*x = RunPreDeploy{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[9]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -869,7 +1117,7 @@ func (x *RunPreDeploy) String() string {
 func (*RunPreDeploy) ProtoMessage() {}
 
 func (x *RunPreDeploy) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[9]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -882,7 +1130,7 @@ func (x *RunPreDeploy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunPreDeploy.ProtoReflect.Descriptor instead.
 func (*RunPreDeploy) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{9}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RunPreDeploy) GetAppId() string {
@@ -928,7 +1176,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[10]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -940,7 +1188,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[10]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -953,7 +1201,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{10}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CommandResult) GetOutcome() CommandOutcome {
@@ -1003,7 +1251,7 @@ type AppState struct {
 
 func (x *AppState) Reset() {
 	*x = AppState{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[11]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1015,7 +1263,7 @@ func (x *AppState) String() string {
 func (*AppState) ProtoMessage() {}
 
 func (x *AppState) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[11]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1028,7 +1276,7 @@ func (x *AppState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppState.ProtoReflect.Descriptor instead.
 func (*AppState) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{11}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AppState) GetCurrentReleaseId() string {
@@ -1080,10 +1328,20 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x13agent_age_recipient\x18\x03 \x01(\fR\x11agentAgeRecipient\"\x83\x01\n" +
 	"\x0eEnrollResponse\x127\n" +
 	"\x18control_plane_public_key\x18\x01 \x01(\fR\x15controlPlanePublicKey\x128\n" +
-	"\x06result\x18\x02 \x01(\x0e2 .moonglass.agent.v1.EnrollResultR\x06result\"0\n" +
+	"\x06result\x18\x02 \x01(\x0e2 .moonglass.agent.v1.EnrollResultR\x06result\"\x83\x01\n" +
 	"\tHeartbeat\x12#\n" +
-	"\ragent_version\x18\x01 \x01(\tR\fagentVersion\"\x0e\n" +
-	"\fHeartbeatAck\"\x9f\x02\n" +
+	"\ragent_version\x18\x01 \x01(\tR\fagentVersion\x122\n" +
+	"\x04disk\x18\x02 \x01(\v2\x1e.moonglass.agent.v1.DiskReportR\x04disk\x12\x1d\n" +
+	"\n" +
+	"deploy_key\x18\x03 \x01(\tR\tdeployKey\"\x0e\n" +
+	"\fHeartbeatAck\"\x89\x02\n" +
+	"\n" +
+	"DiskReport\x12/\n" +
+	"\x14data_root_free_bytes\x18\x01 \x01(\x04R\x11dataRootFreeBytes\x121\n" +
+	"\x15data_root_total_bytes\x18\x02 \x01(\x04R\x12dataRootTotalBytes\x12/\n" +
+	"\x14agent_dir_free_bytes\x18\x03 \x01(\x04R\x11agentDirFreeBytes\x121\n" +
+	"\x15agent_dir_total_bytes\x18\x04 \x01(\x04R\x12agentDirTotalBytes\x123\n" +
+	"\x05level\x18\x05 \x01(\x0e2\x1d.moonglass.agent.v1.DiskLevelR\x05level\"\x9f\x02\n" +
 	"\x06Deploy\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1d\n" +
 	"\n" +
@@ -1097,7 +1355,18 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"healthPath\x12\x18\n" +
 	"\adomains\x18\t \x03(\tR\adomains\x12$\n" +
 	"\x0ehas_pre_deploy\x18\n" +
-	" \x01(\bR\fhasPreDeploy\"E\n" +
+	" \x01(\bR\fhasPreDeploy\"\xcb\x01\n" +
+	"\x05Build\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1d\n" +
+	"\n" +
+	"release_id\x18\x02 \x01(\tR\treleaseId\x12\x18\n" +
+	"\aproject\x18\x03 \x01(\tR\aproject\x12 \n" +
+	"\venvironment\x18\x04 \x01(\tR\venvironment\x12\x18\n" +
+	"\aservice\x18\x05 \x01(\tR\aservice\x12\x1e\n" +
+	"\n" +
+	"repository\x18\x06 \x01(\tR\n" +
+	"repository\x12\x16\n" +
+	"\x06commit\x18\a \x01(\tR\x06commit\"E\n" +
 	"\rSwitchRelease\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1d\n" +
 	"\n" +
@@ -1123,7 +1392,7 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x12current_release_id\x18\x01 \x01(\tR\x10currentReleaseId\x12.\n" +
 	"\x13previous_release_id\x18\x02 \x01(\tR\x11previousReleaseId\x120\n" +
 	"\x14candidate_release_id\x18\x03 \x01(\tR\x12candidateReleaseId\x126\n" +
-	"\x05phase\x18\x04 \x01(\x0e2 .moonglass.agent.v1.ReleasePhaseR\x05phase*\xd7\x01\n" +
+	"\x05phase\x18\x04 \x01(\x0e2 .moonglass.agent.v1.ReleasePhaseR\x05phase*\xe2\x01\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eENROLL_REQUEST\x10\x01\x12\x13\n" +
@@ -1137,7 +1406,8 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\bROLLBACK\x10\b\x12\x12\n" +
 	"\x0eRUN_PRE_DEPLOY\x10\t\x12\x12\n" +
 	"\x0eCOMMAND_RESULT\x10\n" +
-	"*x\n" +
+	"\x12\t\n" +
+	"\x05BUILD\x10\v*x\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aINVALID\x10\x01\x12\x10\n" +
@@ -1150,7 +1420,12 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\bACCEPTED\x10\x01\x12\x11\n" +
 	"\rTOKEN_INVALID\x10\x02\x12\x0e\n" +
 	"\n" +
-	"TOKEN_USED\x10\x03*Z\n" +
+	"TOKEN_USED\x10\x03*F\n" +
+	"\tDiskLevel\x12\x1a\n" +
+	"\x16DISK_LEVEL_UNSPECIFIED\x10\x00\x12\x06\n" +
+	"\x02OK\x10\x01\x12\a\n" +
+	"\x03LOW\x10\x02\x12\f\n" +
+	"\bCRITICAL\x10\x03*Z\n" +
 	"\x0eCommandOutcome\x12\x1f\n" +
 	"\x1bCOMMAND_OUTCOME_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tSUCCEEDED\x10\x01\x12\n" +
@@ -1175,40 +1450,45 @@ func file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP() []byte {
 	return file_proto_moonglass_agent_v1_agent_proto_rawDescData
 }
 
-var file_proto_moonglass_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_proto_moonglass_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_proto_moonglass_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_proto_moonglass_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_proto_moonglass_agent_v1_agent_proto_goTypes = []any{
 	(MessageType)(0),       // 0: moonglass.agent.v1.MessageType
 	(ErrorCode)(0),         // 1: moonglass.agent.v1.ErrorCode
 	(EnrollResult)(0),      // 2: moonglass.agent.v1.EnrollResult
-	(CommandOutcome)(0),    // 3: moonglass.agent.v1.CommandOutcome
-	(ReleasePhase)(0),      // 4: moonglass.agent.v1.ReleasePhase
-	(*Envelope)(nil),       // 5: moonglass.agent.v1.Envelope
-	(*Error)(nil),          // 6: moonglass.agent.v1.Error
-	(*EnrollRequest)(nil),  // 7: moonglass.agent.v1.EnrollRequest
-	(*EnrollResponse)(nil), // 8: moonglass.agent.v1.EnrollResponse
-	(*Heartbeat)(nil),      // 9: moonglass.agent.v1.Heartbeat
-	(*HeartbeatAck)(nil),   // 10: moonglass.agent.v1.HeartbeatAck
-	(*Deploy)(nil),         // 11: moonglass.agent.v1.Deploy
-	(*SwitchRelease)(nil),  // 12: moonglass.agent.v1.SwitchRelease
-	(*Rollback)(nil),       // 13: moonglass.agent.v1.Rollback
-	(*RunPreDeploy)(nil),   // 14: moonglass.agent.v1.RunPreDeploy
-	(*CommandResult)(nil),  // 15: moonglass.agent.v1.CommandResult
-	(*AppState)(nil),       // 16: moonglass.agent.v1.AppState
+	(DiskLevel)(0),         // 3: moonglass.agent.v1.DiskLevel
+	(CommandOutcome)(0),    // 4: moonglass.agent.v1.CommandOutcome
+	(ReleasePhase)(0),      // 5: moonglass.agent.v1.ReleasePhase
+	(*Envelope)(nil),       // 6: moonglass.agent.v1.Envelope
+	(*Error)(nil),          // 7: moonglass.agent.v1.Error
+	(*EnrollRequest)(nil),  // 8: moonglass.agent.v1.EnrollRequest
+	(*EnrollResponse)(nil), // 9: moonglass.agent.v1.EnrollResponse
+	(*Heartbeat)(nil),      // 10: moonglass.agent.v1.Heartbeat
+	(*HeartbeatAck)(nil),   // 11: moonglass.agent.v1.HeartbeatAck
+	(*DiskReport)(nil),     // 12: moonglass.agent.v1.DiskReport
+	(*Deploy)(nil),         // 13: moonglass.agent.v1.Deploy
+	(*Build)(nil),          // 14: moonglass.agent.v1.Build
+	(*SwitchRelease)(nil),  // 15: moonglass.agent.v1.SwitchRelease
+	(*Rollback)(nil),       // 16: moonglass.agent.v1.Rollback
+	(*RunPreDeploy)(nil),   // 17: moonglass.agent.v1.RunPreDeploy
+	(*CommandResult)(nil),  // 18: moonglass.agent.v1.CommandResult
+	(*AppState)(nil),       // 19: moonglass.agent.v1.AppState
 }
 var file_proto_moonglass_agent_v1_agent_proto_depIdxs = []int32{
 	0,  // 0: moonglass.agent.v1.Envelope.type:type_name -> moonglass.agent.v1.MessageType
-	6,  // 1: moonglass.agent.v1.Envelope.error:type_name -> moonglass.agent.v1.Error
+	7,  // 1: moonglass.agent.v1.Envelope.error:type_name -> moonglass.agent.v1.Error
 	1,  // 2: moonglass.agent.v1.Error.code:type_name -> moonglass.agent.v1.ErrorCode
 	2,  // 3: moonglass.agent.v1.EnrollResponse.result:type_name -> moonglass.agent.v1.EnrollResult
-	3,  // 4: moonglass.agent.v1.CommandResult.outcome:type_name -> moonglass.agent.v1.CommandOutcome
-	16, // 5: moonglass.agent.v1.CommandResult.app:type_name -> moonglass.agent.v1.AppState
-	4,  // 6: moonglass.agent.v1.AppState.phase:type_name -> moonglass.agent.v1.ReleasePhase
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	12, // 4: moonglass.agent.v1.Heartbeat.disk:type_name -> moonglass.agent.v1.DiskReport
+	3,  // 5: moonglass.agent.v1.DiskReport.level:type_name -> moonglass.agent.v1.DiskLevel
+	4,  // 6: moonglass.agent.v1.CommandResult.outcome:type_name -> moonglass.agent.v1.CommandOutcome
+	19, // 7: moonglass.agent.v1.CommandResult.app:type_name -> moonglass.agent.v1.AppState
+	5,  // 8: moonglass.agent.v1.AppState.phase:type_name -> moonglass.agent.v1.ReleasePhase
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_proto_moonglass_agent_v1_agent_proto_init() }
@@ -1221,8 +1501,8 @@ func file_proto_moonglass_agent_v1_agent_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_moonglass_agent_v1_agent_proto_rawDesc), len(file_proto_moonglass_agent_v1_agent_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   12,
+			NumEnums:      6,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

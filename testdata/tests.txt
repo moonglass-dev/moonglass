@@ -103,8 +103,13 @@ moonglass.dev/moonglass/internal/policy TestRejectionNamesFieldAndAllowLines
 moonglass.dev/moonglass/internal/policy TestRejectionOmitsEnvironmentValues
 moonglass.dev/moonglass/internal/policy TestSocketAndDataRootAliasesRejected
 moonglass.dev/moonglass/internal/protocol FuzzEnvelopeDecode
+moonglass.dev/moonglass/internal/protocol FuzzOpenBuild
 moonglass.dev/moonglass/internal/protocol FuzzOpenCommandResult
 moonglass.dev/moonglass/internal/protocol FuzzOpenDeploy
+moonglass.dev/moonglass/internal/protocol FuzzOpenHeartbeat
+moonglass.dev/moonglass/internal/protocol TestBuildProtocolAbuse
+moonglass.dev/moonglass/internal/protocol TestBuildRejectsInvalid
+moonglass.dev/moonglass/internal/protocol TestBuildRoundTrip
 moonglass.dev/moonglass/internal/protocol TestCommandResultProtocolAbuse
 moonglass.dev/moonglass/internal/protocol TestCommandResultRejectsInvalid
 moonglass.dev/moonglass/internal/protocol TestCommandResultRoundTrip
@@ -119,6 +124,10 @@ moonglass.dev/moonglass/internal/protocol TestEnvelopeRejectsOversized
 moonglass.dev/moonglass/internal/protocol TestEnvelopeRoundTrip
 moonglass.dev/moonglass/internal/protocol TestEnvelopeRoundTripEveryType
 moonglass.dev/moonglass/internal/protocol TestErrorCodes
+moonglass.dev/moonglass/internal/protocol TestHeartbeatRejectsBadDeployKey
+moonglass.dev/moonglass/internal/protocol TestHeartbeatRejectsBadDiskReport
+moonglass.dev/moonglass/internal/protocol TestHeartbeatReportsProtocolAbuse
+moonglass.dev/moonglass/internal/protocol TestHeartbeatReportsRoundTrip
 moonglass.dev/moonglass/internal/protocol TestHeartbeatRoundTrip
 moonglass.dev/moonglass/internal/protocol TestRollbackRoundTrip
 moonglass.dev/moonglass/internal/protocol TestRunPreDeployRoundTrip
