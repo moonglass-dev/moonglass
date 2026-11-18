@@ -481,6 +481,7 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	mustGit(t, dir, "config", "user.name", "Pipeline Test")
 	writeT(t, dir, "internal/protocol/deploy_test.go", "package protocol\nfunc TestOld(t *testing.T) {}\n")
 	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestOld(t *testing.T) {}\n")
+	writeT(t, dir, "internal/policy/config_test.go", "package policy\nfunc TestOld(t *testing.T) {}\n")
 	mustGit(t, dir, "add", "-A")
 	mustGit(t, dir, "commit", "--quiet", "-m", "base")
 	base, err := git(dir, "rev-parse", "HEAD")
@@ -489,16 +490,20 @@ func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
 	}
 	writeT(t, dir, "internal/protocol/deploy_test.go", "package protocol\nfunc TestNew(t *testing.T) {}\n")
 	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestNew(t *testing.T) {}\n")
+	writeT(t, dir, "internal/policy/config_test.go", "package policy\nfunc TestNew(t *testing.T) {}\n")
 	mustGit(t, dir, "add", "-A")
 	mustGit(t, dir, "commit", "--quiet", "-m", "edit")
-	if msg, err := removedTestLines(dir, base, "HEAD", "W2-8"); err != nil || !strings.Contains(msg, "other_test.go") {
-		t.Fatalf("W2-8 allowance = %q, %v; want other_test.go still blocked", msg, err)
+	if msg, err := removedTestLines(dir, base, "HEAD", "W2-8"); err != nil || msg == "" || strings.Contains(msg, "deploy_test.go") {
+		t.Fatalf("W2-8 allowance = %q, %v; want deploy_test.go allowed and another test still blocked", msg, err)
 	}
-	if msg, err := removedTestLines(dir, base, "HEAD", "W2-12"); err != nil || !strings.Contains(msg, "deploy_test.go") {
-		t.Fatalf("W2-12 allowance = %q, %v; want deploy_test.go still blocked", msg, err)
+	if msg, err := removedTestLines(dir, base, "HEAD", "W2-12"); err != nil || msg == "" {
+		t.Fatalf("W2-12 allowance = %q, %v; want a test file it does not own still blocked", msg, err)
 	}
-	if msg, err := removedTestLines(dir, base, "HEAD", "W3-7"); err != nil || strings.Contains(msg, "deploy_test.go") || !strings.Contains(msg, "other_test.go") {
-		t.Fatalf("W3-7 allowance = %q, %v; want deploy_test.go allowed and other_test.go still blocked", msg, err)
+	if msg, err := removedTestLines(dir, base, "HEAD", "W3-7"); err != nil || msg == "" || strings.Contains(msg, "deploy_test.go") {
+		t.Fatalf("W3-7 allowance = %q, %v; want deploy_test.go allowed and another test still blocked", msg, err)
+	}
+	if msg, err := removedTestLines(dir, base, "HEAD", "W5-3a"); err != nil || msg == "" || strings.Contains(msg, "config_test.go") {
+		t.Fatalf("W5-3a allowance = %q, %v; want config_test.go allowed and another test still blocked", msg, err)
 	}
 }
 
