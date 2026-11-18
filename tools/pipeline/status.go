@@ -271,9 +271,17 @@ func buildReport(e *env) (report, error) {
 		}
 	}
 	// Only one high-risk ticket is in flight at a time (build plan §1).
+	// A ticket whose branch outlived a plan change, such as one resumed after
+	// a split gave it new dependencies, waits for them like any other.
+	waiting := func(i int) []string {
+		if !states[i].Branch || states[i].Status == "blocked" || states[i].Status == "needs-human" {
+			return nil
+		}
+		return unmergedDeps(plan[i], status)
+	}
 	highInFlight := false
-	for _, st := range states {
-		if st.Risk == "high" && st.Branch && st.Status != "blocked" && st.Status != "needs-human" {
+	for i, st := range states {
+		if st.Risk == "high" && st.Branch && st.Status != "blocked" && st.Status != "needs-human" && len(waiting(i)) == 0 {
 			highInFlight = true
 		}
 	}
@@ -290,6 +298,8 @@ func buildReport(e *env) (report, error) {
 			rep.Attention = append(rep.Attention, st.ID)
 		case st.Mergeable || st.Merging:
 			rep.Mergeable = append(rep.Mergeable, st.ID)
+		case len(waiting(i)) > 0:
+			st.Reason = "waits: depends on " + strings.Join(waiting(i), ", ")
 		case st.Branch:
 			rep.InProgress = append(rep.InProgress, st.ID)
 		case st.Status == "todo" && depsMerged(p, status) && rep.Merged >= p.After:
@@ -316,12 +326,17 @@ func planByID(plan []planTicket, id string) planTicket {
 }
 
 func depsMerged(p planTicket, status map[string]string) bool {
+	return len(unmergedDeps(p, status)) == 0
+}
+
+func unmergedDeps(p planTicket, status map[string]string) []string {
+	var out []string
 	for _, d := range p.DependsOn {
 		if status[d] != "merged" {
-			return false
+			out = append(out, d)
 		}
 	}
-	return true
+	return out
 }
 
 // findPlanTicket reads the plan from origin/main, or from the checkout when

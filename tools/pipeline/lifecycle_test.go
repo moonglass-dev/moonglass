@@ -314,6 +314,26 @@ func TestHighRiskTicketsRunOneAtATime(t *testing.T) {
 	}
 }
 
+func TestBranchWaitsForUnmergedDependencies(t *testing.T) {
+	r := newTestRepo(t)
+	writeT(t, r.dir, planPath, `# Plan
+
+- **T-1** First core change — x · depends_on: — · risk: high
+- **T-2** Second core change — y · depends_on: T-1 · risk: high
+`)
+	mustGit(t, r.dir, "commit", "--quiet", "-am", "plan")
+	mustGit(t, r.dir, "push", "--quiet", "origin", "main")
+	// T-2's branch exists, as after a resume, but T-1 has not merged.
+	r.mustRun("ticket-status", "start", "T-2")
+	rep := r.status()
+	if len(rep.InProgress) != 0 || !slices.Equal(rep.Ready, []string{"T-1"}) {
+		t.Fatalf("in progress %v ready %v, want [] [T-1]: T-2 waits and does not hold the high-risk slot", rep.InProgress, rep.Ready)
+	}
+	if got, want := rep.Tickets[1].Reason, "waits: depends on T-1"; got != want {
+		t.Errorf("T-2 reason = %q, want %q", got, want)
+	}
+}
+
 func TestBlockedChildStopsOnlyItsTicketAndResumes(t *testing.T) {
 	r := newTestRepo(t)
 	r.mustRun("ticket-status", "start", "T-1")

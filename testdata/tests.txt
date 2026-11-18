@@ -182,6 +182,7 @@ moonglass.dev/moonglass/internal/update TestVerifyRejectsUnpinnedKey
 moonglass.dev/moonglass/internal/update TestVerifyRejectsWrongEnvelope
 moonglass.dev/moonglass/internal/update TestVerifyRequiresExactFlags
 moonglass.dev/moonglass/tools/pipeline TestBlockedChildStopsOnlyItsTicketAndResumes
+moonglass.dev/moonglass/tools/pipeline TestBranchWaitsForUnmergedDependencies
 moonglass.dev/moonglass/tools/pipeline TestDecide
 moonglass.dev/moonglass/tools/pipeline TestGitHubRepo
 moonglass.dev/moonglass/tools/pipeline TestHighRiskTicketsRunOneAtATime
