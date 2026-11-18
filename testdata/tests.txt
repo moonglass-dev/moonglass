@@ -158,6 +158,7 @@ moonglass.dev/moonglass/tools/pipeline TestPathAllowed
 moonglass.dev/moonglass/tools/pipeline TestPendingChecksWaitBeforeCatchUp
 moonglass.dev/moonglass/tools/pipeline TestPipelinePromptsAreConsistent
 moonglass.dev/moonglass/tools/pipeline TestPlanVerdict
+moonglass.dev/moonglass/tools/pipeline TestRemovedTestLinesOwnerAllowance
 moonglass.dev/moonglass/tools/pipeline TestRepositoryPlanAndTicketsParse
 moonglass.dev/moonglass/tools/pipeline TestResultValidation
 moonglass.dev/moonglass/tools/pipeline TestSkipEligible

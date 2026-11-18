@@ -379,7 +379,7 @@ func cmdLock(e *env, id string) error {
 	if !noTests && len(goTests) == 0 {
 		return failf("no _test.go file changed since %s", base[:12])
 	}
-	if msg, err := removedTestLines(dir, base, "HEAD"); err != nil {
+	if msg, err := removedTestLines(dir, base, "HEAD", id); err != nil {
 		return err
 	} else if msg != "" {
 		return failf("%s", msg)
@@ -437,9 +437,26 @@ func fileHash(path string) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
+// ownerTestEdits are existing test files the owner allowed a ticket to change
+// on 2026-11-17. The lines on main no longer match the behaviour those tickets
+// have to build. Any other test file that existed on main is still untouchable.
+var ownerTestEdits = map[string]map[string]bool{
+	"W2-8": {
+		"internal/protocol/deploy_test.go": true,
+	},
+	"W2-12": {
+		"internal/proxy/proxy_test.go":  true,
+		"internal/proxy/memory_test.go": true,
+	},
+}
+
+func ownerAllowsTestEdit(id, path string) bool {
+	return ownerTestEdits[id][path]
+}
+
 // removedTestLines fails when a test file that existed at base lost lines:
-// tests are never deleted or weakened to get green.
-func removedTestLines(dir, base, to string) (string, error) {
+// tests are never deleted or weakened to get green, except ownerTestEdits.
+func removedTestLines(dir, base, to, id string) (string, error) {
 	out, err := git(dir, "diff", "--numstat", "--no-renames", base, to)
 	if err != nil {
 		return "", err
@@ -447,6 +464,9 @@ func removedTestLines(dir, base, to string) (string, error) {
 	for _, l := range lines(out) {
 		f := strings.Fields(l)
 		if len(f) != 3 || !strings.HasSuffix(f[2], "_test.go") || f[1] == "0" || f[1] == "-" {
+			continue
+		}
+		if ownerAllowsTestEdit(id, f[2]) {
 			continue
 		}
 		if _, err := git(dir, "cat-file", "-e", base+":"+f[2]); err != nil {
@@ -532,7 +552,7 @@ func runGates(e *env, dir, id string) (checkResult, error) {
 		return res, err
 	}
 	add("tests-locked", lockMsg == "", lockMsg)
-	keptMsg, err := removedTestLines(dir, base, "HEAD")
+	keptMsg, err := removedTestLines(dir, base, "HEAD", id)
 	if err != nil {
 		return res, err
 	}

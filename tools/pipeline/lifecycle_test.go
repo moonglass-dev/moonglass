@@ -398,6 +398,31 @@ func mustOrigin(t *testing.T, dir string) string {
 	return url
 }
 
+func TestRemovedTestLinesOwnerAllowance(t *testing.T) {
+	dir := t.TempDir()
+	mustGit(t, dir, "init", "--quiet", "-b", "main")
+	mustGit(t, dir, "config", "user.email", "test@example.test")
+	mustGit(t, dir, "config", "user.name", "Pipeline Test")
+	writeT(t, dir, "internal/protocol/deploy_test.go", "package protocol\nfunc TestOld(t *testing.T) {}\n")
+	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestOld(t *testing.T) {}\n")
+	mustGit(t, dir, "add", "-A")
+	mustGit(t, dir, "commit", "--quiet", "-m", "base")
+	base, err := git(dir, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeT(t, dir, "internal/protocol/deploy_test.go", "package protocol\nfunc TestNew(t *testing.T) {}\n")
+	writeT(t, dir, "internal/proxy/other_test.go", "package proxy\nfunc TestNew(t *testing.T) {}\n")
+	mustGit(t, dir, "add", "-A")
+	mustGit(t, dir, "commit", "--quiet", "-m", "edit")
+	if msg, err := removedTestLines(dir, base, "HEAD", "W2-8"); err != nil || !strings.Contains(msg, "other_test.go") {
+		t.Fatalf("W2-8 allowance = %q, %v; want other_test.go still blocked", msg, err)
+	}
+	if msg, err := removedTestLines(dir, base, "HEAD", "W2-12"); err != nil || !strings.Contains(msg, "deploy_test.go") {
+		t.Fatalf("W2-12 allowance = %q, %v; want deploy_test.go still blocked", msg, err)
+	}
+}
+
 func mustGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	if _, err := git(dir, args...); err != nil {
