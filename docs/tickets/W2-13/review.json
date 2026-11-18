@@ -1,0 +1,17 @@
+{
+  "round": 2,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "c514786b768c3b7565acf933b84bd16db8a5a472",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/agent/state/state.go",
+      "line": 107,
+      "issue": "The DSN joins \"file:\", the raw path and the _pragma query with no escaping, so a '?' or '#' in the data directory changes where modernc splits the path from the pragmas.",
+      "scenario": "With the data directory /srv/mg?x, the DSN is split at the first '?'. Open then opens the wrong file or fails on an unknown parameter instead of opening /srv/mg?x/agent.db with WAL and synchronous=FULL. The default /var/lib/moonglass is not affected."
+    }
+  ]
+}

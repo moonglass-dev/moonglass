@@ -1,6 +1,6 @@
 # Agent state
 
-The agent's own database on each server. W2-3 creates it with the release tables, and W2-10 adds the command records. The dependency rule is the ADR-0010 amendment of 2026-11-17 (owner decision D2, weeks 2–3 preflight).
+The agent's own database on each server. W2-13 creates it with the release tables, W2-3 uses it, and W2-10 adds the command records. The dependency rule is the ADR-0010 amendment of 2026-11-17 (owner decision D2, weeks 2–3 preflight).
 
 ## What it holds, and what it never holds
 
@@ -20,7 +20,7 @@ The agent's own database on each server. W2-3 creates it with the release tables
 
 Timestamps are UTC RFC 3339 text with a `Z`, as in `docs/specs/storage.md`. There is no `org_id`: one agent belongs to one org, and nothing here reaches the control plane's tables.
 
-### `apps` (W2-3)
+### `apps` (W2-13)
 
 One row per `app_id` that has ever been deployed here.
 
@@ -32,7 +32,7 @@ One row per `app_id` that has ever been deployed here.
 | `phase` | `none`, `pending` or `ready`. |
 | `created_at` | |
 
-### `releases` (W2-3)
+### `releases` (W2-13)
 
 | Column | Meaning |
 |---|---|
@@ -60,4 +60,5 @@ One row per `app_id` that has ever been deployed here.
 
 - A command's state change and its `commands` row are written in one transaction (`docs/specs/connection.md`, "Each request id runs once").
 - **Retention.** Per app, the rows for the current and previous release and the three newest `retired` releases are kept: five in all, with their images (`docs/specs/release.md`, "Keep five"). Older `retired` rows are deleted with their images. `failed` and `aborted` rows, and `commands` rows, are deleted after 7 days. Retention runs at start and every hour.
+- A `failed` release row never creates or changes an `apps` row: the binding and the release state stay as they were (`docs/specs/release.md`, "Failure").
 - A database that does not open or migrate stops the agent with the error and the file's path.

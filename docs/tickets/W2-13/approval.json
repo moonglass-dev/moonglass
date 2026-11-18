@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "The previous import blocker is fixed: TestPackageImportsReleaseAndStoreOnly rejects internal/keys, internal/protocol, and internal/deploy, including any package under them. The nine named tests are in package state, and the diff only adds internal/agent/state/state_test.go. They use temporary directories and fixed timestamps. Mode 0600, the five pragmas after a second Open, the spec tables and columns, the database path on both Open errors, the first binding and candidate row, an unchanged binding and created_at, rejection of another binding, atomic refusal, and a failed row that leaves the apps row and App state unchanged are all asserted. Hostile text is stored verbatim, and a canary environment value and the stored detail stay out of the captured log and error text. Confining modernc.org/sqlite remains the depguard rule, checked later by make ci."
+}

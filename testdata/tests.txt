@@ -23,6 +23,17 @@ moonglass.dev/moonglass/internal/agent TestHeartbeatSentOnInterval
 moonglass.dev/moonglass/internal/agent TestReconnectBackoffWithJitter
 moonglass.dev/moonglass/internal/agent TestRejectsControlPlanePinMismatch
 moonglass.dev/moonglass/internal/agent TestServerOfflineThenRecovers
+moonglass.dev/moonglass/internal/agent/state TestOpenCreatesFileMode0600
+moonglass.dev/moonglass/internal/agent/state TestOpenErrorNamesPath
+moonglass.dev/moonglass/internal/agent/state TestOpenMigratesSpecSchema
+moonglass.dev/moonglass/internal/agent/state TestOpenSetsPragmas
+moonglass.dev/moonglass/internal/agent/state TestPackageImportsReleaseAndStoreOnly
+moonglass.dev/moonglass/internal/agent/state TestRecordCandidateFirstDeployWritesBinding
+moonglass.dev/moonglass/internal/agent/state TestRecordCandidateIsAtomic
+moonglass.dev/moonglass/internal/agent/state TestRecordCandidateKeepsBinding
+moonglass.dev/moonglass/internal/agent/state TestRecordCandidateRejectsOtherBinding
+moonglass.dev/moonglass/internal/agent/state TestRecordFailedLeavesStateUnchanged
+moonglass.dev/moonglass/internal/agent/state TestRecordStoresTextVerbatim
 moonglass.dev/moonglass/internal/api TestEveryMountedRouteIsOperationOrAllowlisted
 moonglass.dev/moonglass/internal/api TestGeneratedOpenAPIIsCurrent
 moonglass.dev/moonglass/internal/api TestHumaConfinedToAPI

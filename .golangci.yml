@@ -77,6 +77,17 @@ linters:
           deny:
             - pkg: filippo.io/age
               desc: only internal/keys may import age (ADR-0015)
+        sqlite-deps:
+          # modernc sqlite is imported only by internal/store/sqlite and
+          # internal/agent/state (ADR-0010, amended 2026-11-17). depguard
+          # file exclusions were not applied for age-deps, so every package
+          # that exists today is listed; "**/internal/agent/*.go" matches the
+          # agent's top-level files only and not internal/agent/state.
+          list-mode: lax
+          files: ["**/cmd/**/*.go", "**/internal/agent/*.go", "**/internal/api/**/*.go", "**/internal/cli/**/*.go", "**/internal/installtest/**/*.go", "**/internal/keys/**/*.go", "**/internal/policy/**/*.go", "**/internal/protocol/**/*.go", "**/internal/proxy/**/*.go", "**/internal/registry/**/*.go", "**/internal/release/**/*.go", "**/internal/server/**/*.go", "**/internal/update/**/*.go", "**/tools/**/*.go"]
+          deny:
+            - pkg: modernc.org/sqlite
+              desc: only internal/store/sqlite and internal/agent/state may import modernc sqlite (ADR-0010)
         policy-deps:
           # Restrict these modules outside internal/policy. depguard file
           # exclusions of internal/policy itself were not applied, so this
@@ -92,8 +103,6 @@ linters:
               desc: only internal/policy may import go-toml
             - pkg: github.com/jackc/pgx/v5
               desc: only internal/store may import pgx
-            - pkg: modernc.org/sqlite
-              desc: only internal/store may import modernc sqlite
     forbidigo:
       analyze-types: true
       forbid:

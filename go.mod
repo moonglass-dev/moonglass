@@ -11,6 +11,7 @@ require (
 	github.com/compose-spec/compose-go/v2 v2.17.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	google.golang.org/protobuf v1.36.12
+	modernc.org/sqlite v1.62.0
 )
 
 require (
@@ -232,5 +233,4 @@ require (
 	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.62.0 // indirect
 )
