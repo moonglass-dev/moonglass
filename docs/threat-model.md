@@ -19,7 +19,7 @@ This file is the reviewer's whole brief. Read it, then the diff, and look for th
 | **Host root** on the user's server | Behind the Docker socket, which only the agent holds (S§3.3) | No protocol message carries a shell string (S§3.1). Every container spec passes the sanitizer (S§3.2). `agent.toml` is local policy the control plane cannot change. Agent and proxy are systemd services, not containers |
 | **User secrets** | Ciphertext in the control-plane database. Plaintext only on the user's servers, at run time | Encrypted to the environment public key. The key pair is generated only in the owner's CLI; the private half is stored only wrapped (S§3.11, ADR-0003). Write-only in the web UI. One reveal path, through the CLI: owner-only, step-up, refused to agent identities, audited |
 | **Database backups** | The user's S3-compatible bucket | Dump → zstd → age to the environment key, with no temp files on disk (S§3.9). Readable only with the environment key or the owner recovery key. Bucket credentials are themselves an environment secret, so a restore needs only the recovery key |
-| **Tokens**: API and coding-agent tokens, enrolment tokens, sessions, the bootstrap token, login and magic links | Control-plane database | Every one is 256 bits from `crypto/rand`, written `mg_…`, stored only as SHA-256 in a lookup table and shown once (ADR-0005). API and agent tokens carry scope rows, an expiry and an owner (S§3.10). One-time tokens are marked used in the accepting transaction and fail on replay (B W1-3). Sessions are server-side, listable, revocable, bound to `__Host-` cookies and last 14 days. Links and tokens expire: magic link 15 min, login link 10 min, enrolment and bootstrap tokens 1 h |
+| **Tokens**: API and coding-agent tokens, enrolment tokens, sessions, the bootstrap token, login links, identity links and step-up confirmations | Control-plane database | Every one is 256 bits from `crypto/rand`, written `mg_…`, stored only as SHA-256 in a lookup table and shown once (ADR-0005). API and agent tokens carry scope rows, an expiry and an owner (S§3.10). One-time tokens are marked used in the accepting transaction and fail on replay (B W1-3). Sessions are server-side, listable, revocable, bound to `__Host-` cookies and last 14 days. Links and tokens expire: login link, identity link and step-up 10 min, enrolment and bootstrap tokens 1 h. A step-up approves one request and is single use (`docs/specs/auth.md`) |
 | **Release signing keys** | Two `ed25519-sk` keys, each on its own FIDO2 token, offline; PIN and touch per signature (S§3.14, ADR-0007) | Every artifact carries an OpenSSH `SSHSIG` signature, namespace `moonglass-release`. The install script (from W1-6) and the agent (from W7-6) verify against both pinned public keys before installing. Canary, staged rollout and automatic revert limit a bad release |
 | **Audit trail** | Control-plane database | Hash-chained events written by the registry, never by handlers (B W2-1). `moonglass audit verify` checks the chain (B W5-5). Free export to the user's bucket on every plan (V§5.1) |
 
@@ -157,7 +157,7 @@ From `AGENTS.md`. Changes here get line-by-line review by the owner, and only on
 - Enforcement is on the server, never a flag the caller sets (S§3.12).
 - The recovery key is for granting, rotating and recovering, never for everyday reads (S§3.11).
 - No plan or licence check in the agent or in the open-source build (V§6).
-- An email link never attaches itself to an existing GitHub user; linking two sign-in methods is explicit, with step-up (ADR-0005).
+- A sign-in never attaches itself to an existing user by email address; linking two sign-in methods is explicit, with step-up, except the first owner's first identity linked on the box (ADR-0005).
 - The control plane never replaces itself. Self-hosted operators update `moonglass server` and the CLI by running the signed install (ADR-0007).
 
 ## 9. Reviewer checklist
@@ -191,7 +191,7 @@ Ask every question of every diff. Report a finding with file:line, what breaks a
 - Does a one-time token fail on replay?
 - Is every new bearer secret 256 bits, `mg_`-prefixed, stored only as SHA-256 and shown once?
 - Can a token act outside its scope rows, or above its owning human's role? Can an agent identity approve its own request?
-- Is step-up freshness checked on the server at the moment of approval? Do lifetimes match ADR-0005? Can an email link attach to an existing GitHub user?
+- Is step-up freshness checked on the server at the moment of approval? Do lifetimes match ADR-0005? Is each step-up bound to one user, credential, operation, target and input digest, and used once? Can a sign-in attach to an existing user by email address?
 
 **5. Authz-matrix rows**
 - Is every new operation declared in the registry with a scope, a lowest role that follows the role rule, and an explicit `destructive` flag? Is anything that deletes, irreversibly replaces or stops a service, release, volume or stored data marked destructive?

@@ -54,7 +54,7 @@ Priorities, in your order: security, performance, footprint, UX. One constraint 
 | Secrets | age (X25519): envelope keys per environment, an owner recovery key, wrapping and rotation (§3.11). The reference Go library on servers and CLI; the same author's TypeScript implementation in the browser | Reuse the crypto; **build** key distribution | Losing every server *and* the recovery key loses the secrets, by design |
 | API | Go's standard HTTP server with Huma generating OpenAPI from Go types; one operation registry feeds REST, CLI and MCP | Reuse | Discipline: no operation exists outside the registry |
 | MCP | Official Go SDK v1.7+, spec 2026-07-28, stateless Streamable HTTP, OAuth 2.1 | Reuse | None; Go is a Tier 1 SDK |
-| Auth | **MVP:** GitHub sign-in, email magic links, one-time login links printed on a self-hosted box, server-side sessions, step-up for approvals. **v1:** passkeys (`go-webauthn`), TOTP, generic OIDC | Reuse libraries; **build** the flows | MFA depends on GitHub until v1 |
+| Auth | **MVP:** GitHub and Google sign-in (email links dropped, ADR-0005 amended 2026-11-18), one-time login links printed on a self-hosted box, server-side sessions, step-up for approvals. **v1:** passkeys (`go-webauthn`), TOTP, generic OIDC | Reuse libraries; **build** the flows | MFA depends on GitHub until v1 |
 | API and agent tokens | Opaque random tokens, stored hashed, with scope rows | **Build** (small) | No offline verification or delegation yet |
 | Web UI | **Svelte 5 with SvelteKit in static mode**, Tailwind, Bits UI primitives; shipped inside the binary | Reuse | Smaller component ecosystem than React |
 | Billing | Stripe, in the commercial module | Reuse | Sales tax is yours unless you use a merchant of record |
@@ -195,12 +195,12 @@ Keeping two backends honest:
 ### 3.10 Auth and sessions
 
 **MVP**
-- **Hosted:** GitHub sign-in and email magic links. No passwords. GitHub requires 2FA for most active developer accounts, so a GitHub sign-in is usually two-factor. An email link is single-factor until v1.
+- **Hosted:** GitHub and Google sign-in (ADR-0005 as amended on 2026-11-18; email magic links are not in the MVP). No passwords. GitHub requires 2FA for most active developer accounts, so a GitHub sign-in is usually two-factor.
 - **Self-hosted:** the first admin is created with a one-time bootstrap token printed in the terminal; there is never an open registration window. Dokploy had a pre-authentication admin takeover, and Coolify has since restricted its first-admin registration to a short window after start (R§3). Day-to-day sign-in uses `moonglass server login-link`, which prints a one-time link on the box. Access to the server is the credential, so it needs no SMTP or OAuth app. GitHub sign-in reuses the GitHub App created for git sources. Self-hosted has no email sign-in in the MVP, so there is no SMTP to configure.
-- **Step-up for anything that matters.** Approving a protected deploy, a destructive operation or a change to secret recipients requires a sign-in fresher than ten minutes: a new GitHub round trip or a new email link. A link sent to your inbox is out of band from the coding agent, which is the point.
+- **Step-up for anything that matters.** Approving a protected deploy, a destructive operation or a change to secret recipients requires a sign-in fresher than ten minutes: a new GitHub or Google round trip, then an Approve on a page that shows the exact request (`docs/specs/auth.md`). That page is out of band from the coding agent, which is the point.
 - Server-side sessions, listable and revocable, bound to `__Host-` cookies.
 
-**v1:** passkeys and TOTP for everyone, free. Then email-link accounts can add a real second factor, and approvals can require one. Generic OIDC sign-in follows.
+**v1:** passkeys and TOTP for everyone, free. Then approvals can require a real second factor. Generic OIDC sign-in follows.
 
 **Commercial module:** SAML and SCIM (Enterprise).
 
@@ -447,7 +447,7 @@ You will not read every line, and this product holds deploy rights to production
 | Secrets | Envelope keys per environment, owner recovery key required, write-only in the web UI, reveal through the CLI (2026-11-16) |
 | Container specs | Deny-by-default sanitization in the agent; exceptions only in `agent.toml` (2026-11-16) |
 | Auto-rollback | Crash-loop and health triggers on; error-rate trigger in shadow mode until enabled (2026-11-16) |
-| MVP auth | GitHub, email links, self-hosted login links, step-up; passkeys and TOTP in v1 (2026-11-16) |
+| MVP auth | GitHub, Google, self-hosted login links, step-up; passkeys and TOTP in v1 (2026-11-16; Google replaced email links 2026-11-18) |
 | Builds | Dockerfile and image at launch; Railpack via CLI in v1 (2026-11-16) |
 | UI | Svelte 5 + SvelteKit (static) |
 | Who writes the code | Agents, with you orchestrating; guardrails in §7 |

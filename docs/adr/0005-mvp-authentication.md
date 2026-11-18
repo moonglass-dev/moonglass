@@ -1,7 +1,7 @@
 # ADR-0005: MVP authentication
 
 - **Status:** Accepted
-- **Date:** 2026-11-16
+- **Date:** 2026-11-16, amended 2026-11-18 (decisions 1, 3, 4, 5 and 6: GitHub and Google on hosted, no email in the MVP, step-up approves one request; `docs/specs/auth.md`)
 
 ## Context
 
@@ -9,29 +9,31 @@ The eight weeks were too full, so passkeys and TOTP moved to v1 (S revision 3, M
 
 ## Decision
 
-1. **Hosted: GitHub sign-in and email magic links.** No passwords.
+1. **Hosted: GitHub and Google sign-in** (amended 2026-11-18). No passwords and no email links in the MVP.
 2. **Self-hosted: a bootstrap token, then login links.**
    - The first admin is created with a one-time bootstrap token printed in the terminal. There is never an open registration window.
    - Day-to-day sign-in uses `moonglass server login-link`, which prints a one-time link on the box. Access to the server is the credential.
    - GitHub sign-in reuses the GitHub App created for git sources.
-   - There is no email sign-in on self-hosted in the MVP, so there is no SMTP to configure.
-3. **Step-up.** Three separate things each require a sign-in fresher than ten minutes, checked on the server at the moment of approval: approving a protected deploy, approving a destructive operation, and changing secret recipients (ADR-0006 decision 4). `secrets reveal` requires it too (ADR-0003). On hosted, the fresh sign-in is a new GitHub round trip or a new email link. On self-hosted it is a fresh `moonglass server login-link`: access to the server stays the credential, and GitHub is never required for an approval.
+   - There is no email or Google sign-in on self-hosted in the MVP, so there is no SMTP and no Google client to configure.
+3. **Step-up.** Three separate things each require a sign-in fresher than ten minutes, checked on the server at the moment of approval: approving a protected deploy, approving a destructive operation, and changing secret recipients (ADR-0006 decision 4). `secrets reveal` requires it too (ADR-0003). On hosted, the fresh sign-in is a new GitHub or Google round trip. On self-hosted it is a fresh `moonglass server login-link`: access to the server stays the credential, and GitHub is never required for an approval.
+   - **A step-up approves one request** (amended 2026-11-18). It is a fresh round trip, then an Approve press on a page that shows the request. It is single use and lasts ten minutes. It is bound to the user, the credential that asked, the operation, its target and a digest of its inputs. A fresh sign-in alone never unlocks other calls. Neither provider can force a password to be typed again, so the Approve press on a page that states the request is what shows a person is present (`docs/specs/auth.md`).
 4. **Lifetimes.** All one-time tokens fail on replay.
 
    | Credential | Lifetime |
    |---|---|
    | Session | 14 days from sign-in, absolute; revocable at any time |
    | Step-up freshness | 10 minutes (S§3.10) |
-   | Email magic link | 15 minutes, one use |
+   | Step-up | 10 minutes from the request, one use |
+| Identity link (`identities.link`, `--print-owner-link`) | 10 minutes, one use |
    | `server login-link` | 10 minutes, one use |
    | Enrolment token | 1 hour, one use |
    | Bootstrap token | 1 hour, one use. Restarting `moonglass server` before the first admin exists prints a new one and voids the old |
 
-5. **Email delivery on hosted** uses one transactional sender. Its credentials live only in the operator's environment, never in the database or the repository. No provider SDK without its own ADR. The provider is not yet chosen (Open questions).
-6. **One person, two sign-in methods.** A GitHub sign-in and an email link with the same address are not automatically one user. Linking is an explicit action by the signed-in user, with step-up. An email link never attaches itself to an existing GitHub user.
+5. **No email in the MVP** (amended 2026-11-18). Moonglass sends no mail, so there is no email provider. Email sign-in and email notifications need their own ADR, which names the provider. Provider credentials, the OAuth client secrets included, live only in the operator's environment (`MOONGLASS_*`), never in the database or the repository.
+6. **One person, several sign-in methods.** A GitHub and a Google sign-in with the same address are not automatically one user. Linking is an explicit action by the user, with step-up. The one exception is the first identity of the first owner, which `moonglass server --print-owner-link` links on the box, without step-up (`docs/specs/auth.md`).
 7. **Sessions** are server-side, listable and revocable, bound to `__Host-` cookies.
 8. **Tokens** are opaque random values stored hashed. Each has scope rows (project, environment, operation; ADR-0006), an expiry and an owner. Every token belongs to a human or a named agent identity, and the audit trail records which.
-   - **One format for every bearer secret** (API and agent tokens, enrolment, bootstrap, login and magic links, session IDs): 256 bits from `crypto/rand`, written as `mg_` plus 52 characters of lowercase unpadded base32.
+   - **One format for every bearer secret** (API and agent tokens, enrolment, bootstrap, login links, identity links, step-up confirmations, session IDs): 256 bits from `crypto/rand`, written as `mg_` plus 52 characters of lowercase unpadded base32.
    - Stored only as SHA-256 of the full text, in the lookup tables (ADR-0002). 256 random bits cannot be guessed, so a slow password hash would only cost CPU.
    - Shown once, at creation; afterwards only the name, the prefix and the last four characters.
    - One-time tokens are marked used in the transaction that accepts them, so a replay fails (B W1-3).
@@ -40,10 +42,11 @@ The eight weeks were too full, so passkeys and TOTP moved to v1 (S revision 3, M
 
 ## Consequences
 
-- A GitHub sign-in is usually two-factor, because GitHub requires 2FA for most active developer accounts. An email link is single-factor until v1. MFA depends on GitHub until then (S§2).
-- An approval link sent to an inbox is out of band from the coding agent, which is the point of step-up (S§3.10).
+- A GitHub sign-in is usually two-factor, because GitHub requires 2FA for most active developer accounts. A Google sign-in is two-factor when the account has 2-Step Verification on. MFA depends on the provider until v1 (S§2).
+- Hosted sign-in needs a GitHub or Google account. That fits people who deploy from git.
+- A step-up page in the person's browser is out of band from the coding agent, which is the point of step-up (S§3.10).
 - Self-hosted needs no SMTP and no OAuth app to reach a first sign-in.
-- `internal/auth` is trusted core (B§3). W4-1 builds hosted sign-in and the step-up primitive; W7-1 builds the self-hosted path.
+- `internal/auth` is trusted core (B§3). W4-1a, W4-1b, W4-1c and W4-1 build hosted sign-in and the step-up primitive; W7-1 builds the self-hosted path.
 
 ## Alternatives rejected
 
@@ -58,7 +61,8 @@ The eight weeks were too full, so passkeys and TOTP moved to v1 (S revision 3, M
 
 ## Open questions
 
-1. **Which email provider sends hosted mail.** An owner decision, with an account. **W4-1 is blocked until it is chosen**: magic links and step-up on hosted need it. Requirement: decision 5.
+1. ~~Which email provider sends hosted mail.~~ Closed 2026-11-18: the MVP sends no email (decision 5).
+2. **Sign-up on hosted.** W4-1 refuses an identity that is not linked to a user. Whether a first sign-in creates a user and an org on hosted is decided with W7-1's hosted and self-hosted modes, before the alpha opens at G5.
 
 ## Links
 

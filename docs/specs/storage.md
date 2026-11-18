@@ -73,6 +73,10 @@ Specified by the weeks 2–3 preflight (`docs/specs/secrets.md`). Row-level tabl
 
 `servers` gains `deploy_key`: the server's SSH deploy public key from its latest `Heartbeat` (`docs/specs/protocol.md`), or empty. It is a public key.
 
+### Sessions, links and step-ups (W4-1a)
+
+`session_hashes` and `link_token_hashes` (lookup tables), `step_ups` (row-level), and the `session_id` and `step_up_id` columns of `audit_events` are specified in `docs/specs/auth.md`.
+
 ## Transactions and isolation
 
 Every request that reads or writes an RLS table runs in a transaction that has set `app.org_id` to that org (Postgres). Store methods that take an org run that way. Lookups that exist to find the org (a token hash, an agent public key, an external identity, a user's orgs) do not require `app.org_id` and do not return a secret.

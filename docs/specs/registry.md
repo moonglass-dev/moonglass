@@ -70,6 +70,10 @@ W4-2 stores `environments.protected` and does not gate deploys. W5-2 adds that g
 - **`environments.create`** sets `protected` true for the org's first environment and false for later ones. The column is `NOT NULL` (`docs/specs/storage.md`).
 - **`deploy`** is not gated on `protected` until W5-2. Until then a deploy to a protected environment runs and is audited like every other call.
 
+### Sign-in and step-up (W4-1)
+
+`sessions.list`, `sessions.revoke`, `identities.list` and `identities.link`, the `StepUp` flag, session authentication and the sign-in routes are specified in `docs/specs/auth.md`.
+
 ## Authorisation
 
 `registry.Invoke` allows a call only when all of these pass, in this order:

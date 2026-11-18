@@ -21,7 +21,7 @@ The hierarchy is organisation → projects → environments → services → dep
 
 | Route | Shows |
 |---|---|
-| `/sign-in` | GitHub and email link on hosted; GitHub and the login-link instruction on self-hosted (ADR-0005) |
+| `/sign-in` | GitHub and Google on hosted; GitHub and the login-link instruction on self-hosted (ADR-0005, `docs/specs/auth.md`) |
 | `/{org}` | Redirects to `/{org}/projects` |
 | `/{org}/projects` | Project list |
 | `/{org}/projects/{project}` | A project: its environments and services |
