@@ -124,7 +124,7 @@ The generated runner sends `Authorization: Bearer $MOONGLASS_TOKEN` to `$MOONGLA
 
 ## Inputs and errors
 
-Owner decision of 2026-11-18 (ADR-0006 decisions 3 and 9). W2-11c builds it; every later operation follows it. Where another spec shows a different command shape, this section wins, and the ticket that builds that command corrects its spec.
+Owner decision of 2026-11-18 (ADR-0006 decisions 3 and 9). W2-11c, W2-11f and W2-11g build it; every later operation follows it. Where another spec shows a different command shape, this section wins, and the ticket that builds that command corrects its spec.
 
 ### Input fields
 
@@ -188,10 +188,10 @@ A command that needs work on the client, such as reading stdin, a file or a pin,
 - **W3-2** adds `secrets set` (reads stdin, encrypts, and may first call `environments.list`, `keys.recovery.list` and `environments.key.create`) and `environments key create` (makes the key pair and the wrapped copies) to `registry.LocalCommands`. `keys recovery add` stays generated: `moonglass keys recovery add --recipient age1…`, so `docs/specs/secrets.md` changes its retry line to that form.
 - **W3-4** moves `deploy` to `registry.LocalCommands` when it adds `moonglass.toml`, which the command reads. Until then `deploy` is generated (W2-5).
 
-### Tests (W2-11c)
+### Tests (W2-11c, W2-11f, W2-11g)
 
-W2-11c ships no new operation, so these tests register test operations with `registry.Register` and generate from a test list.
+W2-11c, W2-11f and W2-11g ship no new operation, so these tests register test operations with `registry.Register` and generate from a test list.
 
-- `internal/registry`: `TestInvokeResolvesTargetAfterRoleCheck` (a role denial makes no store call), `TestInvokeUnknownTargetInScopeIsNotFound` (404 error, outcome `error`, reason `not found`, handler not run), `TestInvokeUnknownTargetOutOfScopeIsDenied` (the same error and reason as a known target out of scope), `TestInvokePassesResolvedIDsToHandler`, `TestRefusalKindsAndAuditReasons`, `TestUnmappedStoreErrorIsNotARefusal`.
-- `internal/api`: `TestQueryInputsDecoded` (repeated lists, booleans, integers), `TestBodyInputsDecoded`, `TestUnknownInputsRefused` (query and body, 400), `TestSchemaFailuresAre400` (missing required, wrong type; never 422; no `value` in `errors`), `TestRefusalStatuses` (400, 404, 409 with the refusal's message), `TestUnmappedHandlerErrorIs500`.
-- `internal/cli`: `TestGeneratedFlagNames` (`--env`, hyphens, no aliases), `TestGeneratedFlagsSentAsQueryOrBody`, `TestGeneratedRepeatedBooleanAndIntegerFlags`, `TestGeneratedMissingRequiredFlagExits2` (nothing sent), `TestGeneratedRefusesPositionalAndUnknownFlags`, `TestGeneratedPrintsErrorDetail`, `TestGenerateRefusesInputWithoutFlag`, `TestGenerateSkipsLocalCommands`.
+- W2-11c `internal/registry`: `TestInvokeResolvesTargetAfterRoleCheck` (a role denial makes no store call), `TestInvokeUnknownTargetInScopeIsNotFound` (404 error, outcome `error`, reason `not found`, handler not run), `TestInvokeUnknownTargetOutOfScopeIsDenied` (the same error and reason as a known target out of scope), `TestInvokePassesResolvedIDsToHandler`, `TestRefusalKindsAndAuditReasons`, `TestUnmappedStoreErrorIsNotARefusal`.
+- W2-11f `internal/api`: `TestQueryInputsDecoded` (repeated lists, booleans, integers), `TestBodyInputsDecoded`, `TestUnknownInputsRefused` (query and body, 400), `TestSchemaFailuresAre400` (missing required, wrong type; never 422; no `value` in `errors`), `TestRefusalStatuses` (400, 404, 409 with the refusal's message), `TestUnmappedHandlerErrorIs500`.
+- W2-11g `internal/cli`: `TestGeneratedFlagNames` (`--env`, hyphens, no aliases), `TestGeneratedFlagsSentAsQueryOrBody`, `TestGeneratedRepeatedBooleanAndIntegerFlags`, `TestGeneratedMissingRequiredFlagExits2` (nothing sent), `TestGeneratedRefusesPositionalAndUnknownFlags`, `TestGeneratedPrintsErrorDetail`, `TestGenerateRefusesInputWithoutFlag`, `TestGenerateSkipsLocalCommands`.

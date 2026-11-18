@@ -79,9 +79,9 @@ Specified by the week 5 preflight. `services` gains `deleted_at` and `purge_deta
 
 `servers` gains `deploy_key`: the server's SSH deploy public key from its latest `Heartbeat` (`docs/specs/protocol.md`), or empty. It is a public key.
 
-### Sessions, links and step-ups (W4-1a)
+### Sessions, links and step-ups (W4-1a, W4-1d)
 
-`session_hashes` and `link_token_hashes` (lookup tables), `step_ups` (row-level), and the `session_id` and `step_up_id` columns of `audit_events` are specified in `docs/specs/auth.md`.
+`session_hashes` (lookup table) and the `session_id` and `step_up_id` columns of `audit_events` are added by W4-1a. `link_token_hashes` (lookup table) and `step_ups` (row-level) are added by W4-1d. All four are specified in `docs/specs/auth.md`.
 
 ## Transactions and isolation
 

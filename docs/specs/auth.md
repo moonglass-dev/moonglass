@@ -1,12 +1,13 @@
 # Sign-in, sessions and step-up
 
-What W4-1a, W4-1b, W4-1c and W4-1 build, per ADR-0005 as amended on 2026-11-18. The owner approved this spec on 2026-11-18, including the registry operations, the tables and the step-up rules below, which are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1.
+What W4-1a, W4-1b, W4-1c, W4-1d and W4-1 build, per ADR-0005 as amended on 2026-11-18. The owner approved this spec on 2026-11-18, including the registry operations, the tables and the step-up rules below, which are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1.
 
 ## Which ticket builds what
 
 | Ticket | Builds |
 |---|---|
-| W4-1a | The tables: `session_hashes`, `link_token_hashes`, `step_ups`, and the two new `audit_events` columns, on both backends with conformance |
+| W4-1a | The tables: `session_hashes`, and the two new `audit_events` columns, on both backends with conformance |
+| W4-1d | The tables: `link_token_hashes` and `step_ups`, on both backends with conformance |
 | W4-1b | `internal/auth`: GitHub and Google sign-in, sessions, sign-out, the session cookie, session authentication in the registry, cross-origin protection |
 | W4-1c | Step-up: the `StepUp` flag, the `step_up_required` answer, the step-up page, the CLI's `--step-up` |
 | W4-1 | `sessions.list`, `sessions.revoke`, `identities.list`, `identities.link`, the link landing, and `moonglass server --print-owner-link` |
@@ -182,7 +183,7 @@ The pages are server-rendered by `html/template` with no script. They are sent w
 
 ## Storage
 
-All four are added by W4-1a on both backends, with conformance.
+W4-1a adds `session_hashes` and the `session_id` and `step_up_id` columns of `audit_events` on both backends, with conformance. W4-1d adds `link_token_hashes` and `step_ups` on both backends, with conformance.
 
 **Lookup tables** (ADR-0002 decision 12, no RLS):
 - `session_hashes`: `hash` (SHA-256 hex of the bearer), `id`, `user_id`, `expires_at`, `revoked_at` (empty when live).
@@ -197,11 +198,13 @@ All four are added by W4-1a on both backends, with conformance.
 
 There is no compatibility code (build plan §4). A development database made before W4-1a is recreated.
 
-Conformance covers:
+W4-1a conformance covers:
 - create a session, look it up by hash, revoke it, and refuse it once revoked or expired;
-- mark a link token used once and refuse the second use;
-- step-up rows visible only in their org;
 - the audit chain with the two new columns.
+
+W4-1d conformance covers:
+- mark a link token used once and refuse the second use;
+- step-up rows visible only in their org.
 
 ## Errors
 
