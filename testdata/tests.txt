@@ -135,13 +135,17 @@ moonglass.dev/moonglass/internal/store TestTokensAuditConformancePostgres
 moonglass.dev/moonglass/internal/store TestTokensAuditConformanceSQLite
 moonglass.dev/moonglass/tools/pipeline TestBlockedChildStopsOnlyItsTicketAndResumes
 moonglass.dev/moonglass/tools/pipeline TestDecide
+moonglass.dev/moonglass/tools/pipeline TestGitHubRepo
 moonglass.dev/moonglass/tools/pipeline TestHighRiskTicketsRunOneAtATime
 moonglass.dev/moonglass/tools/pipeline TestMergeCatchesUpWhenMainMoved
 moonglass.dev/moonglass/tools/pipeline TestMergeFailureGoesBackToTheWorker
+moonglass.dev/moonglass/tools/pipeline TestMergeWithNoChecksCatchesUpBeforeWaiting
+moonglass.dev/moonglass/tools/pipeline TestPRBodyLinksUseBlobURLs
 moonglass.dev/moonglass/tools/pipeline TestParsePlanLine
 moonglass.dev/moonglass/tools/pipeline TestParsePlanRejectsUnknownDependencyAndDuplicates
 moonglass.dev/moonglass/tools/pipeline TestParseTicketAndIncomplete
 moonglass.dev/moonglass/tools/pipeline TestPathAllowed
+moonglass.dev/moonglass/tools/pipeline TestPendingChecksWaitBeforeCatchUp
 moonglass.dev/moonglass/tools/pipeline TestPipelinePromptsAreConsistent
 moonglass.dev/moonglass/tools/pipeline TestPlanVerdict
 moonglass.dev/moonglass/tools/pipeline TestRepositoryPlanAndTicketsParse

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -73,7 +74,7 @@ func (g ghForge) checks(number int) (string, string, error) {
 		return "", "", err
 	}
 	if strings.TrimSpace(out) == "" {
-		return "pending", "no checks reported yet", nil
+		return "pending", noChecksYet, nil
 	}
 	var cs []struct{ Name, Bucket, Link string }
 	if jerr := json.Unmarshal([]byte(out), &cs); jerr != nil {
@@ -82,9 +83,14 @@ func (g ghForge) checks(number int) (string, string, error) {
 	return summarizeChecks(cs)
 }
 
+// noChecksYet is what checks reports when GitHub has not attached a workflow
+// to the pull request. A conflicting pull request never starts a
+// pull_request workflow, so this is not CI in progress.
+const noChecksYet = "no checks reported yet"
+
 func summarizeChecks(cs []struct{ Name, Bucket, Link string }) (string, string, error) {
 	if len(cs) == 0 {
-		return "pending", "no checks reported yet", nil
+		return "pending", noChecksYet, nil
 	}
 	var failed, pending []string
 	for _, c := range cs {
@@ -111,11 +117,36 @@ func (g ghForge) merge(number int, sha, subject string) error {
 
 func prTitle(id, title string) string { return id + ": " + title }
 
-func prBody(id string, t ticket) string {
-	return fmt.Sprintf(`Ticket: [%s](%s) · risk: %s
+// prBody links to the ticket branch with blob URLs. A relative link in a
+// pull request body is resolved against the pull request page, so
+// docs/tickets/<ID>.md never opens the file.
+func prBody(repo, branch, id string, t ticket) string {
+	link := func(label, path string) string {
+		return fmt.Sprintf("[%s](https://github.com/%s/blob/%s/%s)", label, repo, branch, path)
+	}
+	return fmt.Sprintf(`Ticket: %s · risk: %s
 
-Built by the ticket pipeline (docs/pipeline/README.md). Results: [plan](%s%s), [tests approval](%s%s), [check](%s%s), [review](%s%s).
-`, ticketPath(id), ticketPath(id), t.Risk, ticketDir(id), planFile, ticketDir(id), approvalFile, ticketDir(id), checkFile, ticketDir(id), reviewFile)
+Built by the ticket pipeline (%s). Results: %s, %s, %s, %s.
+`, link(ticketPath(id), ticketPath(id)), t.Risk,
+		link("docs/pipeline/README.md", "docs/pipeline/README.md"),
+		link("plan", ticketDir(id)+planFile),
+		link("tests approval", ticketDir(id)+approvalFile),
+		link("check", ticketDir(id)+checkFile),
+		link("review", ticketDir(id)+reviewFile))
+}
+
+func githubRepo(remote string) (string, error) {
+	remote = strings.TrimSpace(remote)
+	remote = strings.TrimSuffix(remote, ".git")
+	for _, host := range []string{"github.com:", "github.com/"} {
+		if i := strings.Index(remote, host); i >= 0 {
+			repo := remote[i+len(host):]
+			if strings.Count(repo, "/") == 1 && repo != "" && !strings.HasPrefix(repo, "/") {
+				return repo, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("origin %q is not a github.com repository (expected git@github.com:owner/repo or https://github.com/owner/repo)", remote)
 }
 
 func cmdPR(e *env, id string) error {
@@ -138,7 +169,21 @@ func cmdPR(e *env, id string) error {
 		return err
 	}
 	if pr == nil || pr.State == "MERGED" {
-		if err = g.createPR(branchRef(id), prTitle(id, v.t.Title), prBody(id, v.t)); err != nil {
+		remote, err := git(e.repo, "remote", "get-url", "origin")
+		if err != nil {
+			return err
+		}
+		repo, err := githubRepo(remote)
+		if err != nil {
+			// Lifecycle tests clone a filesystem origin. Production remotes
+			// are github.com and never use this.
+			if slug := os.Getenv("MOONGLASS_GITHUB_REPO"); slug != "" && !strings.Contains(remote, "github.com") {
+				repo = slug
+			} else {
+				return err
+			}
+		}
+		if err = g.createPR(branchRef(id), prTitle(id, v.t.Title), prBody(repo, branchRef(id), id, v.t)); err != nil {
 			return err
 		}
 		if pr, err = g.findPR(branchRef(id)); err != nil {
@@ -237,9 +282,13 @@ func mergeOnce(e *env, id string) (string, string, error) {
 		}
 		return "ci-red", detail, nil
 	}
-	behind := pr.MergeState == "BEHIND" || !isAncestor(e.repo, "origin/main", sha)
+	behind := pr.MergeState == "BEHIND" || pr.MergeState == "DIRTY" || !isAncestor(e.repo, "origin/main", sha)
 	if v.t.Status != "merged" || behind {
-		if checks == "pending" && v.t.Status != "merged" {
+		// Named pending checks are a real run. No checks at all, on a branch
+		// that is behind or conflicting, means GitHub never started the
+		// pull_request workflow. Merge main in first so the following push
+		// can start ci. An up-to-date branch with no checks yet still waits.
+		if checks == "pending" && v.t.Status != "merged" && (detail != noChecksYet || !behind) {
 			return "waiting-ci", "CI is still running on the branch before it catches up with main: " + detail, nil
 		}
 		conflict, err := catchUpAndMark(e, id, sha)

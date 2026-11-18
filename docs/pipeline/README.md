@@ -94,7 +94,8 @@ Every command prints JSON. Exit codes: 0 success, 1 a gate or result failed, 2 a
 ## Branch protection assumed
 
 - `main` requires a pull request and the `ci` check (`.github/workflows/ci.yml`, which runs `make ci`) to pass, and allows squash merge only.
-- Branches need not be up to date before merging: `scripts/ship merge` merges `main` into the branch and waits for CI again itself.
+- Branches need not be up to date before merging: `scripts/ship merge` merges `main` into the branch and waits for CI again itself. If the pull request conflicts, GitHub never starts the `pull_request` workflow, so a branch with no checks is merged with `main` immediately instead of waiting. `ci` also runs on every push to `p/*` (`.github/workflows/ci.yml`), which is what produces that check before the pull request can merge.
+- Pull request bodies link to the ticket file and its result files with `https://github.com/<repo>/blob/p/<ID>/...` URLs. A relative path in the body is resolved against the pull request page and does not open the file.
 - Nobody pushes to `p/*` branches except the pipeline. A push there makes the scripts' pushes fail loudly.
 - `gh` on the machine running T3 is logged in with permission to push, open PRs and merge.
 

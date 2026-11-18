@@ -297,6 +297,42 @@ func TestSkipEligible(t *testing.T) {
 	}
 }
 
+func TestGitHubRepo(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"https://github.com/moonglass-dev/moonglass.git", "moonglass-dev/moonglass"},
+		{"git@github.com:moonglass-dev/moonglass.git", "moonglass-dev/moonglass"},
+		{"https://github.com/moonglass-dev/moonglass", "moonglass-dev/moonglass"},
+	}
+	for _, c := range cases {
+		got, err := githubRepo(c.in)
+		if err != nil || got != c.want {
+			t.Errorf("githubRepo(%q) = %q, %v; want %q", c.in, got, err, c.want)
+		}
+	}
+	if _, err := githubRepo("https://gitlab.com/a/b.git"); err == nil {
+		t.Fatal("githubRepo(gitlab) error = nil")
+	}
+}
+
+func TestPRBodyLinksUseBlobURLs(t *testing.T) {
+	body := prBody("moonglass-dev/moonglass", "p/W3-1", "W3-1", ticket{Risk: "high"})
+	want := "https://github.com/moonglass-dev/moonglass/blob/p/W3-1/docs/tickets/W3-1.md"
+	if !strings.Contains(body, want) {
+		t.Fatalf("body missing %s:\n%s", want, body)
+	}
+	for _, path := range []string{"docs/tickets/W3-1/plan.md", "docs/tickets/W3-1/approval.json", "docs/tickets/W3-1/check.json", "docs/tickets/W3-1/review.json", "docs/pipeline/README.md"} {
+		url := "https://github.com/moonglass-dev/moonglass/blob/p/W3-1/" + path
+		if !strings.Contains(body, url) {
+			t.Errorf("body missing %s", url)
+		}
+	}
+	if strings.Contains(body, "](docs/") {
+		t.Fatalf("body still has a relative link:\n%s", body)
+	}
+}
+
 func TestSummarizeChecks(t *testing.T) {
 	type c = struct{ Name, Bucket, Link string }
 	cases := []struct {

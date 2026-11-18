@@ -21,9 +21,11 @@ const testPlan = `# Plan
 
 // fakeForge stands in for GitHub. Merging fast-forwards main on the origin.
 type fakeForge struct {
-	dir string
-	pr  *pullRequest
-	ci  string
+	dir                  string
+	pr                   *pullRequest
+	ci                   string
+	firstCI, firstDetail string
+	checksN              int
 }
 
 func (f *fakeForge) findPR(string) (*pullRequest, error) { return f.pr, nil }
@@ -33,7 +35,13 @@ func (f *fakeForge) createPR(_, _, _ string) error {
 	return nil
 }
 
-func (f *fakeForge) checks(int) (string, string, error) { return f.ci, "", nil }
+func (f *fakeForge) checks(int) (string, string, error) {
+	f.checksN++
+	if f.checksN == 1 && f.firstCI != "" {
+		return f.firstCI, f.firstDetail, nil
+	}
+	return f.ci, "", nil
+}
 
 func (f *fakeForge) merge(_ int, sha, _ string) error {
 	if _, err := git(f.dir, "push", "--quiet", "origin", sha+":refs/heads/main"); err != nil {
@@ -60,6 +68,7 @@ func newTestRepo(t *testing.T) *testRepo {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", cfg)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("MOONGLASS_GITHUB_REPO", "example/moonglass")
 	origin := filepath.Join(tmp, "origin.git")
 	dir := filepath.Join(tmp, "work")
 	mustGit(t, tmp, "init", "--quiet", "--bare", "-b", "main", origin)
@@ -217,6 +226,51 @@ func TestMergeFailureGoesBackToTheWorker(t *testing.T) {
 	}
 	mustGit(t, r.dir, "pull", "--quiet", "--ff-only", "origin", "p/T-1")
 	r.expectStep("repair")
+}
+
+func TestMergeWithNoChecksCatchesUpBeforeWaiting(t *testing.T) {
+	r := newTestRepo(t)
+	driveToMergeable(r)
+	other := filepath.Join(t.TempDir(), "other")
+	mustGit(t, r.dir, "clone", "--quiet", "--branch", "main", mustOrigin(t, r.dir), other)
+	writeT(t, other, "README.md", "another ticket landed\n")
+	mustGit(t, other, "add", "-A")
+	mustGit(t, other, "commit", "--quiet", "-m", "other ticket")
+	mustGit(t, other, "push", "--quiet", "origin", "main")
+
+	r.forge.ci = "pass"
+	r.forge.firstCI = "pending"
+	r.forge.firstDetail = noChecksYet
+	if m := r.mustRun("ship", "merge", "T-1", "--wait"); m["merge"] != "merged" {
+		t.Fatalf("ship merge with no checks while behind = %v, want merged", m)
+	}
+	mustGit(t, r.dir, "fetch", "--quiet", "origin")
+	if _, ok, err := (refTree{r.dir, "origin/main"}).read("README.md"); err != nil || !ok {
+		t.Errorf("origin/main lacks README.md after the merge (err %v)", err)
+	}
+}
+
+func TestPendingChecksWaitBeforeCatchUp(t *testing.T) {
+	r := newTestRepo(t)
+	driveToMergeable(r)
+	other := filepath.Join(t.TempDir(), "other")
+	mustGit(t, r.dir, "clone", "--quiet", "--branch", "main", mustOrigin(t, r.dir), other)
+	writeT(t, other, "README.md", "another ticket landed\n")
+	mustGit(t, other, "add", "-A")
+	mustGit(t, other, "commit", "--quiet", "-m", "other ticket")
+	mustGit(t, other, "push", "--quiet", "origin", "main")
+
+	r.forge.ci = "pending"
+	r.forge.firstCI = "pending"
+	r.forge.firstDetail = "ci"
+	m := r.mustRun("ship", "merge", "T-1")
+	if m["merge"] != "waiting-ci" {
+		t.Fatalf("ship merge while CI is running = %v, want waiting-ci", m)
+	}
+	mustGit(t, r.dir, "fetch", "--quiet", "origin")
+	if _, ok, err := (refTree{r.dir, "origin/p/T-1"}).read("README.md"); err != nil || ok {
+		t.Errorf("ticket branch contains README.md before CI finished (err %v, ok %v)", err, ok)
+	}
 }
 
 func TestMergeCatchesUpWhenMainMoved(t *testing.T) {

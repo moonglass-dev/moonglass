@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+      # A conflicting pull request does not start a pull_request workflow.
+      # Pushes to ticket branches still run ci, so ship merge is not left
+      # waiting on a check that GitHub will never create.
+      - "p/**"
 
 permissions:
   contents: read
