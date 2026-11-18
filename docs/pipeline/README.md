@@ -43,7 +43,7 @@ The worker never decides what comes next: `scripts/ticket-status next` reads the
 
 ## Gates (`scripts/verify check`)
 
-`clean`, `ticket` (complete front matter and sections), `tests-locked` (locked files unchanged), `tests-kept` (no line of a test on `main` changed or removed), `paths` (only `allowed_paths`; protected paths only through an entry at or below their root), `size` (counted lines ≤ `max_diff_lines`), `words` (no TODO, FIXME, XXX, HACK, fallback, legacy), `dependencies` (every new module named in an accepted ADR), `named-tests` (each named test passes, not skipped), and `make-ci`. It also records the changed-line coverage from `coverage.out`.
+`clean`, `ticket` (complete front matter and sections), `tests-locked` (locked files unchanged), `tests-kept` (no line of a test on `main` changed or removed), `paths` (only `allowed_paths`; protected paths only through an entry at or below their root), `size` (counted lines ≤ `max_diff_lines`), `words` (no TODO, FIXME, XXX, HACK, fallback, legacy), `dependencies` (every new module named in an accepted ADR), `named-tests` (each named test passes, not skipped; `scripts/verify` starts `postgres:18` and sets `MOONGLASS_TEST_POSTGRES` as CI does), and `make-ci`. It also records the changed-line coverage from `coverage.out`.
 
 ## Review rule
 

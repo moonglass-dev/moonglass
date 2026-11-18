@@ -604,8 +604,12 @@ func runGates(e *env, dir, id string) (checkResult, error) {
 
 	cheapOK := allOK(res.Gates)
 	if cheapOK {
-		msg := namedTests(dir, t.Tests)
-		add("named-tests", msg == "", msg)
+		if err := ensureTestPostgres(); err != nil {
+			add("named-tests", false, err.Error())
+		} else {
+			msg := namedTests(dir, t.Tests)
+			add("named-tests", msg == "", msg)
+		}
 	}
 	if allOK(res.Gates) {
 		out, err := e.ci(dir)

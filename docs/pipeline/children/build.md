@@ -30,7 +30,7 @@ Implement the ticket until every named test passes and `make ci` is green.
 - `size`: counted lines (added plus removed, outside tests, docs, Markdown, generated files and `go.sum`) exceed `max_diff_lines`.
 - `words`: an added line outside docs contains TODO, FIXME, XXX, HACK, fallback or legacy, as a word in any case.
 - `dependencies`: a module was added to `go.mod` that no accepted ADR names in full.
-- `named-tests`: a named test did not pass, or skipped.
+- `named-tests`: a named test did not pass, or skipped. Postgres tests run against `postgres:18` with `MOONGLASS_TEST_POSTGRES` set as CI does; `scripts/verify` starts that service when the URL is unset.
 - `make-ci`: `make ci` failed.
 
 ## Rules

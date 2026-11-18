@@ -222,7 +222,10 @@ moonglass.dev/moonglass/internal/update TestVerifyRejectsWrongEnvelope
 moonglass.dev/moonglass/internal/update TestVerifyRequiresExactFlags
 moonglass.dev/moonglass/tools/pipeline TestBlockedChildStopsOnlyItsTicketAndResumes
 moonglass.dev/moonglass/tools/pipeline TestBranchWaitsForUnmergedDependencies
+moonglass.dev/moonglass/tools/pipeline TestCIPostgresURLMatchesWorkflow
 moonglass.dev/moonglass/tools/pipeline TestDecide
+moonglass.dev/moonglass/tools/pipeline TestEnsureTestPostgresKeepsExistingURL
+moonglass.dev/moonglass/tools/pipeline TestEnsureTestPostgresSetsCIURLWhenUnset
 moonglass.dev/moonglass/tools/pipeline TestGitHubRepo
 moonglass.dev/moonglass/tools/pipeline TestHighRiskTicketsRunOneAtATime
 moonglass.dev/moonglass/tools/pipeline TestLockedTestsChangedOwnerAllowance
