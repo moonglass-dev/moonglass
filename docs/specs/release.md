@@ -94,7 +94,7 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 
 ### Failure
 
-- Nothing that fails before step 6 creates anything. A container created in step 6 is force-removed when step 6 or 7 fails.
+- Nothing that fails before step 6 creates anything. A container created in step 6 is force-removed when step 6, 7 or 8 fails.
 - A pulled image is left in the store; the disk guard prunes it (`docs/specs/disk.md`).
 - On `FAILED` or `REJECTED` after step 2, a `releases` row is written with status `failed` and the `detail` as `error`, so the history shows it. The release state is unchanged, so the old release keeps serving.
 - **Start-up reconcile.** When the agent starts, every container labelled `dev.moonglass.managed=true` whose release is not the current, previous or candidate release of its app is removed, and the stops due by `stop_after` are carried out.

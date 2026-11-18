@@ -1,0 +1,51 @@
+{
+  "commit": "8ef1fc5d698a382ec40115293744ca84f6bf8ed5",
+  "ok": true,
+  "gates": [
+    {
+      "name": "clean",
+      "ok": true
+    },
+    {
+      "name": "ticket",
+      "ok": true
+    },
+    {
+      "name": "tests-locked",
+      "ok": true
+    },
+    {
+      "name": "tests-kept",
+      "ok": true
+    },
+    {
+      "name": "paths",
+      "ok": true
+    },
+    {
+      "name": "size",
+      "ok": true,
+      "detail": "585 counted lines, cap 585"
+    },
+    {
+      "name": "words",
+      "ok": true
+    },
+    {
+      "name": "dependencies",
+      "ok": true
+    },
+    {
+      "name": "named-tests",
+      "ok": true
+    },
+    {
+      "name": "make-ci",
+      "ok": true
+    }
+  ],
+  "diff_lines": 585,
+  "changed_line_coverage": 0.8162162162162162,
+  "skip_review_eligible": false,
+  "skip_review_reason": "risk is standard"
+}

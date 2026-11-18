@@ -33,6 +33,8 @@ linters:
             - github.com/coder/websocket
             - github.com/danielgtaylor/huma/v2
             - filippo.io/age
+            - github.com/moby/moby/client
+            - github.com/moby/moby/api
         proxy-deps:
           # Caddy is imported only by internal/proxy. cmd/ calls proxy.Run.
           list-mode: lax
@@ -77,6 +79,12 @@ linters:
           deny:
             - pkg: filippo.io/age
               desc: only internal/keys may import age (ADR-0015)
+        docker-deps:
+          list-mode: lax
+          files: ["**/cmd/**/*.go", "**/internal/agent/**/*.go", "**/internal/api/**/*.go", "**/internal/cli/**/*.go", "**/internal/installtest/**/*.go", "**/internal/keys/**/*.go", "**/internal/policy/**/*.go", "**/internal/protocol/**/*.go", "**/internal/proxy/**/*.go", "**/internal/registry/**/*.go", "**/internal/release/**/*.go", "**/internal/server/**/*.go", "**/internal/store/**/*.go", "**/internal/update/**/*.go", "**/tools/**/*.go"]
+          deny:
+            - pkg: github.com/moby/moby
+              desc: only internal/deploy may import the Docker client today (ADR-0014)
         sqlite-deps:
           # modernc sqlite is imported only by internal/store/sqlite and
           # internal/agent/state (ADR-0010, amended 2026-11-17). Every file
