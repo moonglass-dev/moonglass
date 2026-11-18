@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-17
+- Amended: 2026-11-17, decision 5 (owner decision D24, week 3 planning)
 
 ## Context
 
@@ -13,6 +14,7 @@ W3-1 builds environment keys, the agent's age recipient, the owner recovery key,
 2. Only `internal/keys` imports it. Every other package, the CLI included, calls `internal/keys`. depguard denies the module everywhere else.
 3. Only X25519 recipients and identities are used (ADR-0003). Scrypt passphrase recipients, SSH recipients, plugins and post-quantum hybrid recipients are not used.
 4. W3-1's test vectors must decrypt with the stock `age` command-line tool. CI installs it from the Ubuntu archive, and the test that uses it fails in CI when it is missing and skips locally when it is not installed.
+5. **The server's SSH deploy key** (`docs/specs/build.md`, W3-8) is written with `golang.org/x/crypto/ssh` from `golang.org/x/crypto v0.58.0`, the version age already brings in. The standard library cannot write an OpenSSH private key, and trusted core does not hand-roll key encodings. W3-8 makes the module direct in `go.mod` and adds `golang.org/x/crypto/ssh` to the depguard allow list for `internal/keys` only. No other package of the module is imported directly.
 
 ## Consequences
 

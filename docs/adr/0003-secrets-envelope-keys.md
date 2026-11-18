@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
-- **Amended:** 2026-11-17, decisions 2 and 5 and new decisions 11 to 13 (owner decisions D6, D13, D14 and D15, weeks 2–3 preflight)
+- **Amended:** 2026-11-17, decisions 2 and 5 and new decisions 11 to 13 (owner decisions D6, D13, D14 and D15, weeks 2–3 preflight); decision 9 (owner decision D22, week 3 planning)
 
 ## Context
 
@@ -38,7 +38,7 @@ The control plane must never hold a readable secret (V§1). A new or replacement
    Rotation deletes the agent-wrapped copies of the old environment key and keeps its recovery-wrapped copy, so old backups stay readable through the recovery key. Rotation does not un-leak, so the UI lists the values to rotate at their source.
 7. **Agent key rotation** is on demand at launch: the agent makes a new key and re-wraps the environment keys it holds to itself.
 8. **One reveal path:** `moonglass secrets reveal` has the agent re-encrypt the value to a one-time CLI key; the control plane relays only ciphertext. It is owner-only, requires step-up, and is refused for any token owned by an agent identity, whatever its scope. Every reveal is audited. The recovery key is never used for everyday reads. Values are write-only in the web UI.
-9. **The CLI pins each environment's public key** on first use and warns if it changes.
+9. **The CLI pins each environment's public key** on first use and warns if it changes. **It also pins the org's recovery recipients** (amended 2026-11-17, D22): `keys init` records the recipient it registers, and a CLI with no pin records the set it first fetches and prints it. A different set later stops the command. Otherwise a taken-over control plane could name its own recipient as the recovery key and receive every new environment key.
 10. **Git access** uses a deploy key generated on the server; the control plane holds no repository credentials after setup.
 11. **Step-up is not replaced by holding a key** (2026-11-17). Grant, rotate, reveal and every other recipient change need the sign-in fresher than ten minutes of ADR-0005 decision 3, even when the owner's CLI also holds the recovery key. Holding the recovery key is not proof that a human is present: on a machine where an AI agent works, that agent can read the key file or type into the terminal. The week 5 agent-safety story depends on this rule. These operations therefore wait for the step-up primitive (W4-1).
 12. **The first recovery recipient** (2026-11-17). `moonglass keys init` uploads the recovery key's public half. While the org has no recovery recipient and no environment key exists, registering one needs the owner role and no step-up, and it is audited. Adding a second recovery recipient or replacing one is a recipient change, with step-up. Known risk, accepted by the owner: someone holding an owner token could register their own recovery key before the real owner does.

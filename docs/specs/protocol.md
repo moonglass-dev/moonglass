@@ -130,7 +130,7 @@ Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds the
 
 | Field | Type | Rule |
 |---|---|---|
-| `disk` | `DiskReport` | `data_root_free_bytes`, `data_root_total_bytes`, `agent_dir_free_bytes`, `agent_dir_total_bytes` (`uint64`), and `level`: `OK`, `LOW` or `CRITICAL` (`docs/specs/disk.md`). |
+| `disk` | `DiskReport` | Optional (owner decision D25): absent means not measured. When present, `data_root_free_bytes`, `data_root_total_bytes`, `agent_dir_free_bytes`, `agent_dir_total_bytes` (`uint64`), each free value at most its total, and `level`: `OK`, `LOW` or `CRITICAL` (`docs/specs/disk.md`); `UNSPECIFIED` and unknown levels are rejected. From W3-6 the agent always sends it. |
 | `deploy_key` | `string` | The server's SSH deploy public key as one OpenSSH line, `ssh-ed25519 <base64> moonglass-deploy`, at most 256 bytes; empty until the key exists (`docs/specs/build.md`). It is a public key, not a secret. |
 
 ## Log and usage streaming (W4-4)

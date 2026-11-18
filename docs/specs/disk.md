@@ -37,7 +37,7 @@ Never pruned: volumes, the images of any app's current and previous release, and
 
 ## Reporting
 
-Every `Heartbeat` carries the `disk` report (`docs/specs/protocol.md`, W3-7). The control plane keeps the latest report per connected server in memory. Showing it (the servers screen) and alerting on it (notifications, W4-7) are later tickets. A change of level is also written to the agent's log.
+From W3-6 every `Heartbeat` carries the `disk` report (`docs/specs/protocol.md`, W3-7). The field is optional on the wire, so heartbeats sent between W3-7 and W3-6 stay valid; the control plane treats an absent report as not measured. The control plane keeps the latest report per connected server in memory. Showing it (the servers screen) and alerting on it (notifications, W4-7) are later tickets. A change of level is also written to the agent's log.
 
 ## Tests
 

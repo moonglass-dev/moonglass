@@ -93,7 +93,7 @@ From S§4. "Protected" means a protected environment.
 Docs never claim more than this section allows (`AGENTS.md`), and never say "audited" before the external review in v1 (S§7).
 
 1. **A takeover of the running control plane can deploy its own image into an unprotected environment, and that image receives that environment's secrets.** The MVP defends against a stolen database plus a decryption credential, removes host root and keeps protected environments' keys out of reach. v1 closes the deploy gap for protected environments with agent-verified approvals (S§4). An org's first environment starts protected; later ones start unprotected until switched on (ADR-0006).
-2. **Browser-side encryption trusts the JavaScript we serve.** The CLI path does not: it is a signed binary that pins each environment's public key on first use and warns if it changes (S§3.11).
+2. **Browser-side encryption trusts the JavaScript we serve.** The CLI path does not: it is a signed binary that pins each environment's public key and the org's recovery recipients on first use and stops if they change (S§3.11, ADR-0003 decision 9). The first use on a new machine trusts what the control plane returns, and the CLI prints it for the owner to check.
 3. **Lose every server and the recovery key, and the secrets and backups are gone.** Nobody can decrypt them, including us (S§3.11).
 4. **The install script is trusted through HTTPS from moonglass.dev.** Whoever controls that domain can serve a different script. Everything the script downloads is signature-checked; the script itself is only if the user verifies its `.sig` first (ADR-0007).
 

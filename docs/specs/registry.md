@@ -37,6 +37,7 @@ Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry 
 | W2-5 | `releases.list` | `GET /v1/releases` | viewer | no | project, environment |
 | W3-8 | `servers.deploy-key` | `GET /v1/servers/deploy-key` | viewer | no | org |
 | W3-2 | `keys.recovery.add` | `POST /v1/keys/recovery` | owner | no | org |
+| W3-2 | `keys.recovery.list` | `GET /v1/keys/recovery` | viewer | no | org |
 | W3-2 | `environments.key.create` | `POST /v1/environments/key` | member | no | project, environment |
 | W3-2 | `secrets.set` | `PUT /v1/secrets` | member | no | project, environment |
 | W3-2 | `secrets.list` | `GET /v1/secrets` | viewer | no | project, environment |
@@ -53,6 +54,7 @@ Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry 
 - **`releases.list`** returns the service's releases, newest first, at most 50: id, status, `image_ref` or git source, `image_id`, `repo_digest`, `detail`, times, and which are current and previous. For a tag, `repo_digest` is the digest that actually ran.
 - **`servers.deploy-key`** takes `server` and returns its deploy public key (`docs/specs/build.md`), or a 404 that says the server has not reported one yet.
 - **`keys.recovery.add`** takes an age recipient. It succeeds only while the org has no recovery recipient and no environment key; otherwise it is refused with a message that adding another recovery key is a recipient change that needs step-up (ADR-0003 decision 12).
+- **`keys.recovery.list`** (owner decision D21) returns the org's recovery recipients: `id`, `recipient` (`age1…`) and `created_at`. They are public keys. The CLI checks them against its pins before it wraps an environment key (`docs/specs/secrets.md`).
 - **`environments.key.create`** takes the environment, its `public_key` and one wrapped copy per recovery recipient on record. It is refused when the environment already has a key, or when the wrapped copies do not name exactly the recovery recipients on record.
 - **`secrets.set`** takes `kind`, `name` and `ciphertext`, and replaces an existing value of that name. **`secrets.list`** returns kinds, names and times, never ciphertext. Values are never read back through the API (`docs/specs/secrets.md`).
 
@@ -82,7 +84,7 @@ Secret reveal, grant, rotate and every other secret-recipient change also need t
 
 ## Tokens
 
-An owner token is `mg_` plus 52 lowercase unpadded base32 characters, from 256 bits of `crypto/rand`. `MintToken` stores `SHA-256` of the full text in `token_hashes`, and the name, expiry, human owner and last four characters in `tokens`. The plaintext is returned once and never stored or logged. An owner token has exactly one scope row, `* * *`; `MintToken` rejects any other row, a missing name and an expiry that is not in the future. There is no registration endpoint: the first token is minted in process (`Server.MintOwnerToken`).
+An owner token is `mg_` plus 52 lowercase unpadded base32 characters, from 256 bits of `crypto/rand`. `MintToken` stores `SHA-256` of the full text in `token_hashes`, and the name, expiry, human owner and last four characters in `tokens`. The plaintext is returned once and never stored or logged. An owner token has exactly one scope row, `* * *`; `MintToken` rejects any other row, a missing name and an expiry that is not in the future. There is no registration endpoint: a token is minted in process (`Server.MintOwnerToken`), and from W3-10 `moonglass server --print-owner-token NAME` prints one (`docs/specs/enrolment.md`).
 
 `Registry.Authenticate` hashes the bearer text, finds the token and its holder's role, and returns `ErrUnauthenticated` for a malformed, unknown, expired or revoked token.
 
