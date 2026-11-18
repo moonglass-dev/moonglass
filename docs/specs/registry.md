@@ -86,9 +86,21 @@ A denied call does not run the handler. Authorisation lives only in `Invoke`; no
 
 Secret reveal, grant, rotate and every other secret-recipient change also need the step-up of ADR-0005 decision 3. They are not added until W4-1 builds it (ADR-0003 decision 11).
 
+From W5-1b the order is agent, role, scope, destructive gate, step-up, and each operation also declares `Level` and `AgentCallable` (`docs/specs/agent-identities.md`, "Authorisation order"). The authz matrix that checks every operation against it is `internal/registry/testdata/authz-matrix.txt` (W5-1).
+
+## Week 5 operations
+
+Specified by the week 5 preflight (owner decisions D28 to D70, approved 2026-11-18):
+
+- Agent identities and their scoped tokens, `agents.*` (W5-1c, W5-1): `docs/specs/agent-identities.md`.
+- `services.delete`, `services.restore`, `services.purge` and the `deleted` input of `services.list` (W5-5d, W5-5e), and the same for environments and projects (W5-8): `docs/specs/delete.md`.
+- `audit.list` (W5-5): `docs/specs/audit.md`.
+
 ## Tokens
 
 An owner token is `mg_` plus 52 lowercase unpadded base32 characters, from 256 bits of `crypto/rand`. `MintToken` stores `SHA-256` of the full text in `token_hashes`, and the name, expiry, human owner and last four characters in `tokens`. The plaintext is returned once and never stored or logged. An owner token has exactly one scope row, `* * *`; `MintToken` rejects any other row, a missing name and an expiry that is not in the future. There is no registration endpoint: a token is minted in process (`Server.MintOwnerToken`), and `moonglass server --print-owner-token NAME` prints one (`docs/specs/enrolment.md`).
+
+From W5-1, `MintToken` also mints agent identities' tokens, with 1 to 32 checked scope rows, and every token expires 1 hour to 90 days after minting (`docs/specs/agent-identities.md`, "Tokens"). A person's token keeps exactly `* * *`.
 
 `Registry.Authenticate` hashes the bearer text, finds the token and its holder's role, and returns `ErrUnauthenticated` for a malformed, unknown, expired or revoked token.
 
@@ -98,9 +110,11 @@ Every `Invoke` by an authenticated principal writes one event after the decision
 
 `hash = SHA-256(JSON [prev_hash, org_id, seq, id, at, principal_kind, user_id, token_id, operation, outcome, reason])`, hex encoded. Events start at `seq` 1 with an empty `prev_hash`. `VerifyAudit` recomputes the chain and names the first bad sequence number when an event is changed, removed or reordered.
 
+W5-1b adds `agent_id` to the event and the hash, and W5-5 adds `project_id`, `environment_id` and the `system` principal kind, `audit.list`, and `moonglass audit verify`, which checks the chain on the CLI (`docs/specs/agent-identities.md`, `docs/specs/audit.md`).
+
 ## Routes and commands that are not operations
 
-`registry.NonOperationRoutes` is the fixed list of routes outside the registry, with the authorisation each enforces: `GET /v1/agent` (agent listener, Ed25519 challenge), `POST /v1/enroll` (single-use enrolment token), `GET /v1/logs/stream` (viewer read of that project and environment) and `GET /v1/usage/stream` (viewer read of that project and environment). The two stream routes take `project`, `environment` and `service` (`docs/specs/live.md`). SSE is not a registry operation. `registry.LocalCommands` is the fixed list of local-only subcommands (`version`, `server`, `keys init`, `agent enroll`, `agent connect`, `proxy`), each with what it touches. Tests fail when the server mounts a route, or the binary has a subcommand, that is on neither list nor in the registry.
+`registry.NonOperationRoutes` is the fixed list of routes outside the registry, with the authorisation each enforces: `GET /v1/agent` (agent listener, Ed25519 challenge), `POST /v1/enroll` (single-use enrolment token), `GET /v1/logs/stream` (viewer read of that project and environment) and `GET /v1/usage/stream` (viewer read of that project and environment). The two stream routes take `project`, `environment` and `service` (`docs/specs/live.md`). SSE is not a registry operation. `registry.LocalCommands` is the fixed list of local-only subcommands (`version`, `server`, `keys init`, `agent enroll`, `agent connect`, `proxy`, and `audit verify` from W5-5), each with what it touches. Tests fail when the server mounts a route, or the binary has a subcommand, that is on neither list nor in the registry.
 
 ## Generation
 

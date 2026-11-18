@@ -21,7 +21,7 @@ This file is the reviewer's whole brief. Read it, then the diff, and look for th
 | **Database backups** | The user's S3-compatible bucket | Dump → zstd → age to the environment key, with no temp files on disk (S§3.9). Readable only with the environment key or the owner recovery key. Bucket credentials are themselves an environment secret, so a restore needs only the recovery key |
 | **Tokens**: API and coding-agent tokens, enrolment tokens, sessions, the bootstrap token, login links, identity links and step-up confirmations | Control-plane database | Every one is 256 bits from `crypto/rand`, written `mg_…`, stored only as SHA-256 in a lookup table and shown once (ADR-0005). API and agent tokens carry scope rows, an expiry and an owner (S§3.10). One-time tokens are marked used in the accepting transaction and fail on replay (B W1-3). Sessions are server-side, listable, revocable, bound to `__Host-` cookies and last 14 days. Links and tokens expire: login link, identity link and step-up 10 min, enrolment and bootstrap tokens 1 h. A step-up approves one request and is single use (`docs/specs/auth.md`) |
 | **Release signing keys** | Two `ed25519-sk` keys, each on its own FIDO2 token, offline; PIN and touch per signature (S§3.14, ADR-0007) | Every artifact carries an OpenSSH `SSHSIG` signature, namespace `moonglass-release`. The install script (from W1-6) and the agent (from W7-6) verify against both pinned public keys before installing. Canary, staged rollout and automatic revert limit a bad release |
-| **Audit trail** | Control-plane database | Hash-chained events written by the registry, never by handlers (B W2-1). `moonglass audit verify` checks the chain (B W5-5). Free export to the user's bucket on every plan (V§5.1) |
+| **Audit trail** | Control-plane database | Hash-chained events written by the registry, never by handlers (B W2-1). `moonglass audit verify` recomputes the chain on the CLI and pins its newest event, so a later rewrite of history that machine has verified is caught (B W5-5, `docs/specs/audit.md`). A running control plane under someone else's control can still serve a fully recomputed chain to a machine that has never verified it. Free export to the user's bucket on every plan (V§5.1) |
 
 Also sensitive, and never held by the control plane: agent keys, the owner recovery key, certificate private keys (S§3.4) and the git deploy key (S§3.11). All are generated where they are used.
 
@@ -96,6 +96,7 @@ Docs never claim more than this section allows (`AGENTS.md`), and never say "aud
 2. **Browser-side encryption trusts the JavaScript we serve.** The CLI path does not: it is a signed binary that pins each environment's public key and the org's recovery recipients on first use and stops if they change (S§3.11, ADR-0003 decision 9). The first use on a new machine trusts what the control plane returns, and the CLI prints it for the owner to check.
 3. **Lose every server and the recovery key, and the secrets and backups are gone.** Nobody can decrypt them, including us (S§3.11).
 4. **The install script is trusted through HTTPS from moonglass.dev.** Whoever controls that domain can serve a different script. Everything the script downloads is signature-checked; the script itself is only if the user verifies its `.sig` first (ADR-0007).
+5. **`[sources] repositories` limits which code is built, not what it builds from.** A Dockerfile's base images are pulled by BuildKit and are not checked against `registries` (`docs/specs/local-policy.md`).
 
 What browser-side encryption protects, and what it does not (S§3.11):
 
@@ -195,6 +196,8 @@ Ask every question of every diff. Report a finding with file:line, what breaks a
 
 **5. Authz-matrix rows**
 - Is every new operation declared in the registry with a scope, a lowest role that follows the role rule, and an explicit `destructive` flag? Is anything that deletes, irreversibly replaces or stops a service, release, volume or stored data marked destructive?
+- Does it declare `Level` and `AgentCallable` by their rule (`docs/specs/agent-identities.md`)? Can an agent identity act above admin, mint or revoke credentials, or call an operation declared `AgentCallable: No`? Does `internal/registry/testdata/authz-matrix.txt` gain its 8 lines?
+- Does a new command type the agent accepts have a command class, and is a forbidden class refused before anything else (`docs/specs/local-policy.md`)?
 - Does a protected deploy or a recipient change still pass its own gate, rather than relying on `destructive`?
 - Does the authz matrix have a row for it against every token scope and every role, asserting allow or deny?
 - Does a new HTTP route or CLI command appear on neither the registry nor its fixed list beside it? Any authorisation in middleware? Were the generated files regenerated, not edited?

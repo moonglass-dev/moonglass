@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-11-16
 - **Amended:** 2026-11-17, new decisions 10 to 12 (owner decision D8, weeks 2–3 preflight)
+- **Amended:** 2026-11-18, new decisions 13 and 14 (week 5 preflight, owner decisions D43 to D52, `docs/specs/local-policy.md`)
 
 ## Context
 
@@ -35,6 +36,8 @@ Docker socket access is root-equivalent (S§2). A typed protocol is not enough o
 10. **The checked spec is the whole request** (2026-11-17). The fields the deny list does not judge (command, environment, labels, networks, restart policy, log configuration) are carried in the spec too and pass through unchanged, so the Engine request is built from the checked value and nothing else (`docs/specs/container-policy.md`).
 11. **Only the agent sets Moonglass labels** (2026-11-17). Labels in the `dev.moonglass.` namespace mark what the agent manages, so the agent and its clean-up trust them. A user-supplied label in that namespace is rejected, and no block can allow it. The agent sets its own labels through a separate field that no protocol message or Compose file reaches.
 12. **Environment values stay out of every record** (2026-11-17). Environment variable values are never logged and never written into an error, a rejection, a command result or an audit record. Names may be.
+13. **Command classes are fixed per command type** (2026-11-18). Every command type the agent accepts has one class. A type sent by a destructive registry operation is `delete`; one that runs a process in an existing container is `exec`; the rest have none. A forbidden class is answered `REJECTED` before anything else is checked. Forbidding a class that has no command type yet is valid and does nothing. A test fails when a command type has no class (`docs/specs/local-policy.md`).
+14. **Sources are matched in one normal form** (2026-11-18). `registries` matches the image's repository without tag or digest, with the default registry `docker.io` and `library/` filled in; `repositories` matches `github.com/<owner>/<repo>`, lower-cased. Patterns must be written in that form, with a literal host, or the agent does not start. A present, empty list allows nothing of its kind. The check runs on `DEPLOY` and `BUILD` before any pull or clone. Images built on the server are never pulled, and are checked through the repository label the agent puts on each build. A build's base images are not checked (`docs/specs/local-policy.md`).
 
 **`agent.toml` schema,** implemented by W1-1. `[update] channel` is `stable` or `canary`. `[commands] forbid` takes the classes `delete` (any command that carries out a destructive operation) and `exec` (container exec, v1). `[sources]` lists glob patterns; when present, deploys come only from them. Any other key or value stops the agent.
 
@@ -77,5 +80,5 @@ bind_mounts = ["/proc:/host/proc:ro", "/sys:/host/sys:ro"]
 ## Links
 
 - S§2, S§3.1, S§3.2, S§3.5, S§3.13, S§4, S§7, S§9; V§1; M§6
-- B§6: W1-1, W2-3, W2-6, W3-4, W5-3, W6-4
+- B§6: W1-1, W2-3, W2-6, W3-4, W5-3a, W5-3, W6-4
 - `docs/threat-model.md` §6 and checklist item 2

@@ -26,6 +26,7 @@ Every table has `org_id`, except the lookup tables listed in one file in `intern
 - `agent_keys` — lookup key is the agent's public key. Maps to `server_id` and `org_id`.
 - `enrolment_token_hashes` — lookup key is `SHA-256` of the bearer token. Maps to `org_id`, expiry, and a used/revoked marker. The plaintext token is never stored. Format of the bearer value is ADR-0005 (256 bits, `mg_` plus 52 lowercase unpadded base32); this ticket stores and looks up the hash only.
 - `token_hashes` — lookup key is `SHA-256` of an API token (`docs/specs/registry.md`). Maps to `org_id` and `token_id`, with a revoked marker. It has no RLS because the org is not known when it is read.
+- `purge_due` (W5-5c) — lookup key is the id of a soft-deleted row. Maps to `org_id`, with the expiry at which it is purged. It lets the hourly purge find due rows without knowing their orgs (`docs/specs/delete.md`).
 
 
 ### Row-level tables
@@ -33,9 +34,10 @@ Every table has `org_id`, except the lookup tables listed in one file in `intern
 - `orgs` — `org_id` equals the org's `id`. Created with a row for itself.
 - `memberships` — `org_id`, `user_id`, `role`, uniqueness on `(org_id, user_id)`. `role` is one of `owner`, `admin`, `member`, `viewer` (ADR-0006). There is no separate `roles` table: the allowed values are the role list, enforced by a constraint on both backends.
 - `servers` — `org_id`, `id` (the `server_id`), `created_at`. The public key lives only in `agent_keys`.
-- `tokens` — `org_id`, `id`, `user_id` (the human owner), `name`, `last4`, `expires_at`, `created_at`. Never the secret; the `mg_` prefix is constant and not stored.
+- `tokens` — `org_id`, `id`, `user_id` (the human owner), `name`, `last4`, `expires_at`, `created_at`. Never the secret; the `mg_` prefix is constant and not stored. W5-1a adds `agent_id`: empty for a person's token, otherwise the agent identity that holds it, whose owner is `user_id` (`docs/specs/agent-identities.md`).
+- `agent_identities` (W5-1a) — `org_id`, `id`, `name`, `owner_user_id`, `created_at`, `revoked_at`; unique `(org_id, name)` (`docs/specs/agent-identities.md`).
 - `token_scopes` — `org_id`, `token_id`, `project`, `environment`, `operation`; `*` is the wildcard. An owner token has exactly one row, `* * *`.
-- `audit_events` — `org_id`, `seq` (from 1, primary key with `org_id`), `id`, `at`, `principal_kind` (`human` or `agent`), `user_id`, `token_id`, `operation`, `outcome` (`allowed`, `denied` or `error`), `reason`, `prev_hash`, `hash`. `prev_hash` is empty for `seq` 1. The registry is the only writer, through `AppendAudit`, which reads the chain head and inserts in one transaction and retries when another writer takes the same `seq`.
+- `audit_events` — `org_id`, `seq` (from 1, primary key with `org_id`), `id`, `at`, `principal_kind` (`human` or `agent`), `user_id`, `token_id`, `operation`, `outcome` (`allowed`, `denied` or `error`), `reason`, `prev_hash`, `hash`. `prev_hash` is empty for `seq` 1. The registry is the only writer, through `AppendAudit`, which reads the chain head and inserts in one transaction and retries when another writer takes the same `seq`. W5-1a adds `agent_id`; W5-5c adds `project_id`, `environment_id` and the principal kind `system` (`docs/specs/agent-identities.md`, `docs/specs/audit.md`).
 
 A person is a stable `user_id` minted when their first `user_identities` row is written. There is no `users` table with names or other profile fields: those would need `org_id` and RLS (a person can belong to several orgs) and are not needed to enrol or store memberships. `user_identities` plus `user_orgs` plus `memberships` are the user tables for this ticket.
 
@@ -68,6 +70,10 @@ Specified by the weeks 2–3 preflight (`docs/specs/secrets.md`). Row-level tabl
 - `environment_keys` — `org_id`, `environment_id` (unique), `public_key` (`age1…`), `created_at`.
 - `wrapped_environment_keys` — `org_id`, `environment_id`, `recipient_kind` (`recovery`, or `agent` from W4-8), `recipient_id` (a `recovery_recipients.id` or a `server_id`), `ciphertext` (an age file), `created_at`; unique `(org_id, environment_id, recipient_kind, recipient_id)`.
 - `secrets` — `org_id`, `environment_id`, `kind` (`env` or `registry`), `name`, `ciphertext` (an age file), `updated_at`; unique `(org_id, environment_id, kind, name)`.
+
+### Soft delete (W5-5c, W5-8a)
+
+Specified by the week 5 preflight. `services` gains `deleted_at` and `purge_detail` (W5-5c); `environments` and `projects` gain `deleted_at` (W5-8a). Every list, lookup and `ResolveTarget` leaves deleted rows out. The rules, the store methods and their conformance cases are `docs/specs/delete.md`.
 
 ### Server deploy keys (W3-8)
 

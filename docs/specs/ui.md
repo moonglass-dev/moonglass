@@ -25,12 +25,12 @@ The hierarchy is organisation → projects → environments → services → dep
 | `/{org}` | Redirects to `/{org}/projects` |
 | `/{org}/projects` | Project list |
 | `/{org}/projects/{project}` | A project: its environments and services |
-| `/{org}/projects/{project}/{env}` | An environment: services, what is live, protected flag, secrets (names only) |
+| `/{org}/projects/{project}/{env}` | An environment: services, what is live, protected flag, secrets (names only), deleted services (W5-7, `docs/specs/delete.md`) |
 | `/{org}/projects/{project}/{env}/{service}` | A service: current release, deploy history, logs, current usage, settings |
 | `/{org}/projects/{project}/{env}/{service}/deploys/{deploy}` | One deploy: steps, logs, diff, rollback |
 | `/{org}/servers` and `/{org}/servers/{server}` | Servers: online state, key fingerprint, disk, what runs there |
 | `/{org}/approvals` and `/{org}/approvals/{approval}` | Pending and past approvals, each with its diff |
-| `/{org}/audit` | The audit trail |
+| `/{org}/audit` | The audit trail (W5-7, `docs/specs/audit.md`) |
 | `/{org}/settings/{section}` | Members, tokens and agent identities, sessions, keys, notifications |
 
 Every `{…}` segment is the resource's opaque, stable ID, never its name. Names are display text, so a link survives a rename. `{org}` is in every route on hosted and self-hosted, so there is one route shape (ADR-0002: self-hosted may hold several organisations).

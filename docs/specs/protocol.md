@@ -22,7 +22,7 @@ Every message is wrapped in an envelope before it is sent.
 | `payload` | `bytes` | Encoded payload message for that type, possibly empty. |
 | `error` | `Error` | Required when `type` is `ERROR`, and forbidden on any other type. This is the only place an error travels; it is not also encoded in `payload`. |
 
-`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `COMMAND_RESULT`, `BUILD`.
+`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `COMMAND_RESULT`, `BUILD`. W4-4 adds `LOG_REQUEST`, `LOG_CHUNK` and `USAGE`, and W5-5a adds `STOP_APP` and `REMOVE_APP` (below).
 
 Encode (`Marshal`) and decode (`Unmarshal`) round-trip a well-formed envelope. `Marshal` is deterministic. The on-the-wire encoding is a 4-byte big-endian length of the protobuf payload, followed by that many bytes of protobuf. The length must match the rest of the buffer exactly, so a truncated or trailing-garbage input is rejected.
 
@@ -178,6 +178,17 @@ When the app has no container, the agent sends one chunk with `final` true and e
 | `disk_write_bytes` | `uint64` | From `io.stat`. |
 
 The streams and the SSE routes are `docs/specs/live.md`. What each side sends and accepts is `docs/specs/connection.md`.
+
+## Stop and remove an app (W5-5a)
+
+Specified by the week 5 preflight (`docs/specs/delete.md`, owner decision D62). Two commands, server to agent, each answered with one `CommandResult`. Each payload has one field, `app_id`, an identifier as for `Deploy`; opening it rejects unknown fields. Field numbers: `STOP_APP` = 15, `StopApp.app_id` = 1; `REMOVE_APP` = 16, `RemoveApp.app_id` = 1. Messages added later take numbers after these.
+
+| Message | Type | Fields |
+|---|---|---|
+| `StopApp` | `STOP_APP` | `app_id` |
+| `RemoveApp` | `REMOVE_APP` | `app_id` |
+
+Both are `delete` class for `agent.toml` (`docs/specs/local-policy.md`). What the agent does with them is `docs/specs/delete.md`.
 
 ## Secret delivery (W4-8) and reveal (W4-9)
 

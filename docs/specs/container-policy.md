@@ -15,7 +15,7 @@ A library, not a feature. There is no `Deploy` yet.
 - Turn a Compose project into container specs after `compose-go` has resolved it, and check each one.
 - Return a `Rejection` that says what failed and what would allow it.
 
-Wiring this into the agent, mapping a `Rejection` to a protocol error code, the Deploy executor (W2-3), command-policy enforcement (W5-3) and Compose reconcile (W6-4) are later tickets. They must call this package for every container, build and pre-deploy step they create, and must create only what `Check` returned.
+Wiring this into the agent, mapping a `Rejection` to a protocol error code, the Deploy executor (W2-3), command-policy enforcement (W5-3a, W5-3; `docs/specs/local-policy.md`) and Compose reconcile (W6-4) are later tickets. They must call this package for every container, build and pre-deploy step they create, and must create only what `Check` returned.
 
 ## API
 
@@ -274,11 +274,11 @@ registries   = ["ghcr.io/acme/*"]
 | Key | Rule |
 |---|---|
 | `update.channel` | `stable` or `canary`. Absent means `stable`. |
-| `commands.forbid` | List of `delete` and `exec`. Any other class, or a duplicate, is an error. Absent means nothing is forbidden. |
-| `sources.repositories`, `sources.registries` | Lists of glob patterns in Go `path.Match` syntax. A pattern with bad syntax, an empty list or an empty or duplicate entry is an error. When a key is present, deploys come only from patterns of that kind; an absent key does not restrict that kind. |
+| `commands.forbid` | List of `delete` and `exec`. Any other class, or a duplicate, is an error. Absent means nothing is forbidden. Which command types are in each class: `docs/specs/local-policy.md` (W5-3). |
+| `sources.repositories`, `sources.registries` | Lists of glob patterns in Go `path.Match` syntax. A pattern with bad syntax, an empty list or an empty or duplicate entry is an error. When a key is present, deploys come only from patterns of that kind; an absent key does not restrict that kind. From W5-3a (`docs/specs/local-policy.md`): patterns must be in the normal form, and a present, empty list allows nothing of its kind instead of being an error. |
 | `containers.allow` | Array of tables, see "Allow blocks". |
 
-`Parse` and `LoadFile` return the parsed `Config` and the compiled allow blocks. They only load and validate `[commands]` and `[sources]`. Enforcing them is W5-3.
+`Parse` and `LoadFile` return the parsed `Config` and the compiled allow blocks. They only load and validate `[commands]` and `[sources]`. What they mean, how a source is matched and where the agent enforces them is `docs/specs/local-policy.md` (W5-3a, W5-3). From W5-3a the image-name normaliser of "Matching" also treats `localhost` as a registry host and folds `index.docker.io` into `docker.io`.
 
 ### The file
 

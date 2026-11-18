@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
+- **Amended:** 2026-11-18, decision 3 (week 5 preflight, owner decisions D28 to D31, `docs/specs/agent-identities.md`)
 
 ## Context
 
@@ -15,6 +16,7 @@ Moonglass offers the same operations to people, scripts and coding agents. If RE
    - **Role.** The caller's role (owner, admin, member, viewer; V§5.2) reaches the operation's declared lowest role. A token acts with its owning human's role. The declared role follows one rule: viewer for operations that only read, and for operations that act only on the caller's own sessions and identities (amended 2026-11-18, `docs/specs/auth.md`); member for changes that are not destructive; admin for destructive operations; owner for secret reveal, changing secret recipients and membership changes. A build check fails a destructive operation declared below admin.
    - **Scope.** Some scope row on the token matches. A row is (project, environment, operation): project and environment are opaque IDs, the operation is its registry name, and any of the three may be `*`. A W2-1 owner token is one row, `* * *`; W5-1's agent tokens use the same fields.
    - **Gates.** The three gates below pass.
+   - **Agent identities** (2026-11-18). Every operation also declares its target level (org, project or environment) and whether an agent identity may call it at all, with no default for either. An operation that manages credentials, sign-in, approvals, key material or the protected flag, and every step-up operation, is not callable by agents. An agent identity's token acts with its owning human's current role, capped at admin, so owner-only operations are never an agent's.
 4. **Three separate gates,** none a substitute for another. Each needs a sign-in fresher than ten minutes, checked on the server at the moment of approval (S§3.10, ADR-0005):
    - **`destructive`:** the operation deletes, irreversibly replaces or stops a service, a release, a volume or stored data. Deploy and rollback are not destructive. Called by an agent identity, it returns "pending approval" with a link; a human approves in the UI or with `moonglass approve` (S§3.12).
    - **Protected-environment deploy:** any deploy or source change in a protected environment needs a human approval, whoever asks. No role skips it. An org's first environment starts protected and uses the plan's allowance (one on Free, V§5.3); later environments start unprotected until someone switches them on. The first-deploy wizard (W7-7) asks the same question and never overrides a flag already set.

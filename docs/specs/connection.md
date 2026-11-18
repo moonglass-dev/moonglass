@@ -38,11 +38,11 @@ Specified by the weeks 2–3 preflight (owner decision D7). From W2-10 the conne
 
 - The server keeps at most one live connection per enrolled server. A new connection authenticated by the same key replaces the old one, which is closed.
 - One control-plane node holds every connection. Routing commands between nodes through `LISTEN/NOTIFY` (ADR-0002 decision 6) is not built here.
-- The server sends `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK` and `RUN_PRE_DEPLOY` (and `BUILD` from W3-4) to the server that runs the service, and accepts `HEARTBEAT` and `COMMAND_RESULT`. From W4-4 it also sends `LOG_REQUEST` and accepts `LOG_CHUNK` and `USAGE`.
+- The server sends `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK` and `RUN_PRE_DEPLOY` (and `BUILD` from W3-4, `STOP_APP` and `REMOVE_APP` from W5-5b) to the server that runs the service, and accepts `HEARTBEAT` and `COMMAND_RESULT`. From W4-4 it also sends `LOG_REQUEST` and accepts `LOG_CHUNK` and `USAGE`.
 - **Request ids for commands** are `c` followed by 32 lowercase hex characters from 128 random bits, minted by the server. The id is stored with the release step it belongs to (`docs/specs/storage.md`) before the command is sent.
 - **One command at a time per app.** The server sends the next command for an app only after the previous one has a result.
 - **One build at a time per server** (owner decision D26). The server sends a `BUILD` to a server only when no other `BUILD` to it is waiting for a result, and queues the rest in arrival order. The `BUILD` timeout therefore counts only the build itself. Queued builds wait on the control plane, not on the agent.
-- **Timeouts** for a result, counted from sending: `DEPLOY` 20 minutes, `BUILD` 30 minutes, `RUN_PRE_DEPLOY` 20 minutes, `SWITCH_RELEASE` 3 minutes, `ROLLBACK` 3 minutes. On timeout the server closes the connection; the command is re-sent once the agent reconnects (below). The release step fails only when the re-sent command also times out.
+- **Timeouts** for a result, counted from sending: `DEPLOY` 20 minutes, `BUILD` 30 minutes, `RUN_PRE_DEPLOY` 20 minutes, `SWITCH_RELEASE` 3 minutes, `ROLLBACK` 3 minutes, `STOP_APP` 5 minutes, `REMOVE_APP` 10 minutes (W5-5b). On timeout the server closes the connection; the command is re-sent once the agent reconnects (below). The release step fails only when the re-sent command also times out.
 - **Re-sending.** After the agent reconnects, the server re-sends every command that has no result yet, with its original request id. After the server itself restarts, the `deploy` and `rollback` operations re-send the step recorded in `releases.request_id` and `rollbacks.request_id` (W2-5, `docs/specs/storage.md`).
 - A `CommandResult` whose request id the server did not send, or already has a result for, closes the connection.
 
@@ -50,6 +50,7 @@ Specified by the weeks 2–3 preflight (owner decision D7). From W2-10 the conne
 
 - The agent accepts `HEARTBEAT_ACK`, the command types above and, from W4-4, `LOG_REQUEST`, and sends `HEARTBEAT`, `COMMAND_RESULT` and, from W4-4, `LOG_CHUNK` and `USAGE`. Anything else closes the connection, as before.
 - Commands for different apps run concurrently. Commands for one app run one at a time, in the order they arrived.
+- From W5-3, every command first passes `agent.toml`'s command classes and sources, and a refused one is answered `REJECTED` (`docs/specs/local-policy.md`).
 - A `BUILD` that arrives while another build runs on this server is answered `REJECTED` with `another build is running on this server`, and nothing is done. A re-sent `BUILD` with the running build's request id is not a second build ("Each request id runs once").
 - At start, before connecting, the agent loads `agent.toml` with `policy.LoadFile` from `--policy FILE` (default `/etc/moonglass/agent.toml`, owner uid 0), with `policy.Env` from the Docker Engine (`DockerRootDir`, the default runtime, read through `internal/deploy`, because only it may import the Docker client: ADR-0014) and `ContainerProject` from the `dev.moonglass.project` label. A file that does not load stops the agent with the policy error. An absent file is the empty policy (`docs/specs/container-policy.md`).
 - It opens its state database (`docs/specs/agent-state.md`) and checks the Engine API version (ADR-0014) before connecting.
