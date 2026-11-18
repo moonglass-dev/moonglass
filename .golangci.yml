@@ -32,6 +32,7 @@ linters:
             - github.com/caddyserver/caddy/v2
             - github.com/coder/websocket
             - github.com/danielgtaylor/huma/v2
+            - filippo.io/age
         proxy-deps:
           # Caddy is imported only by internal/proxy. cmd/ calls proxy.Run.
           list-mode: lax
@@ -67,6 +68,15 @@ linters:
           deny:
             - pkg: github.com/danielgtaylor/huma/v2
               desc: only internal/api may import Huma
+        age-deps:
+          # age is imported only by internal/keys (ADR-0015 decision 2).
+          # depguard file exclusions were not applied for policy-deps, so
+          # every package that exists today is listed.
+          list-mode: lax
+          files: ["**/cmd/**/*.go", "**/internal/agent/**/*.go", "**/internal/api/**/*.go", "**/internal/cli/**/*.go", "**/internal/installtest/**/*.go", "**/internal/policy/**/*.go", "**/internal/protocol/**/*.go", "**/internal/proxy/**/*.go", "**/internal/registry/**/*.go", "**/internal/release/**/*.go", "**/internal/server/**/*.go", "**/internal/store/**/*.go"]
+          deny:
+            - pkg: filippo.io/age
+              desc: only internal/keys may import age (ADR-0015)
         policy-deps:
           # Restrict these modules outside internal/policy. depguard file
           # exclusions of internal/policy itself were not applied, so this

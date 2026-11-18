@@ -1,4 +1,4 @@
-// Package keys generates the agent identity (ADR-0003, agent identity only).
+// Package keys owns the agent identity and every age operation (ADR-0015).
 package keys
 
 import (

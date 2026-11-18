@@ -1,5 +1,7 @@
 moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollFailures
 moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollPrintsFingerprint
+moonglass.dev/moonglass/cmd/moonglass TestKeysInitFailures
+moonglass.dev/moonglass/cmd/moonglass TestKeysInitWritesRecoveryKeyFile
 moonglass.dev/moonglass/cmd/moonglass TestUsageOnMissingOrUnknownCommand
 moonglass.dev/moonglass/cmd/moonglass TestVersionPrintsVersionCommitAndDate
 moonglass.dev/moonglass/cmd/moonglass TestVersionReportsFailedWrite
@@ -29,10 +31,18 @@ moonglass.dev/moonglass/internal/installtest TestInstallRejectsBadSignatureWrite
 moonglass.dev/moonglass/internal/installtest TestInstallVerifiesSignatureBeforeWriting
 moonglass.dev/moonglass/internal/installtest TestOnlyAgentHasDockerGroup
 moonglass.dev/moonglass/internal/installtest TestUnitsAreHardened
+moonglass.dev/moonglass/internal/keys FuzzParseKeyRecord
+moonglass.dev/moonglass/internal/keys TestAgentAgreeKeyAsAgeRecipient
 moonglass.dev/moonglass/internal/keys TestAgentTLSCertCarriesKey
 moonglass.dev/moonglass/internal/keys TestFingerprintIsSHA256OfSigningKey
 moonglass.dev/moonglass/internal/keys TestGenerateAgentIdentity
+moonglass.dev/moonglass/internal/keys TestGenerateEnvironmentKey
+moonglass.dev/moonglass/internal/keys TestKeyRecordRejectsMalformed
+moonglass.dev/moonglass/internal/keys TestKeyRecordRoundTrip
+moonglass.dev/moonglass/internal/keys TestKeyVectorsDecryptWithStockAge
+moonglass.dev/moonglass/internal/keys TestOnlyX25519RecipientsAndIdentitiesParse
 moonglass.dev/moonglass/internal/keys TestTLSConfigsPinTLS13
+moonglass.dev/moonglass/internal/keys TestWrapUnwrapKeyRecord
 moonglass.dev/moonglass/internal/policy FuzzParse
 moonglass.dev/moonglass/internal/policy TestAllowBlockMatchesEveryNamedKey
 moonglass.dev/moonglass/internal/policy TestAllowEveryKeyAllowsItsField

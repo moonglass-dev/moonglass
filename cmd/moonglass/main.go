@@ -42,6 +42,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return runVersion(stdout, stderr)
 		},
 		"server":        func(rest []string) int { return runServer(rest, stdout, stderr) },
+		"keys init":     func(rest []string) int { return runKeysInit(rest, stdout, stderr) },
 		"agent enroll":  func(rest []string) int { return runAgentEnroll(rest, stdout, stderr) },
 		"agent connect": func(rest []string) int { return runAgentConnect(rest, stderr) },
 		"proxy":         func(rest []string) int { return runProxy(rest, stderr) },

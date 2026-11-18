@@ -23,7 +23,7 @@ The plaintext of every wrapped environment key, to an agent or to a recovery rec
 {"v": 1, "environment_id": "<32 hex>", "protected": false, "identity": "AGE-SECRET-KEY-1…"}
 ```
 
-- `v` is 1. Any other value, an unknown field or a missing field is an error.
+- `v` is 1. Any other value, an unknown field, a missing field, a duplicated field or trailing data after the object is an error.
 - An agent decides whether an environment is protected from the record it unwrapped itself, never from a field in a request. The control plane holds only ciphertext and cannot change a record, because age authenticates its payload.
 - A record whose `environment_id` differs from the environment it was delivered for is refused.
 - From W4-2, each new record the CLI creates copies the environment's current flag. An existing record changes only when `secrets rotate` (W3-3) writes a new one. Until that write, the copy an agent already holds is unchanged, and the UI and the CLI say so.
@@ -41,7 +41,10 @@ Names are visible everywhere. Values are write-only: no operation returns a valu
 
 ## Recovery key (W3-1, W3-2)
 
-- `moonglass keys init --out FILE` generates one age identity and writes it to `FILE` with mode 0600. It refuses to overwrite a file. It prints the recipient (`age1…`) and the warning from ADR-0003 that losing every server and this key loses the secrets. The identity text printed on request is the file's contents; there is no second format.
+- `moonglass keys init --out FILE` generates one age X25519 identity and writes it to `FILE` with mode 0600, created exclusively. The file holds exactly one line: the identity, then `\n`. Stock `age -d -i FILE` reads it.
+- The command prints exactly three lines to stdout: the recipient (`age1…`) first; then where the key was written, that its mode is 0600 and to keep it offline; then the warning from ADR-0003 that losing every server and this key loses the secrets. stderr is empty on success. The identity is never printed, logged or put in an error.
+- It refuses to overwrite an existing file and creates nothing when the directory is missing.
+- The agent's recipient and identity are the age Bech32 encoding of the public and private halves of `agent-agree.key`. The file on disk is unchanged.
 - From W3-2 it then calls `keys.recovery.add` with the recipient. That succeeds only while the org has no recovery recipient and no environment key (ADR-0003 decision 12); the owner accepted the risk that someone holding an owner token could register a key first.
 - `keys init` is a local command (`registry.LocalCommands`) that calls one operation.
 

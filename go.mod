@@ -5,6 +5,7 @@ go 1.27.0
 toolchain go1.27.4
 
 require (
+	filippo.io/age v1.3.2
 	github.com/caddyserver/caddy/v2 v2.11.9
 	github.com/coder/websocket v1.8.15
 	github.com/compose-spec/compose-go/v2 v2.17.0
@@ -21,6 +22,7 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/bigmod v0.1.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
+	filippo.io/hpke v0.4.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/DeRuina/timberjack v1.4.8 // indirect
