@@ -93,12 +93,15 @@ func decide(v view) step {
 		}
 	case "tests-locked":
 		switch {
+		// A check that passed on the current code needs no build round, even
+		// one never recorded: a build child with nothing left to change is
+		// rejected and only spends the budget.
+		case v.check != nil && v.checkFresh && v.check.OK:
+			return runStep("scripts/ship pr", id)
 		case v.r.done("build") == 0:
 			return v.child("build")
 		case v.check == nil || !v.checkFresh:
 			return runStep("scripts/verify check", id)
-		case v.check.OK:
-			return runStep("scripts/ship pr", id)
 		default:
 			return v.child("build", dir+checkFile)
 		}
