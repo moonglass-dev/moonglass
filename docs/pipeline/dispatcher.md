@@ -30,7 +30,7 @@ Never ask anyone a question. When something these rules do not cover goes wrong,
 A wake-up is a worker's completion. Workers finish only when their ticket is mergeable, merged, blocked or needs a human.
 
 1. Run `scripts/ticket-status --json`. If `stop` is true, end with `Stopped: .pipeline/STOP exists. Delete it and send "resume" to continue.`
-2. Merge. For each ID in `mergeable`, in order, run `scripts/ship merge <ID> --wait`. It waits for CI itself, for up to 40 minutes. A pull request that is behind `main` and has no checks is not waiting on CI: GitHub does not start a `pull_request` workflow while the branch conflicts, so the script merges `main` in first and the push starts `ci`. Read the JSON it prints:
+2. Merge. For each ID in `mergeable`, in order, run `scripts/ship merge <ID> --wait`. It waits for CI itself, for up to 40 minutes. A pull request that is behind `main` and has no checks is not waiting on CI: GitHub does not start a `pull_request` workflow while the branch conflicts, so the script merges `main` in first. That makes the pull request mergeable, and the `pull_request` workflow starts `ci`. Read the JSON it prints:
    - `"merge": "merged"`: go on.
    - `"merge": "waiting-ci"`: CI is still running after the wait. Leave it; the next turn tries again.
    - `"merge": "ci-red"` or `"conflict"` (exit 1): the script recorded the failure on the ticket branch. The ticket is now in `in_progress` and gets a worker in step 4.

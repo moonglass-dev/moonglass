@@ -5,10 +5,11 @@ on:
   push:
     branches:
       - main
-      # A conflicting pull request does not start a pull_request workflow.
-      # Pushes to ticket branches still run ci, so ship merge is not left
-      # waiting on a check that GitHub will never create.
-      - "p/**"
+      # Do not also run on p/*. A push to a ticket branch cannot read the
+      # pull request's Go build cache, so that second run compiles from
+      # scratch (about 12 minutes) and gh pr checks waits for it. A
+      # conflicting pull request has no pull_request run; ship merge merges
+      # main in first, and this workflow then runs on the updated pull request.
 
 permissions:
   contents: read
