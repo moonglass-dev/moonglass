@@ -118,6 +118,7 @@ if [ "$host_setup" -eq 1 ]; then
 	id "$PROXY_USER" >/dev/null 2>&1 ||
 		useradd --system --no-create-home --home-dir /var/lib/moonglass/proxy --shell /usr/sbin/nologin "$PROXY_USER" ||
 		die "cannot create user $PROXY_USER"
+	getent group moonglass-proxy-admin >/dev/null 2>&1 || groupadd --system moonglass-proxy-admin || die "cannot create group moonglass-proxy-admin"
 	install -d -m 0755 -o root -g root /etc/moonglass
 	systemctl daemon-reload || die "systemctl daemon-reload failed"
 fi

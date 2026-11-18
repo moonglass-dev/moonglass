@@ -24,18 +24,14 @@ import (
 )
 
 const (
-	adminSocketName      = "proxy-admin.sock"
+	// DefaultAdminSocket is the agent-facing guarded admin socket. It lives in
+	// the proxy unit's RuntimeDirectory, so the agent reaches it through the
+	// group moonglass-proxy-admin and no other user can traverse to it.
+	DefaultAdminSocket   = "/run/moonglass-proxy/admin.sock"
 	caddyAdminSocketName = "proxy-caddy.sock"
 	storageDirName       = "caddy"
 	autosaveName         = "caddy-autosave.json"
 )
-
-// AdminSocketPath is the Unix socket the agent talks to. It serves Caddy's
-// admin API through a guard that refuses configs which would move the admin
-// API to TCP or the certificate keys out of the data dir.
-func AdminSocketPath(dataDir string) string {
-	return filepath.Join(dataDir, adminSocketName)
-}
 
 func caddyAdminSocketPath(dataDir string) string {
 	return filepath.Join(dataDir, caddyAdminSocketName)
@@ -56,9 +52,10 @@ func StorageDir(dataDir string) string {
 }
 
 // Run starts Caddy with only its admin API on a Unix socket under dataDir, and
-// serves until ctx is done. The agent then pushes a complete JSON config to the
-// admin API. Caddy is process-global, so one Run at a time.
-func Run(ctx context.Context, dataDir string) error {
+// serves the guarded admin API on adminSocket until ctx is done. The agent then
+// pushes a complete JSON config to that API. Caddy's own admin socket stays at
+// <dataDir>/proxy-caddy.sock. Caddy is process-global, so one Run at a time.
+func Run(ctx context.Context, dataDir, adminSocket string) error {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fmt.Errorf("create proxy data dir %s: %w; check that the service user owns its parent", dataDir, err)
 	}
@@ -78,9 +75,9 @@ func Run(ctx context.Context, dataDir string) error {
 		return fmt.Errorf("encode initial proxy config: %w", err)
 	}
 	if err = caddy.Load(initial, true); err != nil {
-		return fmt.Errorf("start Caddy with its admin API on %s: %w; check that the data dir is writable and that no other proxy uses it", AdminSocketPath(dataDir), err)
+		return fmt.Errorf("start Caddy with its admin API on %s: %w; check that the data dir is writable and that no other proxy uses it", caddyAdminSocketPath(dataDir), err)
 	}
-	listener, err := listenAdmin(dataDir)
+	listener, err := listenAdmin(adminSocket)
 	if err != nil {
 		_ = caddy.Stop()
 		return err
@@ -92,7 +89,7 @@ func Run(ctx context.Context, dataDir string) error {
 	select {
 	case <-ctx.Done():
 	case err := <-served:
-		serveErr = fmt.Errorf("serve admin socket %s: %w", AdminSocketPath(dataDir), err)
+		serveErr = fmt.Errorf("serve admin socket %s: %w", adminSocket, err)
 	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

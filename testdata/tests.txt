@@ -2,6 +2,8 @@ moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollFailures
 moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollPrintsFingerprint
 moonglass.dev/moonglass/cmd/moonglass TestKeysInitFailures
 moonglass.dev/moonglass/cmd/moonglass TestKeysInitWritesRecoveryKeyFile
+moonglass.dev/moonglass/cmd/moonglass TestProxyAdminSocketDefault
+moonglass.dev/moonglass/cmd/moonglass TestProxyRejectsEmptyAdminSocket
 moonglass.dev/moonglass/cmd/moonglass TestUsageOnMissingOrUnknownCommand
 moonglass.dev/moonglass/cmd/moonglass TestVersionPrintsVersionCommitAndDate
 moonglass.dev/moonglass/cmd/moonglass TestVersionReportsFailedWrite
@@ -27,9 +29,12 @@ moonglass.dev/moonglass/internal/cli TestEverySubcommandIsGeneratedOrLocal
 moonglass.dev/moonglass/internal/cli TestGeneratedCLIIsCurrent
 moonglass.dev/moonglass/internal/cli TestGeneratedRunnerSendsBearerToken
 moonglass.dev/moonglass/internal/installtest TestInstallAcceptsEitherPinnedKey
+moonglass.dev/moonglass/internal/installtest TestInstallCreatesProxyAdminGroup
 moonglass.dev/moonglass/internal/installtest TestInstallRejectsBadSignatureWritesNothing
 moonglass.dev/moonglass/internal/installtest TestInstallVerifiesSignatureBeforeWriting
 moonglass.dev/moonglass/internal/installtest TestOnlyAgentHasDockerGroup
+moonglass.dev/moonglass/internal/installtest TestOnlyAgentJoinsProxyAdminGroup
+moonglass.dev/moonglass/internal/installtest TestProxyUnitOwnsAdminSocketDir
 moonglass.dev/moonglass/internal/installtest TestUnitsAreHardened
 moonglass.dev/moonglass/internal/keys FuzzParseKeyRecord
 moonglass.dev/moonglass/internal/keys TestAgentAgreeKeyAsAgeRecipient
@@ -113,7 +118,11 @@ moonglass.dev/moonglass/internal/protocol TestRunPreDeployRoundTrip
 moonglass.dev/moonglass/internal/protocol TestSwitchReleaseRoundTrip
 moonglass.dev/moonglass/internal/protocol TestWrapRejectsTypeMismatch
 moonglass.dev/moonglass/internal/proxy TestAdminAPIOnUnixSocket
+moonglass.dev/moonglass/internal/proxy TestAdminSocketAtGivenPath
+moonglass.dev/moonglass/internal/proxy TestAdminSocketModeAndGroup
+moonglass.dev/moonglass/internal/proxy TestAdminSocketRefusesNonSocketPath
 moonglass.dev/moonglass/internal/proxy TestAdminSocketRefusesOtherMutations
+moonglass.dev/moonglass/internal/proxy TestCaddyAdminSocketStaysPrivate
 moonglass.dev/moonglass/internal/proxy TestCounterRecordsRequest
 moonglass.dev/moonglass/internal/proxy TestNoTCPAdminPort
 moonglass.dev/moonglass/internal/proxy TestOneHTTPSRouteInternalIssuer

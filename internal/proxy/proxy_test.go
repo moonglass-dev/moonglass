@@ -20,22 +20,28 @@ import (
 
 const startTimeout = 15 * time.Second
 
-// startProxy runs the proxy in a short temp directory (unix socket paths are
-// limited to about 100 bytes) and returns the data dir and an admin client.
-func startProxy(t *testing.T) (string, *http.Client) {
+// tempProxyDir makes a short temp directory (unix socket paths are limited to
+// about 100 bytes) and removes it at cleanup.
+func tempProxyDir(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("/tmp", "mgproxy")
 	if err != nil {
-		t.Fatalf("create data dir: %v", err)
+		t.Fatalf("create temp dir: %v", err)
 	}
-	dataDir := dir + "/data"
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
 
+// runProxy runs the proxy with its guarded admin socket at sock and returns a
+// client that dials that socket.
+func runProxy(t *testing.T, dataDir, sock string) *http.Client {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	var runErr error
 	go func() {
 		defer close(done)
-		runErr = proxy.Run(ctx, dataDir)
+		runErr = proxy.Run(ctx, dataDir, sock)
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -43,7 +49,6 @@ func startProxy(t *testing.T) (string, *http.Client) {
 		if runErr != nil {
 			t.Errorf("proxy.Run: expected nil after cancel, got %v", runErr)
 		}
-		_ = os.RemoveAll(dir)
 	})
 
 	admin := &http.Client{
@@ -51,7 +56,7 @@ func startProxy(t *testing.T) (string, *http.Client) {
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				var d net.Dialer
-				return d.DialContext(ctx, "unix", proxy.AdminSocketPath(dataDir))
+				return d.DialContext(ctx, "unix", sock)
 			},
 		},
 	}
@@ -60,10 +65,10 @@ func startProxy(t *testing.T) (string, *http.Client) {
 		resp, err := admin.Get("http://localhost/config/")
 		if err == nil {
 			_ = resp.Body.Close()
-			return dataDir, admin
+			return admin
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("admin API not reachable on %s within %s: %v", proxy.AdminSocketPath(dataDir), startTimeout, err)
+			t.Fatalf("admin API not reachable on %s within %s: %v", sock, startTimeout, err)
 		}
 		select {
 		case <-done:
@@ -71,6 +76,16 @@ func startProxy(t *testing.T) (string, *http.Client) {
 		case <-time.After(50 * time.Millisecond):
 		}
 	}
+}
+
+// startProxy runs the proxy with its data dir and its guarded admin socket in a
+// short temp directory and returns both paths and an admin client.
+func startProxy(t *testing.T) (dataDir, sock string, admin *http.Client) {
+	t.Helper()
+	dir := tempProxyDir(t)
+	dataDir = dir + "/data"
+	sock = dir + "/admin.sock"
+	return dataDir, sock, runProxy(t, dataDir, sock)
 }
 
 func freePort(t *testing.T) int {
@@ -191,9 +206,8 @@ func get(t *testing.T, c *http.Client, url string) string {
 }
 
 func TestAdminAPIOnUnixSocket(t *testing.T) {
-	dataDir, admin := startProxy(t)
+	dataDir, sock, admin := startProxy(t)
 
-	sock := proxy.AdminSocketPath(dataDir)
 	info, err := os.Stat(sock)
 	if err != nil {
 		t.Fatalf("stat %s: %v", sock, err)
@@ -201,8 +215,8 @@ func TestAdminAPIOnUnixSocket(t *testing.T) {
 	if info.Mode()&os.ModeSocket == 0 {
 		t.Errorf("%s: expected a unix socket, got mode %v", sock, info.Mode())
 	}
-	if perm := info.Mode().Perm(); perm&0o077 != 0 {
-		t.Errorf("%s: expected mode 0600 or tighter, got %04o", sock, perm)
+	if perm := info.Mode().Perm(); perm != 0o660 {
+		t.Errorf("%s: expected mode 0660 exactly, got %04o", sock, perm)
 	}
 	dirInfo, err := os.Stat(dataDir)
 	if err != nil {
@@ -222,7 +236,7 @@ func TestAdminAPIOnUnixSocket(t *testing.T) {
 }
 
 func TestNoTCPAdminPort(t *testing.T) {
-	dataDir, admin := startProxy(t)
+	dataDir, _, admin := startProxy(t)
 	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer upstream.Close()
 	// A pushed config that carries the admin address must not open a TCP port.
@@ -242,7 +256,7 @@ func TestPushedConfigCannotOpenTCPAdmin(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", home)
-	dataDir, admin := startProxy(t)
+	dataDir, _, admin := startProxy(t)
 
 	fileStorage := map[string]any{"module": "file_system", "root": proxy.StorageDir(dataDir)}
 	adminSock := map[string]any{"listen": proxy.AdminListenAddress(dataDir)}
@@ -305,7 +319,7 @@ func TestPushedConfigCannotOpenTCPAdmin(t *testing.T) {
 }
 
 func TestAdminSocketRefusesOtherMutations(t *testing.T) {
-	_, admin := startProxy(t)
+	_, _, admin := startProxy(t)
 
 	for _, req := range []struct{ method, path string }{
 		{http.MethodPost, "/stop"},
@@ -336,7 +350,7 @@ func TestAdminSocketRefusesOtherMutations(t *testing.T) {
 }
 
 func TestOneHTTPSRouteInternalIssuer(t *testing.T) {
-	dataDir, admin := startProxy(t)
+	dataDir, _, admin := startProxy(t)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "hello from upstream")
 	}))
@@ -352,7 +366,7 @@ func TestOneHTTPSRouteInternalIssuer(t *testing.T) {
 }
 
 func TestCounterRecordsRequest(t *testing.T) {
-	dataDir, admin := startProxy(t)
+	dataDir, _, admin := startProxy(t)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "ok")
 	}))

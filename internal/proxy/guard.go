@@ -89,19 +89,33 @@ func mustJSON(v any) string {
 	return string(b)
 }
 
-// listenAdmin opens the guarded admin socket, mode 0600.
-func listenAdmin(dataDir string) (net.Listener, error) {
-	path := AdminSocketPath(dataDir)
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("remove stale admin socket %s: %w", path, err)
+// listenAdmin opens the guarded admin socket at path, mode 0660, with the
+// process's effective group. It never creates or chmods the parent directory:
+// the proxy unit's RuntimeDirectory does that.
+func listenAdmin(path string) (net.Listener, error) {
+	info, statErr := os.Lstat(path)
+	switch {
+	case statErr == nil:
+		if info.Mode()&os.ModeSocket == 0 {
+			return nil, fmt.Errorf("admin socket path %s exists and is not a socket; remove it or pass another --admin-socket", path)
+		}
+		if err := os.Remove(path); err != nil {
+			return nil, fmt.Errorf("remove stale admin socket %s: %w", path, err)
+		}
+	case !os.IsNotExist(statErr):
+		return nil, fmt.Errorf("inspect admin socket path %s: %w", path, statErr)
 	}
 	l, err := net.Listen("unix", path)
 	if err != nil {
-		return nil, fmt.Errorf("listen on admin socket %s: %w", path, err)
+		return nil, fmt.Errorf("listen on admin socket %s: %w; check that its directory exists and is writable (the proxy unit's RuntimeDirectory creates /run/moonglass-proxy)", path, err)
 	}
-	if err := os.Chmod(path, 0o600); err != nil {
+	if err := os.Chown(path, -1, os.Getegid()); err != nil {
 		_ = l.Close()
-		return nil, fmt.Errorf("restrict admin socket %s to its owner: %w", path, err)
+		return nil, fmt.Errorf("set group of admin socket %s to gid %d: %w", path, os.Getegid(), err)
+	}
+	if err := os.Chmod(path, 0o660); err != nil { //nolint:gosec // G302: group members (the agent) must connect; the runtime dir is 0750.
+		_ = l.Close()
+		return nil, fmt.Errorf("set admin socket %s to mode 0660: %w", path, err)
 	}
 	return l, nil
 }

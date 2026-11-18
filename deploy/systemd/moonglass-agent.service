@@ -7,7 +7,7 @@ Requires=docker.service
 [Service]
 Type=simple
 User=moonglass
-SupplementaryGroups=docker
+SupplementaryGroups=docker moonglass-proxy-admin
 EnvironmentFile=/etc/moonglass/agent.env
 ExecStart=/usr/local/bin/moonglass agent connect --data-dir /var/lib/moonglass/agent --url ${MOONGLASS_URL}
 Restart=on-failure

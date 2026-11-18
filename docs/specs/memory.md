@@ -12,7 +12,7 @@ The hard ceiling is **102400 KiB** (100 MiB) for the sum of the two processes' R
 
 1. Builds the static binary (`CGO_ENABLED=0`, no `-race`) into a temp dir, so the sample is the shipped build.
 2. Starts a control plane in the test process on `127.0.0.1:0` (enrolment over plain HTTP, agent endpoint over TLS 1.3 WSS) and enrols an agent into a temp data dir.
-3. Starts `moonglass proxy --data-dir <temp>` and `moonglass agent connect --data-dir <temp> --url https://<loopback>` as real processes.
+3. Starts `moonglass proxy --data-dir <temp> --admin-socket <temp>` and `moonglass agent connect --data-dir <temp> --url https://<loopback>` as real processes.
 4. Waits until the agent has reached the control plane and the proxy admin socket exists, then lets both sit idle for 3 seconds. Nothing is deployed and no requests are made.
 5. Samples each process once with `scripts/measure-memory --pid PID` and fails if proxy plus agent is greater than 102400 KiB. The failure message names both values.
 

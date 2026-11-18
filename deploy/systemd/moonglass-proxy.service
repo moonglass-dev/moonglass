@@ -6,11 +6,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=moonglass-proxy
+Group=moonglass-proxy-admin
 ExecStart=/usr/local/bin/moonglass proxy --data-dir /var/lib/moonglass/proxy
 Restart=on-failure
 RestartSec=2
 StateDirectory=moonglass/proxy
 StateDirectoryMode=0700
+RuntimeDirectory=moonglass-proxy
+RuntimeDirectoryMode=0750
 MemoryMax=64M
 NoNewPrivileges=true
 AmbientCapabilities=CAP_NET_BIND_SERVICE

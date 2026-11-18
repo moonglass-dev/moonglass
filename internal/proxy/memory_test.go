@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"moonglass.dev/moonglass/internal/agent"
-	"moonglass.dev/moonglass/internal/proxy"
 	"moonglass.dev/moonglass/internal/server"
 	"moonglass.dev/moonglass/internal/store/sqlite"
 )
@@ -149,7 +148,8 @@ func TestProxyAndAgentIdleUnderBudget(t *testing.T) {
 	go func() { _ = srv.Serve(tls.NewListener(ln, cfg)) }()
 	t.Cleanup(func() { _ = srv.Close() })
 
-	proxyCmd := startProcess(t, "proxy", bin, "proxy", "--data-dir", filepath.Join(tmp, "proxy"))
+	adminSock := filepath.Join(tmp, "admin.sock")
+	proxyCmd := startProcess(t, "proxy", bin, "proxy", "--data-dir", filepath.Join(tmp, "proxy"), "--admin-socket", adminSock)
 	agentCmd := startProcess(t, "agent", bin, "agent", "connect", "--data-dir", agentDir, "--url", "https://"+ln.Addr().String())
 
 	deadline := time.Now().Add(startTimeout)
@@ -160,11 +160,11 @@ func TestProxyAndAgentIdleUnderBudget(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	for {
-		if _, err := os.Stat(proxy.AdminSocketPath(filepath.Join(tmp, "proxy"))); err == nil {
+		if _, err := os.Stat(adminSock); err == nil {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("proxy admin socket did not appear within %s", startTimeout)
+			t.Fatalf("proxy admin socket %s did not appear within %s", adminSock, startTimeout)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}

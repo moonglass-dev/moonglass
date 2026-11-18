@@ -1,0 +1,17 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "938ec77266555f77ba330f2fcb3d32e540364245",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "docs/specs/install.md",
+      "line": 41,
+      "issue": "The Agent and Proxy unit bullets (lines 41 and 42) still say \"(from W2-12)\", but Scope says install.md drops the \"(from W2-12)\" markers. Only the \"(W2-12)\" marker on line 14 was removed.",
+      "scenario": "After merge, a reader of install.md sees the agent's moonglass-proxy-admin group and the proxy's RuntimeDirectory described as future W2-12 work, though they ship in this change."
+    }
+  ]
+}
