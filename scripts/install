@@ -29,6 +29,29 @@ die() {
 	exit 1
 }
 
+warn() {
+	printf 'moonglass-install: %s\n' "$*" >&2
+	return 0
+}
+
+# git_version_ok succeeds when git is 2.30 or later. Its output is captured
+# first so git's own exit status counts, since POSIX sh has no pipefail. awk
+# only compares the text; nothing here is evaluated.
+git_version_ok() {
+	command -v git >/dev/null 2>&1 || return 1
+	git_out="$(git --version 2>/dev/null)" || return 1
+	printf '%s\n' "$git_out" | awk 'NR == 1 {
+		ok = $1 == "git" && $2 == "version" && $3 ~ /^[0-9]+\.[0-9]+/
+		split($3, v, ".")
+		ok = ok && (v[1] + 0 > 2 || (v[1] + 0 == 2 && v[2] + 0 >= 30))
+	} END { exit !ok }'
+}
+
+# buildx_ok succeeds when the Docker CLI and its buildx plugin are present.
+buildx_ok() {
+	command -v docker >/dev/null 2>&1 && docker buildx version >/dev/null 2>&1
+}
+
 from="$RELEASE_URL"
 signers=""
 prefix=""
@@ -122,5 +145,9 @@ if [ "$host_setup" -eq 1 ]; then
 	install -d -m 0755 -o root -g root /etc/moonglass
 	systemctl daemon-reload || die "systemctl daemon-reload failed"
 fi
+
+# Build prerequisites (docs/specs/build.md "Host requirements"): a warning, never a failure.
+git_version_ok || warn "git 2.30 or later not found; git builds need it, image deploys work without it"
+buildx_ok || warn "docker buildx plugin not found; git builds need it, image deploys work without it"
 
 printf 'moonglass-install: installed %s/bin/moonglass and the units in %s\n' "$prefix" "$unit_dir" >&2

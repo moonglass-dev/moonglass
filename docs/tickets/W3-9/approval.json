@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "The five named tests are in package installtest and the diff only adds internal/installtest/build_prereqs_test.go. The unit test requires one Service.MemoryMax of 512M on the agent and 64M on the proxy. The install tests use per-test PATH shims under t.TempDir, require exit 0 with the binary and both units installed, and count stderr lines for git 2.30, buildx, and git builds across the six version strings, a missing buildx plugin, a docker that exits 127, both tools present, and both missing. The present case also records that git is invoked as --version and docker as buildx version. Existing tests are untouched. These runs use the custom layout from runInstall, so a warning has to appear on that path, and nothing in the new file skips, waits, or uses a fixed port or the network."
+}
