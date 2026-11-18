@@ -187,7 +187,11 @@ moonglass.dev/moonglass/internal/store TestEnrolmentTokenStoredHashedOnly
 moonglass.dev/moonglass/internal/store TestLookupTablesMatchSchema
 moonglass.dev/moonglass/internal/store TestMigrateIdempotent
 moonglass.dev/moonglass/internal/store TestPostgresMissingOrgFilterReturnsNothing
+moonglass.dev/moonglass/internal/store TestPostgresRLSOnProjectTables
 moonglass.dev/moonglass/internal/store TestPostgresRLSOnTokenAndAuditTables
+moonglass.dev/moonglass/internal/store TestProjectNamesValidated
+moonglass.dev/moonglass/internal/store TestProjectsConformancePostgres
+moonglass.dev/moonglass/internal/store TestProjectsConformanceSQLite
 moonglass.dev/moonglass/internal/store TestSchemasMatch
 moonglass.dev/moonglass/internal/store TestTokenAuditTablesHaveRLS
 moonglass.dev/moonglass/internal/store TestTokensAndAuditSQLite

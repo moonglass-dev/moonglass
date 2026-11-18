@@ -36,6 +36,7 @@ func (r Role) Valid() bool {
 var (
 	ErrNotFound     = errors.New("store: not found")
 	ErrDuplicate    = errors.New("store: already exists")
+	ErrInvalidName  = errors.New("store: invalid name")
 	ErrTokenUsed    = errors.New("store: enrolment token already used")
 	ErrTokenExpired = errors.New("store: enrolment token expired")
 )
@@ -53,6 +54,34 @@ type Server struct {
 	ID        string
 	PublicKey string
 	CreatedAt string
+}
+
+// Project is one project of an org.
+type Project struct {
+	OrgID     string
+	ID        string
+	Name      string
+	CreatedAt string
+}
+
+// Environment is one environment of a project.
+type Environment struct {
+	OrgID     string
+	ID        string
+	ProjectID string
+	Name      string
+	CreatedAt string
+}
+
+// Service is one service of an environment, on exactly one server.
+type Service struct {
+	OrgID         string
+	ID            string
+	ProjectID     string
+	EnvironmentID string
+	Name          string
+	ServerID      string
+	CreatedAt     string
 }
 
 // TokenInfo describes an enrolment token without revealing its hash.
@@ -112,6 +141,27 @@ type Store interface {
 	AddServer(ctx context.Context, orgID, publicKey string) (Server, error)
 	ServerByPublicKey(ctx context.Context, publicKey string) (Server, error)
 	Servers(ctx context.Context, orgID string) ([]Server, error)
+	// CreateProject returns ErrInvalidName for a name outside the name format
+	// and ErrDuplicate when the org already has that name.
+	CreateProject(ctx context.Context, orgID, name string) (Project, error)
+	// Projects returns the org's projects ordered by name.
+	Projects(ctx context.Context, orgID string) ([]Project, error)
+	// CreateEnvironment returns ErrInvalidName for a name outside the name
+	// format, ErrNotFound when projectID is not in orgID, and ErrDuplicate for
+	// a repeated name in the project.
+	CreateEnvironment(ctx context.Context, orgID, projectID, name string) (Environment, error)
+	// Environments returns the project's environments ordered by name.
+	Environments(ctx context.Context, orgID, projectID string) ([]Environment, error)
+	// CreateService returns ErrInvalidName for a name outside the name format,
+	// ErrNotFound when environmentID or serverID is not in orgID, and
+	// ErrDuplicate for a repeated name in the environment.
+	CreateService(ctx context.Context, orgID, environmentID, name, serverID string) (Service, error)
+	// Services returns the environment's services ordered by name.
+	Services(ctx context.Context, orgID, environmentID string) ([]Service, error)
+	// ResolveTarget resolves project and environment names to their ids in the
+	// org. An empty environment resolves the project only and returns an empty
+	// environment id. ErrNotFound when either name is not the org's.
+	ResolveTarget(ctx context.Context, orgID, project, environment string) (projectID, environmentID string, err error)
 	// AddEnrolmentToken stores tokenHash (see HashToken); the caller chooses expires.
 	AddEnrolmentToken(ctx context.Context, orgID, tokenHash string, expires time.Time) error
 	// UseEnrolmentToken marks the token used and returns its org. It returns
