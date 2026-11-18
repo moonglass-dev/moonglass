@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
-
 	"moonglass.dev/moonglass/internal/store"
 )
 
@@ -470,9 +468,9 @@ func TestPostgresRLSOnProjectTables(t *testing.T) {
 					}
 					return
 				}
-				var pgErr *pgconn.PgError
-				if !errors.As(err, &pgErr) || pgErr.Code != "42501" {
-					t.Errorf("INSERT INTO %s for org %s under app.org_id=%s error = %v, want pgconn.PgError code %q", ins.table, tc.org, a.orgID, err, "42501")
+				var sqlState interface{ SQLState() string }
+				if !errors.As(err, &sqlState) || sqlState.SQLState() != "42501" {
+					t.Errorf("INSERT INTO %s for org %s under app.org_id=%s error = %v, want SQLSTATE %q", ins.table, tc.org, a.orgID, err, "42501")
 				}
 			})
 		}
