@@ -69,7 +69,7 @@ Review tickets (drift reviews, docs only) always skip model review: their output
 `scripts/ticket-status` lists it under `attention`, with the reason. `docs/tickets/<ID>/BLOCKED.md` holds the reason and the status it stopped at. For `needs-human`, the reason is also in `<ID>/plan.md`.
 
 1. Fix the cause on `main` in a normal PR: edit the ticket, the spec, the ADR, or the plan line.
-2. Run `scripts/ticket-status set <ID> resume`. It returns the ticket to the status it stopped at (`todo` for needs-human, with the plan discarded), deletes `BLOCKED.md`, and resets the step budget.
+2. Run `scripts/ticket-status set <ID> resume`. It merges `origin/main` into the branch, so the fix from step 1 reaches it, returns the ticket to the status it stopped at (`todo` for needs-human, with the plan discarded), deletes `BLOCKED.md`, and resets the step budget. Completed-step counts carry over, so a step that already ran is not repeated. If the merge conflicts, resume stops: merge `main` into `p/<ID>` by hand, push, and resume again.
 3. The dispatcher's next turn restarts its worker.
 
 To stop a ticket yourself: `scripts/ticket-status set <ID> blocked --reason "<why>"`.

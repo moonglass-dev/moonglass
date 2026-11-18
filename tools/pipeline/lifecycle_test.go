@@ -337,6 +337,62 @@ func TestBlockedChildStopsOnlyItsTicketAndResumes(t *testing.T) {
 	r.expectStep("ticket")
 }
 
+func TestResumeTakesMainAndKeepsCounting(t *testing.T) {
+	r := newTestRepo(t)
+	r.mustRun("ticket-status", "start", "T-1")
+	r.expectStep("ticket")
+	writeT(t, r.dir, ticketPath("T-1"), completeTicket("T-1", "low", "[pkg/]"))
+	r.mustRun("verify", "record", "T-1")
+	r.expectStep("plan")
+	writeT(t, r.dir, ticketDir("T-1")+planFile, readyPlan)
+	r.mustRun("verify", "record", "T-1")
+	r.expectStep("scripts/verify lock T-1")
+	r.mustRun("verify", "lock", "T-1")
+
+	// A red build round, then the worker stops the ticket.
+	r.e.runCI = func(string) (string, error) { return "FAIL", errors.New("make ci failed") }
+	r.expectStep("build")
+	writeT(t, r.dir, "pkg/hello.txt", "hello\n")
+	if rec := r.mustRun("verify", "record", "T-1"); rec["check_ok"] != false {
+		t.Fatalf("record build = %v, want check_ok false", rec)
+	}
+	r.mustRun("ticket-status", "set", "T-1", "blocked", "--reason", "make ci is red")
+
+	// The owner fixes the cause on main.
+	other := filepath.Join(t.TempDir(), "other")
+	mustGit(t, r.dir, "clone", "--quiet", "--branch", "main", mustOrigin(t, r.dir), other)
+	writeT(t, other, "docs/fix.md", "fixed\n")
+	mustGit(t, other, "add", "-A")
+	mustGit(t, other, "commit", "--quiet", "-m", "fix on main")
+	mustGit(t, other, "push", "--quiet", "origin", "main")
+
+	if res := r.mustRun("ticket-status", "set", "T-1", "resume"); res["status"] != "tests-locked" {
+		t.Fatalf("resume = %v, want status tests-locked", res)
+	}
+	if _, err := git(r.dir, "merge-base", "--is-ancestor", "origin/main", "HEAD"); err != nil {
+		t.Fatalf("p/T-1 does not contain origin/main after resume: %v", err)
+	}
+	// Main moved the code under the old check, so it is checked again, not built again.
+	r.expectStep("scripts/verify check T-1")
+	if _, err := r.run("verify", "check", "T-1"); err == nil {
+		t.Fatalf("verify check with make ci red: err = nil, want a failure")
+	}
+	r.expectStep("build")
+	writeT(t, r.dir, "pkg/hello.txt", "hello, again\n")
+	r.e.runCI = func(string) (string, error) { return "ok", nil }
+	if rec := r.mustRun("verify", "record", "T-1"); rec["check_ok"] != true {
+		t.Fatalf("record build after resume = %v, want check_ok true", rec)
+	}
+	rd, err := loadRounds(fsTree{r.dir}, "T-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rd.done("build"); got != 2 {
+		t.Errorf("done:build after a build round on each side of the resume = %d, want 2", got)
+	}
+	r.expectStep("scripts/ship pr T-1")
+}
+
 func TestStepLimitBlocks(t *testing.T) {
 	r := newTestRepo(t)
 	r.mustRun("ticket-status", "start", "T-1")

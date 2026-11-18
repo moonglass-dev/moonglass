@@ -92,15 +92,18 @@ func decide(v view) step {
 			return v.child("tests", dir+approvalFile)
 		}
 	case "tests-locked":
+		// An existing check decides before the build count does: code that is
+		// already on the branch is checked again, not built again, because a
+		// build child with nothing left to change is rejected and only spends
+		// the budget.
 		switch {
-		// A check that passed on the current code needs no build round, even
-		// one never recorded: a build child with nothing left to change is
-		// rejected and only spends the budget.
-		case v.check != nil && v.checkFresh && v.check.OK:
+		case v.check != nil && !v.checkFresh:
+			return runStep("scripts/verify check", id)
+		case v.check != nil && v.check.OK:
 			return runStep("scripts/ship pr", id)
-		case v.r.done("build") == 0:
+		case v.check == nil && v.r.done("build") == 0:
 			return v.child("build")
-		case v.check == nil || !v.checkFresh:
+		case v.check == nil:
 			return runStep("scripts/verify check", id)
 		default:
 			return v.child("build", dir+checkFile)
@@ -379,6 +382,14 @@ func cmdSet(e *env, id, status, reason string) error {
 func resume(e *env, dir, id string, t ticket) error {
 	if t.Status != "blocked" && t.Status != "needs-human" {
 		return fmt.Errorf("%s is %s, not blocked or needs-human", id, t.Status)
+	}
+	// The cause of a stop is fixed on main, so the branch takes main first.
+	if err := fetch(e); err != nil {
+		return err
+	}
+	if _, err := git(dir, "merge", "--quiet", "--no-edit", "origin/main"); err != nil {
+		_, _ = git(dir, "merge", "--abort")
+		return fmt.Errorf("merge origin/main into %s: %w; merge it by hand on the branch, push, and resume again", branchRef(id), err)
 	}
 	bpath := filepath.Join(dir, filepath.FromSlash(ticketDir(id)+blockedFile))
 	note, _ := os.ReadFile(bpath)

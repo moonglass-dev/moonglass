@@ -202,7 +202,9 @@ func cmdRecord(e *env, id string) error {
 			return err
 		}
 	}
-	r.Counts["done:"+c.Step] = c.Round
+	// done counts every accepted round over the ticket's life. The round
+	// number restarts at 1 after a resume, so it cannot order steps.
+	r.Counts["done:"+c.Step]++
 	r.Claim = nil
 	if err := writeFile(dir, ticketDir(id)+roundsFile, encodeJSON(r)); err != nil {
 		return err
