@@ -142,7 +142,7 @@ func TestDestructiveBelowAdminIsRejected(t *testing.T) {
 }
 
 func TestRoleAndScopeAreEnforced(t *testing.T) {
-	proj := registry.Target{ProjectID: "p1", EnvironmentID: "e1"}
+	proj := registry.Target{Project: "web", Environment: "prod"}
 	tests := []struct {
 		name    string
 		role    store.Role
@@ -169,13 +169,33 @@ func TestRoleAndScopeAreEnforced(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newEnv(t)
+			ctx := context.Background()
+			project, err := e.st.CreateProject(ctx, e.orgID, "web")
+			if err != nil {
+				t.Fatalf("CreateProject(%q) error = %v, want nil", "web", err)
+			}
+			environment, err := e.st.CreateEnvironment(ctx, e.orgID, project.ID, "prod")
+			if err != nil {
+				t.Fatalf("CreateEnvironment(%q, %q) error = %v, want nil", project.ID, "prod", err)
+			}
 			effects := 0
 			op, err := registry.Register(e.reg, registry.Spec{Name: "t.op", Method: "POST", Path: "/v1/t", MinRole: tt.minRole, Destructive: tt.destr},
 				func(context.Context, registry.Call, empty) (empty, error) { effects++; return empty{}, nil })
 			if err != nil {
 				t.Fatalf("Register error = %v, want nil", err)
 			}
-			p := e.principal(tt.role, tt.scopes...)
+			ids := map[string]string{"p1": project.ID, "e1": environment.ID}
+			scopes := make([]registry.Scope, len(tt.scopes))
+			for i, row := range tt.scopes {
+				if id, ok := ids[row.Project]; ok {
+					row.Project = id
+				}
+				if id, ok := ids[row.Environment]; ok {
+					row.Environment = id
+				}
+				scopes[i] = row
+			}
+			p := e.principal(tt.role, scopes...)
 			p.Agent = tt.agent
 			_, err = registry.Invoke(context.Background(), e.reg, op, p, tt.target, empty{})
 			if !errors.Is(err, tt.wantErr) || (tt.wantErr == nil && err != nil) {
