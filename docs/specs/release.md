@@ -153,6 +153,11 @@ The control plane runs at most one deploy per service and queues at most one mor
 - Exit code 0: apply `PreDeployDone(id, true)`, start the candidate container, and answer `SUCCEEDED`. Any other exit code, a kill or an Engine error: apply `PreDeployDone(id, false)`, remove the candidate container, write the row as `aborted`, and answer `FAILED` with `pre-deploy step exited with code <n>; its output is in the logs of container mg-<app_id>-<release_id>-pre`. The old release keeps serving.
 - The step's output is never put in the result, which the control plane stores: an app can print its own environment. The one-off container is kept, stopped, so its logs stay readable, until its release is retired.
 - `reversible` is stored in `pre_deploy_reversible` for auto-rollback (W4-3). It does not change these steps.
+- **Order.** An unknown app is `REJECTED` before anything is read. The transition is checked next, so a release that is not the pending candidate, a candidate deployed without `has_pre_deploy` and a second `RunPreDeploy` are `REJECTED` with the stored state unchanged. Only then are the candidate's record read and the step's spec checked.
+- **Policy rejection.** A `Rejection` of the step's spec is `REJECTED` with the rendered rejection as `detail`: nothing is created and no state or row is written.
+- **Leftover step container.** A container already at `mg-<app_id>-<release_id>-pre` follows the candidate's leftover rule: one carrying `dev.moonglass.managed=true` with the same app and release is removed first, and any other container fails the step and is left in place.
+- **Candidate start.** A candidate that fails to start after exit 0 aborts like an Engine error: the candidate is removed, the row is `aborted` and the answer is `FAILED`.
+- Every Engine call other than the wait keeps the 60-second limit; the wait holds the step's 15-minute limit and kills the container over it.
 
 ## Tests that need Docker
 

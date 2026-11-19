@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All nine named tests are in packages deploy and state. The diff only adds internal/deploy/predeploy_test.go, internal/agent/state/predeploy_test.go, and argv modes on testdata/server while keeping the no-args HTTP server. Docker tests use testEngine/testProject: skip without an Engine unless CI, imported images, per-run project labels and cleanup, temp agent.db, unique app IDs. The timeout test shortens the unexported 15-minute limit and bounds elapsed time well under the sleep; RecordPreDeployOutcome covers success, abort, and refusals including a ready candidate. testdata/tests.txt does not list these tests yet."
+}

@@ -25,6 +25,7 @@ const dbName = "agent.db"
 const (
 	statusCandidate = "candidate"
 	statusFailed    = "failed"
+	statusAborted   = "aborted"
 )
 
 //go:embed migrations/*.sql
@@ -129,6 +130,19 @@ const selectApp = `SELECT a.project, a.environment, a.service, a.phase,
 // App returns the stored binding and release state of appID. known is false
 // when the app has never been deployed here, and the other values are zero.
 func (d *DB) App(ctx context.Context, appID string) (Binding, release.State, bool, error) {
+	binding, st, known, err := readState(ctx, d.db, appID)
+	if err != nil {
+		return Binding{}, release.State{}, false, fmt.Errorf("read app %s from agent state %s: %w", appID, d.path, err)
+	}
+	return binding, st, known, nil
+}
+
+// readState reads one app's binding and release state through q, which is
+// either the database or one of its transactions.
+func readState(ctx context.Context, q interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, appID string,
+) (Binding, release.State, bool, error) {
 	var (
 		binding      Binding
 		phase        string
@@ -139,7 +153,7 @@ func (d *DB) App(ctx context.Context, appID string) (Binding, release.State, boo
 		candidateID  sql.NullString
 		candImage    sql.NullString
 	)
-	err := d.db.QueryRowContext(ctx, selectApp, appID).Scan(
+	err := q.QueryRowContext(ctx, selectApp, appID).Scan(
 		&binding.Project, &binding.Environment, &binding.Service, &phase,
 		&currentID, &currentImage,
 		&previousID, &prevImage,
@@ -149,11 +163,11 @@ func (d *DB) App(ctx context.Context, appID string) (Binding, release.State, boo
 		return Binding{}, release.State{}, false, nil
 	}
 	if err != nil {
-		return Binding{}, release.State{}, false, fmt.Errorf("read app %s from agent state %s: %w", appID, d.path, err)
+		return Binding{}, release.State{}, false, err
 	}
 	parsed, err := parsePhase(phase)
 	if err != nil {
-		return Binding{}, release.State{}, false, fmt.Errorf("read app %s from agent state %s: %w", appID, d.path, err)
+		return Binding{}, release.State{}, false, err
 	}
 	return binding, release.State{
 		Current:   storedRelease(currentID, currentImage),
@@ -161,6 +175,35 @@ func (d *DB) App(ctx context.Context, appID string) (Binding, release.State, boo
 		Candidate: storedRelease(candidateID, candImage),
 		Phase:     parsed,
 	}, true, nil
+}
+
+const selectReleaseRecord = `SELECT image_ref, image_id, repo_digest, port, health_path, domains, has_pre_deploy, container_id
+	FROM releases WHERE app_id = ? AND release_id = ?`
+
+// Release returns the stored record of one release of one app. found is false
+// when there is no such row, and the other values are zero.
+func (d *DB) Release(ctx context.Context, appID, releaseID string) (Record, bool, error) {
+	var (
+		rec          Record
+		domains      string
+		hasPreDeploy int64
+	)
+	err := d.db.QueryRowContext(ctx, selectReleaseRecord, appID, releaseID).Scan(
+		&rec.ImageRef, &rec.ImageID, &rec.RepoDigest, &rec.Port, &rec.HealthPath, &domains, &hasPreDeploy, &rec.ContainerID,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Record{}, false, nil
+	}
+	if err != nil {
+		return Record{}, false, fmt.Errorf("read release %s of app %s from agent state %s: %w", releaseID, appID, d.path, err)
+	}
+	if err := json.Unmarshal([]byte(domains), &rec.Domains); err != nil {
+		return Record{}, false, fmt.Errorf("read release %s of app %s from agent state %s: decode domains: %w", releaseID, appID, d.path, err)
+	}
+	rec.AppID = appID
+	rec.ReleaseID = releaseID
+	rec.HasPreDeploy = hasPreDeploy != 0
+	return rec, true, nil
 }
 
 func storedRelease(id, image sql.NullString) *release.Release {
@@ -246,6 +289,86 @@ func (d *DB) RecordCandidate(ctx context.Context, b Binding, r Record, state rel
 		return fmt.Errorf("record candidate %s of app %s: %w", r.ReleaseID, r.AppID, err)
 	}
 	return nil
+}
+
+// RecordPreDeploy records a pre-deploy outcome in one transaction: the release
+// row's pre_deploy_reversible, and on abort its status, error and empty
+// container_id, plus the app's new release state. It writes nothing and returns
+// an error when next does not follow from the stored state of that release, so
+// only the pending candidate's outcome is ever recorded. detail is stored as
+// given and never logged.
+func (d *DB) RecordPreDeploy(ctx context.Context, appID, releaseID string, next release.State, reversible bool, detail string) error {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, stored, known, err := readState(ctx, tx, appID)
+	if err != nil {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if !known {
+		return fmt.Errorf("record pre-deploy outcome of release %s: app %s is not in agent state; deploy it first", releaseID, appID)
+	}
+	want, err := stored.PreDeployDone(releaseID, next.Candidate != nil)
+	if err != nil {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if !sameState(want, next) {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: the given state does not follow from the stored one; record the state PreDeployDone returned", releaseID, appID)
+	}
+
+	reversibleValue := 0
+	if reversible {
+		reversibleValue = 1
+	}
+	var res sql.Result
+	if next.Candidate != nil {
+		res, err = tx.ExecContext(ctx,
+			`UPDATE releases SET pre_deploy_reversible = ? WHERE app_id = ? AND release_id = ? AND status = ?`,
+			reversibleValue, appID, releaseID, statusCandidate)
+	} else {
+		res, err = tx.ExecContext(ctx,
+			`UPDATE releases SET pre_deploy_reversible = ?, status = ?, error = ?, container_id = ''
+			WHERE app_id = ? AND release_id = ? AND status = ?`,
+			reversibleValue, statusAborted, detail, appID, releaseID, statusCandidate)
+	}
+	if err != nil {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: write releases row: %w", releaseID, appID, err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: count updated rows: %w", releaseID, appID, err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: the release row is not the pending candidate; nothing was written", releaseID, appID)
+	}
+
+	if _, err = tx.ExecContext(ctx,
+		`UPDATE apps SET current_release_id = ?, previous_release_id = ?, candidate_release_id = ?, phase = ?
+		WHERE app_id = ?`,
+		nullID(next.Current), nullID(next.Previous), nullID(next.Candidate), next.Phase.String(), appID); err != nil {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: write apps row: %w", releaseID, appID, err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
+	}
+	return nil
+}
+
+// sameState reports whether two states name the same releases and phase. Only
+// the ids are compared: the machine keeps the stored images.
+func sameState(a, b release.State) bool {
+	return sameRelease(a.Current, b.Current) && sameRelease(a.Previous, b.Previous) &&
+		sameRelease(a.Candidate, b.Candidate) && a.Phase == b.Phase
+}
+
+func sameRelease(a, b *release.Release) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.ID == b.ID
 }
 
 // RecordFailed records a failed release in one transaction. It never creates or

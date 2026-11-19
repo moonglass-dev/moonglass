@@ -1,0 +1,4 @@
+# base 292fe63e15e97ef557b1e5941a058dbd8a97fb50
+e1ef9decb28adc73549da49faebba6d547aad7b967134e393d5c6eeb947209b2  internal/agent/state/predeploy_test.go
+f380e9ebbfc93b8179605efb26ac3d54f9def22acf0198ff8bce25a5f0466498  internal/deploy/predeploy_test.go
+ef76d279f64788b3ebc00497dc8962737ebd429cd6529874a2cdd0457e1914a2  internal/deploy/testdata/server/main.go

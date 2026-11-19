@@ -1,0 +1,29 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "bd5a17a197a3c32cfab5e661412b4338b33e5773",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "docs/specs/release.md",
+      "line": 156,
+      "issue": "The new Order rule says an unknown app is REJECTED 'before anything is read', but RunPreDeploy reads the app row first (db.App), and a failure of that read is FAILED, not REJECTED.",
+      "scenario": "A reader of the spec expects a database read error on an unknown app to be REJECTED; internal/deploy/predeploy.go:53 answers FAILED with 'read app \u003cid\u003e: ...'."
+    },
+    {
+      "file": "internal/deploy/predeploy.go",
+      "line": 111,
+      "issue": "When the abort's RecordPreDeploy fails, the candidate container has already been force-removed but the stored state stays pending with the old container_id, and the answer carries that pending state.",
+      "scenario": "The agent database is briefly locked during the abort: the result is FAILED with the candidate still pending; a re-sent RunPreDeploy runs the step again, then fails to start the removed candidate and aborts. Nothing is lost and the old release keeps serving."
+    },
+    {
+      "file": "internal/deploy/predeploy_test.go",
+      "line": 357,
+      "issue": "TestRunPreDeployFailureAbortsDeploy compares Current and Previous only when both are empty, so a Docker-level regression that cleared a non-empty Current on abort would not be caught here (TestRecordPreDeployOutcome covers it at the state layer only).",
+      "scenario": "An abort path that recorded the zero state instead of PreDeployDone(id, false) would still pass this test because Current and Previous were already nil."
+    }
+  ]
+}

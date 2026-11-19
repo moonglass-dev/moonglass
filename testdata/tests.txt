@@ -34,6 +34,7 @@ moonglass.dev/moonglass/internal/agent/state TestRecordCandidateIsAtomic
 moonglass.dev/moonglass/internal/agent/state TestRecordCandidateKeepsBinding
 moonglass.dev/moonglass/internal/agent/state TestRecordCandidateRejectsOtherBinding
 moonglass.dev/moonglass/internal/agent/state TestRecordFailedLeavesStateUnchanged
+moonglass.dev/moonglass/internal/agent/state TestRecordPreDeployOutcome
 moonglass.dev/moonglass/internal/agent/state TestRecordStoresTextVerbatim
 moonglass.dev/moonglass/internal/api TestEveryMountedRouteIsOperationOrAllowlisted
 moonglass.dev/moonglass/internal/api TestGeneratedOpenAPIIsCurrent
@@ -53,9 +54,17 @@ moonglass.dev/moonglass/internal/deploy TestDeployResolvesRegistryImages
 moonglass.dev/moonglass/internal/deploy TestDeployWithPreDeployLeavesContainerCreated
 moonglass.dev/moonglass/internal/deploy TestEngineAPIVersionFloor
 moonglass.dev/moonglass/internal/deploy TestEngineCallDeadlines
+moonglass.dev/moonglass/internal/deploy TestPreDeploySpecDerivesFromCandidate
 moonglass.dev/moonglass/internal/deploy TestReconcileKeepsReferencedReleases
 moonglass.dev/moonglass/internal/deploy TestReconcileRemovesUnreferencedContainers
 moonglass.dev/moonglass/internal/deploy TestResolveRefParsing
+moonglass.dev/moonglass/internal/deploy TestRunPreDeployEngineErrorAborts
+moonglass.dev/moonglass/internal/deploy TestRunPreDeployFailureAbortsDeploy
+moonglass.dev/moonglass/internal/deploy TestRunPreDeployOutputStaysOutOfResult
+moonglass.dev/moonglass/internal/deploy TestRunPreDeployRejectsIllegalTransition
+moonglass.dev/moonglass/internal/deploy TestRunPreDeployReplacesLeftoverStepContainer
+moonglass.dev/moonglass/internal/deploy TestRunPreDeploySuccessStartsCandidate
+moonglass.dev/moonglass/internal/deploy TestRunPreDeployTimeoutKillsStep
 moonglass.dev/moonglass/internal/deploy TestRunningAfterStart
 moonglass.dev/moonglass/internal/installtest TestAgentUnitMemoryMaxFitsBuilds
 moonglass.dev/moonglass/internal/installtest TestInstallAcceptsEitherPinnedKey

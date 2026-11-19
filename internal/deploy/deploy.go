@@ -24,13 +24,14 @@ const (
 )
 
 type Executor struct {
-	engine *Engine
-	policy *policy.Policy
-	db     *state.DB
+	engine         *Engine
+	policy         *policy.Policy
+	db             *state.DB
+	preDeployLimit time.Duration
 }
 
 func New(engine *Engine, p *policy.Policy, db *state.DB) *Executor {
-	return &Executor{engine: engine, policy: p, db: db}
+	return &Executor{engine: engine, policy: p, db: db, preDeployLimit: preDeployTimeout}
 }
 
 type rejectedError struct{ error }
