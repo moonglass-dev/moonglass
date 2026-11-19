@@ -1,7 +1,7 @@
 ---
 id: W2-Sa
 title: Design tokens and 2-pane shell layout
-status: todo
+status: merged
 risk: standard
 depends_on: [W2-Sc]
 allowed_paths:

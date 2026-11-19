@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All five named tests are in package ui in ui/shell_test.go; the diff adds only that file. They parse component source the same way the W2-Sc tests do, so they fail until the six shell components exist (and until this branch has origin/main’s ui/ helpers). Two-pane grid and landmarks, --surface-frame/--surface-canvas with L(frame) < L(canvas) in both themes, 8px --radius-lg and no shadow, square edge-to-edge rows with --border-subtle, j/k/Enter hooks, and --text-lg 22/28/-0.025em at weight 600 are asserted with expected-vs-actual messages. Not required to pass: class:active/class:highlighted/onclick={onopen} wiring, hover-neighbor dividers, ListRow :focus-visible, or 24px targets. A few needles lock one Svelte spelling (the aria-current ternary, $bindable(0))."
+}
