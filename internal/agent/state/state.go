@@ -206,6 +206,58 @@ func (d *DB) Release(ctx context.Context, appID, releaseID string) (Record, bool
 	return rec, true, nil
 }
 
+// CurrentRelease is an app's binding and the record of the release in its
+// current_release_id.
+type CurrentRelease struct {
+	Binding Binding
+	Record  Record
+}
+
+const selectCurrentReleases = `SELECT a.app_id, a.project, a.environment, a.service,
+	r.release_id, r.image_ref, r.image_id, r.repo_digest, r.port, r.health_path,
+	r.domains, r.has_pre_deploy, r.container_id
+	FROM apps a
+	JOIN releases r ON r.app_id = a.app_id AND r.release_id = a.current_release_id
+	ORDER BY a.app_id`
+
+// CurrentReleases returns every app that has a current release, ordered by
+// app_id, each with its binding and its current release's record. An app with
+// only a candidate, or with no releases, is absent.
+func (d *DB) CurrentReleases(ctx context.Context) ([]CurrentRelease, error) {
+	rows, err := d.db.QueryContext(ctx, selectCurrentReleases)
+	if err != nil {
+		return nil, fmt.Errorf("read current releases from agent state %s: %w", d.path, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []CurrentRelease
+	for rows.Next() {
+		var (
+			cr           CurrentRelease
+			domains      string
+			hasPreDeploy int64
+		)
+		err := rows.Scan(
+			&cr.Record.AppID, &cr.Binding.Project, &cr.Binding.Environment, &cr.Binding.Service,
+			&cr.Record.ReleaseID, &cr.Record.ImageRef, &cr.Record.ImageID, &cr.Record.RepoDigest,
+			&cr.Record.Port, &cr.Record.HealthPath, &domains, &hasPreDeploy, &cr.Record.ContainerID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("read current releases from agent state %s: %w", d.path, err)
+		}
+		if err := json.Unmarshal([]byte(domains), &cr.Record.Domains); err != nil {
+			return nil, fmt.Errorf("read current releases from agent state %s: decode domains of app %s release %s: %w",
+				d.path, cr.Record.AppID, cr.Record.ReleaseID, err)
+		}
+		cr.Record.HasPreDeploy = hasPreDeploy != 0
+		out = append(out, cr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read current releases from agent state %s: %w", d.path, err)
+	}
+	return out, nil
+}
+
 func storedRelease(id, image sql.NullString) *release.Release {
 	if !id.Valid {
 		return nil

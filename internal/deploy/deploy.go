@@ -57,6 +57,9 @@ func (x *Executor) Deploy(ctx context.Context, d *agentv1.Deploy) *agentv1.Comma
 		AppID: appID, ReleaseID: d.GetReleaseId(), ImageRef: d.GetImage(), Port: d.GetPort(),
 		HealthPath: d.GetHealthPath(), Domains: d.GetDomains(), HasPreDeploy: d.GetHasPreDeploy(),
 	}
+	if domErr := x.checkDomains(ctx, appID, d.GetDomains()); domErr != nil {
+		return x.fail(ctx, rec, st, domErr)
+	}
 	img, err := x.prepare(ctx, d, &rec)
 	if err != nil {
 		return x.fail(ctx, rec, st, err)
@@ -72,6 +75,36 @@ func (x *Executor) Deploy(ctx context.Context, d *agentv1.Deploy) *agentv1.Comma
 	res.ImageId = img.ID
 	res.RepoDigest = img.RepoDigest
 	return res
+}
+
+// checkDomains refuses a domain that another app's current release routes. The
+// first conflict in the order the Deploy sent them is named. A candidate of
+// another app holds no domain, and the app's own releases never conflict.
+func (x *Executor) checkDomains(ctx context.Context, appID string, domains []string) error {
+	if len(domains) == 0 {
+		return nil
+	}
+	current, err := x.db.CurrentReleases(ctx)
+	if err != nil {
+		return err
+	}
+	owner := make(map[string]string)
+	for _, cr := range current {
+		if cr.Record.AppID == appID {
+			continue
+		}
+		for _, domain := range cr.Record.Domains {
+			if _, taken := owner[domain]; !taken {
+				owner[domain] = cr.Record.AppID
+			}
+		}
+	}
+	for _, domain := range domains {
+		if other, taken := owner[domain]; taken {
+			return rejected(fmt.Errorf("domain %s is already routed to app %s", domain, other))
+		}
+	}
+	return nil
 }
 
 func (x *Executor) prepare(ctx context.Context, d *agentv1.Deploy, rec *state.Record) (resolved, error) {

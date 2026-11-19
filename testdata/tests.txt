@@ -24,6 +24,7 @@ moonglass.dev/moonglass/internal/agent TestHeartbeatSentOnInterval
 moonglass.dev/moonglass/internal/agent TestReconnectBackoffWithJitter
 moonglass.dev/moonglass/internal/agent TestRejectsControlPlanePinMismatch
 moonglass.dev/moonglass/internal/agent TestServerOfflineThenRecovers
+moonglass.dev/moonglass/internal/agent/state TestCurrentReleasesListsEveryAppsCurrentRelease
 moonglass.dev/moonglass/internal/agent/state TestOpenCreatesFileMode0600
 moonglass.dev/moonglass/internal/agent/state TestOpenErrorNamesPath
 moonglass.dev/moonglass/internal/agent/state TestOpenMigratesSpecSchema
@@ -49,12 +50,18 @@ moonglass.dev/moonglass/internal/deploy TestCreateOptionsRefusesUncarriedFields
 moonglass.dev/moonglass/internal/deploy TestDeployFailuresLeaveStateUnchanged
 moonglass.dev/moonglass/internal/deploy TestDeployImportedImageStartsCandidate
 moonglass.dev/moonglass/internal/deploy TestDeployRejectsBeforeActing
+moonglass.dev/moonglass/internal/deploy TestDeployRejectsDomainRoutedByAnotherApp
 moonglass.dev/moonglass/internal/deploy TestDeployReplacesLeftoverContainer
 moonglass.dev/moonglass/internal/deploy TestDeployResolvesRegistryImages
 moonglass.dev/moonglass/internal/deploy TestDeployWithPreDeployLeavesContainerCreated
 moonglass.dev/moonglass/internal/deploy TestEngineAPIVersionFloor
 moonglass.dev/moonglass/internal/deploy TestEngineCallDeadlines
 moonglass.dev/moonglass/internal/deploy TestPreDeploySpecDerivesFromCandidate
+moonglass.dev/moonglass/internal/deploy TestProxyPushBuildsCompleteConfig
+moonglass.dev/moonglass/internal/deploy TestProxyPushFailuresPushNothing
+moonglass.dev/moonglass/internal/deploy TestProxyPushIssuers
+moonglass.dev/moonglass/internal/deploy TestProxyPushesOneAtATime
+moonglass.dev/moonglass/internal/deploy TestProxyRunPushesAgainWhenRunningConfigDiffers
 moonglass.dev/moonglass/internal/deploy TestReconcileKeepsReferencedReleases
 moonglass.dev/moonglass/internal/deploy TestReconcileRemovesUnreferencedContainers
 moonglass.dev/moonglass/internal/deploy TestResolveRefParsing
@@ -198,6 +205,7 @@ moonglass.dev/moonglass/internal/proxy TestAdminSocketAtGivenPath
 moonglass.dev/moonglass/internal/proxy TestAdminSocketModeAndGroup
 moonglass.dev/moonglass/internal/proxy TestAdminSocketRefusesNonSocketPath
 moonglass.dev/moonglass/internal/proxy TestAdminSocketRefusesOtherMutations
+moonglass.dev/moonglass/internal/proxy TestAgentPushLoadsIntoProxy
 moonglass.dev/moonglass/internal/proxy TestCaddyAdminSocketStaysPrivate
 moonglass.dev/moonglass/internal/proxy TestCounterRecordsRequest
 moonglass.dev/moonglass/internal/proxy TestNoTCPAdminPort

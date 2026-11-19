@@ -14,7 +14,7 @@ Caddy's admin API is bound to a Unix socket. The agent-facing socket is `--admin
 
 On start the proxy loads a minimal config: the admin socket, file-system storage under `<data-dir>/caddy`, and log level WARN. It also keeps Caddy's autosave file at `<data-dir>/caddy-autosave.json`, not in the user's home. Every config pushed afterwards is complete and must repeat `admin` (exactly `{"listen": proxy.AdminListenAddress}`) and `storage` (exactly the file_system module at `proxy.StorageDir`). The proxy enforces this: the agent-facing socket (`--admin-socket`) is a guard in front of Caddy's own admin socket `<data-dir>/proxy-caddy.sock` (0600, data dir 0700). It forwards GET and HEAD, accepts only `POST /load` with a config that passes the check (otherwise 400 with the reason), and refuses every other mutation (403).
 
-Certificates and their private keys stay in `<data-dir>/caddy`, owned by Caddy.
+Certificates and their private keys stay in `<data-dir>/caddy`, owned by Caddy. The config the agent pushes is specified in `docs/specs/release.md`, "Proxy config".
 
 ## Counter module
 
