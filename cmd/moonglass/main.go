@@ -9,10 +9,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"moonglass.dev/moonglass/internal/agent"
+	"moonglass.dev/moonglass/internal/agent/state"
 	"moonglass.dev/moonglass/internal/cli"
+	"moonglass.dev/moonglass/internal/deploy"
+	"moonglass.dev/moonglass/internal/proxy"
 	"moonglass.dev/moonglass/internal/server"
 )
 
@@ -94,25 +98,106 @@ func runServer(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func runAgentConnect(args []string, stderr io.Writer) int {
+// agentConnectArgs is the parsed form of `moonglass agent connect`. Parsing
+// sets only the proxy socket and issuer; the run function sets OnError.
+type agentConnectArgs struct {
+	dataDir string
+	url     string
+	proxy   deploy.ProxyConfig
+}
+
+// parseAgentConnect parses the flags of `moonglass agent connect` and checks
+// every value before the command opens or dials anything.
+func parseAgentConnect(args []string) (agentConnectArgs, bool) {
 	fs := newFlags("agent connect")
 	dataDir := fs.String("data-dir", "/var/lib/moonglass/agent", "agent data directory")
 	url := fs.String("url", "", "control-plane URL")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *url == "" {
+	socket := fs.String("proxy-socket", proxy.DefaultAdminSocket, "the proxy's agent-facing admin socket")
+	issuer := fs.String("tls-issuer", "acme", "TLS issuer: acme, acme-staging or internal")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *url == "" || *socket == "" {
+		return agentConnectArgs{}, false
+	}
+	switch *issuer {
+	case "acme", "acme-staging", "internal":
+	default:
+		return agentConnectArgs{}, false
+	}
+	return agentConnectArgs{
+		dataDir: *dataDir,
+		url:     *url,
+		proxy:   deploy.ProxyConfig{Socket: *socket, Issuer: *issuer},
+	}, true
+}
+
+// lockedWriter serialises the connect loop's and the push goroutine's writes.
+type lockedWriter struct {
+	w  io.Writer
+	mu sync.Mutex
+}
+
+func (l *lockedWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
+}
+
+func runAgentConnect(args []string, stderr io.Writer) int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return agentConnect(ctx, args, stderr)
+}
+
+// agentConnect opens the Docker Engine and the agent state, then runs the proxy
+// push beside the connection for as long as the command runs
+// (docs/specs/connection.md, "Commands").
+func agentConnect(ctx context.Context, args []string, stderr io.Writer) int {
+	a, ok := parseAgentConnect(args)
+	if !ok {
 		_, _ = io.WriteString(stderr, usage)
 		return 2
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	opts := agent.ConnectOptions{
-		AgentVersion: version,
-		OnError:      func(err error) { _, _ = fmt.Fprintf(stderr, "moonglass: %v\n", err) },
-	}
-	if err := agent.Connect(ctx, *dataDir, *url, opts); err != nil {
-		_, _ = fmt.Fprintf(stderr, "moonglass: %v\n", err)
+	w := &lockedWriter{w: stderr}
+	report := func(err error) { _, _ = fmt.Fprintf(w, "moonglass: %v\n", err) }
+
+	engine, err := deploy.Connect(ctx)
+	if err != nil {
+		report(err)
 		return 1
 	}
-	return 0
+	db, err := state.Open(ctx, a.dataDir)
+	if err != nil {
+		_ = engine.Close()
+		report(err)
+		return 1
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	a.proxy.OnError = report
+	p := deploy.NewProxy(engine, db, a.proxy)
+	done := make(chan struct{})
+	go func() {
+		_ = p.Run(runCtx)
+		close(done)
+	}()
+
+	opts := agent.ConnectOptions{AgentVersion: version, OnError: report}
+	connectErr := agent.Connect(runCtx, a.dataDir, a.url, opts)
+	cancel()
+	<-done
+	code := 0
+	if connectErr != nil {
+		report(connectErr)
+		code = 1
+	}
+	if err := db.Close(); err != nil {
+		report(err)
+		code = 1
+	}
+	if err := engine.Close(); err != nil {
+		report(err)
+		code = 1
+	}
+	return code
 }
 
 func runAgentEnroll(args []string, stdout, stderr io.Writer) int {

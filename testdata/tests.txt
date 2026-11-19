@@ -1,3 +1,6 @@
+moonglass.dev/moonglass/cmd/moonglass TestAgentConnectProxyFlagDefaults
+moonglass.dev/moonglass/cmd/moonglass TestAgentConnectRejectsBadProxyFlags
+moonglass.dev/moonglass/cmd/moonglass TestAgentConnectRunsProxyPush
 moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollFailures
 moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollPrintsFingerprint
 moonglass.dev/moonglass/cmd/moonglass TestKeysInitFailures
@@ -212,6 +215,7 @@ moonglass.dev/moonglass/internal/proxy TestNoTCPAdminPort
 moonglass.dev/moonglass/internal/proxy TestOneHTTPSRouteInternalIssuer
 moonglass.dev/moonglass/internal/proxy TestProxyAndAgentIdleUnderBudget
 moonglass.dev/moonglass/internal/proxy TestPushedConfigCannotOpenTCPAdmin
+moonglass.dev/moonglass/internal/registry TestAgentConnectSynopsisNamesProxyFlags
 moonglass.dev/moonglass/internal/registry TestAppendAuditIsCalledOnlyByTheRegistry
 moonglass.dev/moonglass/internal/registry TestAuditEventsAreHashChained
 moonglass.dev/moonglass/internal/registry TestAuditEventsWrittenByRegistryNotHandler
