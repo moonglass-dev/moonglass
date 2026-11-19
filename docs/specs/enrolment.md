@@ -14,6 +14,8 @@ The token secret is not a field of `EnrollRequest`. The agent sends it as `Autho
 
 At enrol the agent generates, on the machine, one Ed25519 signing key and one X25519 key whose public half is the `agent_age_recipient` field (raw 32-byte public keys). Private keys never leave the machine and are not sent to the control plane. They are written under the agent `--data-dir` (default `/var/lib/moonglass/agent` when running as a service; tests use a temp dir). Standard library `crypto/ed25519` and `crypto/ecdh` only; this ticket does not add the `age` module (W3-1).
 
+`internal/keys` is the only package that knows these four files: it reads them and writes them atomically, and `internal/agent` calls it.
+
 The fingerprint printed on stdout after a successful enrol is the lowercase hex SHA-256 of the raw Ed25519 public key (64 hex characters). It is also written under the data dir. The secrets flow (later) compares against this value.
 
 `EnrollRequest.agent_signing_public_key` and `agent_age_recipient` must be exactly 32 bytes. Any other length is a malformed request: the server answers HTTP 400 with a plain-text error, and does not call `UseEnrolmentToken`, so the token is not consumed. An unparsable or oversize body or a wrong envelope type is also HTTP 400.

@@ -4,17 +4,14 @@ package agent
 import (
 	"bytes"
 	"context"
-	"crypto/ecdh"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"moonglass.dev/moonglass/internal/keys"
@@ -28,22 +25,14 @@ var (
 	ErrTokenUsed    = errors.New("agent: enrolment token was already used")
 )
 
-// Files under the agent data dir. All are mode 0600.
-const (
-	fileSigning     = "agent-signing.key"
-	fileAgree       = "agent-agree.key"
-	filePin         = "control-plane.pub"
-	fileFingerprint = "fingerprint"
-)
-
 // Enroll registers this machine with the control plane at url using a one-time
 // token and returns the agent fingerprint. It reuses the identity in dataDir
 // or generates one, and writes nothing until the server answers ACCEPTED with
 // a 32-byte control-plane key, which it then pins.
 func Enroll(ctx context.Context, client *http.Client, dataDir, url, token string) (string, error) {
-	id, saved, err := loadIdentity(dataDir)
+	id, saved, err := keys.LoadAgentIdentity(dataDir)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("enrol: %w: remove %s to start over", err, dataDir)
 	}
 	if !saved {
 		if id, err = keys.GenerateAgentIdentity(); err != nil {
@@ -71,18 +60,15 @@ func Enroll(ctx context.Context, client *http.Client, dataDir, url, token string
 		return "", err
 	}
 	if !saved {
-		if err := writeFile(dataDir, fileSigning, id.SigningPrivate); err != nil {
-			return "", err
-		}
-		if err := writeFile(dataDir, fileAgree, id.AgreePrivate); err != nil {
-			return "", err
+		if err := keys.WriteAgentIdentity(dataDir, id); err != nil {
+			return "", fmt.Errorf("enrol: %w", err)
 		}
 	}
-	if err := writeFile(dataDir, filePin, pin); err != nil {
-		return "", err
+	if err := keys.WriteControlPlanePin(dataDir, ed25519.PublicKey(pin)); err != nil {
+		return "", fmt.Errorf("enrol: %w", err)
 	}
-	if err := writeFile(dataDir, fileFingerprint, []byte(fingerprint+"\n")); err != nil {
-		return "", err
+	if err := keys.WriteFingerprint(dataDir, fingerprint); err != nil {
+		return "", fmt.Errorf("enrol: %w", err)
 	}
 	return fingerprint, nil
 }
@@ -146,57 +132,4 @@ func post(ctx context.Context, client *http.Client, url, token string, id keys.A
 // redact keeps the token out of transport errors, which can quote the request.
 func redact(err error, token string) error {
 	return errors.New(strings.ReplaceAll(err.Error(), token, "[token]"))
-}
-
-// loadIdentity reads the saved keys. saved is false when the data dir has none.
-func loadIdentity(dataDir string) (id keys.AgentIdentity, saved bool, err error) {
-	signing, err := os.ReadFile(filepath.Join(dataDir, fileSigning)) //nolint:gosec // G304: dataDir is the operator's own flag, joined with a fixed file name
-	if errors.Is(err, fs.ErrNotExist) {
-		return keys.AgentIdentity{}, false, nil
-	}
-	if err != nil {
-		return keys.AgentIdentity{}, false, fmt.Errorf("enrol: read %s: %w", fileSigning, err)
-	}
-	agree, err := os.ReadFile(filepath.Join(dataDir, fileAgree)) //nolint:gosec // G304: dataDir is the operator's own flag, joined with a fixed file name
-	if err != nil {
-		return keys.AgentIdentity{}, false, fmt.Errorf("enrol: read %s: %w (remove %s to start over)", fileAgree, err, dataDir)
-	}
-	if len(signing) != ed25519.PrivateKeySize {
-		return keys.AgentIdentity{}, false, fmt.Errorf("enrol: %s is %d bytes, expected %d: remove %s to start over", fileSigning, len(signing), ed25519.PrivateKeySize, dataDir)
-	}
-	priv, err := ecdh.X25519().NewPrivateKey(agree)
-	if err != nil {
-		return keys.AgentIdentity{}, false, fmt.Errorf("enrol: %s is not an X25519 key: %w (remove %s to start over)", fileAgree, err, dataDir)
-	}
-	sk := ed25519.PrivateKey(signing)
-	return keys.AgentIdentity{
-		SigningPublic:  sk.Public().(ed25519.PublicKey),
-		SigningPrivate: sk,
-		AgreePublic:    priv.PublicKey().Bytes(),
-		AgreePrivate:   agree,
-	}, true, nil
-}
-
-// writeFile writes name under dir atomically with mode 0600.
-func writeFile(dir, name string, data []byte) error {
-	tmp, err := os.CreateTemp(dir, name+".tmp-*")
-	if err != nil {
-		return fmt.Errorf("enrol: write %s: %w", name, err)
-	}
-	defer func() { _ = os.Remove(tmp.Name()) }()
-	if err := tmp.Chmod(0o600); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("enrol: write %s: %w", name, err)
-	}
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("enrol: write %s: %w", name, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("enrol: write %s: %w", name, err)
-	}
-	if err := os.Rename(tmp.Name(), filepath.Join(dir, name)); err != nil {
-		return fmt.Errorf("enrol: write %s: %w", name, err)
-	}
-	return nil
 }

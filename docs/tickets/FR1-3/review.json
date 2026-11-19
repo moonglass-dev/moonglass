@@ -1,0 +1,23 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "b62148e020587ba6014b970f848770693e625399",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/agent/enroll.go",
+      "line": 35,
+      "issue": "Every LoadAgentIdentity error now gets the advice 'remove DIR to start over', including a read error on agent-signing.key that is not a missing file. Before this change that case had no advice.",
+      "scenario": "agent-signing.key is mode 0400 and owned by root, and the agent runs as another user. Enrol fails with EACCES and tells the operator to remove the data dir, which throws away a valid identity when a chmod or chown would fix it."
+    },
+    {
+      "file": "internal/agent/connect.go",
+      "line": 270,
+      "issue": "connectKeyErr picks its advice by fs.ErrNotExist, so a permission or I/O error on agent-signing.key or control-plane.pub now says 'remove DIR and enrol again' instead of 'run `moonglass agent enroll` first'. The plan noted this change.",
+      "scenario": "control-plane.pub is unreadable because of a permission error. Connect advises deleting the data dir and enrolling again, which discards the identity and the pin when the real fault is file ownership."
+    }
+  ]
+}

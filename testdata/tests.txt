@@ -11,6 +11,7 @@ moonglass.dev/moonglass/cmd/moonglass TestVersionPrintsVersionCommitAndDate
 moonglass.dev/moonglass/cmd/moonglass TestVersionReportsFailedWrite
 moonglass.dev/moonglass/internal/agent TestAgentClosesOnBadFrame
 moonglass.dev/moonglass/internal/agent TestAgentNoticesDropBetweenHeartbeats
+moonglass.dev/moonglass/internal/agent TestAgentPackageHoldsNoKeyFileIO
 moonglass.dev/moonglass/internal/agent TestAgentRefusesRedirect
 moonglass.dev/moonglass/internal/agent TestAgentRejectsTLS12Server
 moonglass.dev/moonglass/internal/agent TestConnectDialsOutboundWSS
@@ -71,13 +72,18 @@ moonglass.dev/moonglass/internal/installtest TestProxyUnitOwnsAdminSocketDir
 moonglass.dev/moonglass/internal/installtest TestUnitsAreHardened
 moonglass.dev/moonglass/internal/keys FuzzParseKeyRecord
 moonglass.dev/moonglass/internal/keys TestAgentAgreeKeyAsAgeRecipient
+moonglass.dev/moonglass/internal/keys TestAgentIdentityFilesRoundTrip
 moonglass.dev/moonglass/internal/keys TestAgentTLSCertCarriesKey
+moonglass.dev/moonglass/internal/keys TestControlPlanePinFile
+moonglass.dev/moonglass/internal/keys TestFingerprintFile
 moonglass.dev/moonglass/internal/keys TestFingerprintIsSHA256OfSigningKey
 moonglass.dev/moonglass/internal/keys TestGenerateAgentIdentity
 moonglass.dev/moonglass/internal/keys TestGenerateEnvironmentKey
 moonglass.dev/moonglass/internal/keys TestKeyRecordRejectsMalformed
 moonglass.dev/moonglass/internal/keys TestKeyRecordRoundTrip
 moonglass.dev/moonglass/internal/keys TestKeyVectorsDecryptWithStockAge
+moonglass.dev/moonglass/internal/keys TestLoadAgentIdentityAbsentDir
+moonglass.dev/moonglass/internal/keys TestLoadAgentIdentityRejectsMalformed
 moonglass.dev/moonglass/internal/keys TestOnlyX25519RecipientsAndIdentitiesParse
 moonglass.dev/moonglass/internal/keys TestTLSConfigsPinTLS13
 moonglass.dev/moonglass/internal/keys TestWrapUnwrapKeyRecord

@@ -2,15 +2,13 @@ package agent
 
 import (
 	"context"
-	"crypto/ed25519"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -52,9 +50,13 @@ type ConnectOptions struct {
 // exponential backoff and full jitter until ctx is cancelled. It reads the
 // data dir and never writes it.
 func Connect(ctx context.Context, dataDir, rawURL string, opts ConnectOptions) error {
-	priv, pin, err := loadConnectKeys(dataDir)
+	priv, err := keys.LoadAgentSigningKey(dataDir)
 	if err != nil {
-		return err
+		return connectKeyErr(err, dataDir)
+	}
+	pin, err := keys.LoadControlPlanePin(dataDir)
+	if err != nil {
+		return connectKeyErr(err, dataDir)
 	}
 	endpoint, err := agentURL(rawURL)
 	if err != nil {
@@ -260,21 +262,10 @@ func agentURL(raw string) (string, error) {
 	return u.String(), nil
 }
 
-// loadConnectKeys reads the enrolled signing key and the control-plane pin.
-func loadConnectKeys(dataDir string) (ed25519.PrivateKey, ed25519.PublicKey, error) {
-	signing, err := os.ReadFile(filepath.Join(dataDir, fileSigning)) //nolint:gosec // G304: dataDir is the operator's own flag, joined with a fixed file name
-	if err != nil {
-		return nil, nil, fmt.Errorf("connect: read %s: %w: run `moonglass agent enroll` first", fileSigning, err)
+// connectKeyErr adds the advice for a missing or malformed enrolment file.
+func connectKeyErr(err error, dataDir string) error {
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("connect: %w: run `moonglass agent enroll` first", err)
 	}
-	if len(signing) != ed25519.PrivateKeySize {
-		return nil, nil, fmt.Errorf("connect: %s is %d bytes, expected %d: remove %s and enrol again", fileSigning, len(signing), ed25519.PrivateKeySize, dataDir)
-	}
-	pin, err := os.ReadFile(filepath.Join(dataDir, filePin)) //nolint:gosec // G304: dataDir is the operator's own flag, joined with a fixed file name
-	if err != nil {
-		return nil, nil, fmt.Errorf("connect: read %s: %w: run `moonglass agent enroll` first", filePin, err)
-	}
-	if len(pin) != ed25519.PublicKeySize {
-		return nil, nil, fmt.Errorf("connect: %s is %d bytes, expected %d: remove %s and enrol again", filePin, len(pin), ed25519.PublicKeySize, dataDir)
-	}
-	return ed25519.PrivateKey(signing), ed25519.PublicKey(pin), nil
+	return fmt.Errorf("connect: %w: remove %s and enrol again", err, dataDir)
 }
