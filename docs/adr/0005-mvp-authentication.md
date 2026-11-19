@@ -46,7 +46,7 @@ The eight weeks were too full, so passkeys and TOTP moved to v1 (S revision 3, M
 - Hosted sign-in needs a GitHub or Google account. That fits people who deploy from git.
 - A step-up page in the person's browser is out of band from the coding agent, which is the point of step-up (S§3.10).
 - Self-hosted needs no SMTP and no OAuth app to reach a first sign-in.
-- `internal/auth` is trusted core (B§3). W4-1a, W4-1b, W4-1c, W4-1d and W4-1 build hosted sign-in and the step-up primitive; W7-1 builds the self-hosted path.
+- `internal/auth` is trusted core (B§3). W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build hosted sign-in and the step-up primitive; W7-1 builds the self-hosted path.
 
 ## Alternatives rejected
 

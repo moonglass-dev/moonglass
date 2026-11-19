@@ -64,7 +64,7 @@ If the transaction fails after the agent stopped the app, the service is live bu
 **`services.restore`:**
 1. Refused with 409 when its environment or project is deleted: restore that first.
 2. A service with no current release is restored on the control plane alone.
-3. Otherwise the control plane mints a new release that runs the current release's image again, and drives `DEPLOY` then `SWITCH_RELEASE` as `deploy` does (`docs/specs/registry.md`). The image is the current release's `repo_digest`, or for a git release its `moonglass.local/<project>/<service>:<release_id>` reference; port, health path and domains are the current release's. No pre-deploy step runs: a restore never repeats a migration.
+3. Otherwise the control plane mints a new release that runs the current release's image again, and drives `DEPLOY` then `SWITCH_RELEASE` as `deploy` does (`docs/specs/registry.md`). The image is the current release's `repo_digest`, or for a git release its `moonglass.local/<project>/<service>:<release_id>` reference; port, health path and domains are the current release's. No pre-deploy step runs: a restore never repeats a migration. From W6-1d the new release also copies the current release's `command`, `volumes`, `labels`, `restart` and `healthcheck`, and from W6-4b its `compose_hash`, so a restored database gets its volume back (`docs/specs/storage.md`). A restore of a service with a volume works because the stopped app runs no container (`docs/specs/release.md`, "One release per volume").
 4. When the new release succeeds, one transaction clears `deleted_at` and deletes the `purge_due` row. Otherwise the service stays deleted, and the call fails with the release's `detail`.
 5. It returns the service and the new release.
 
@@ -104,7 +104,8 @@ Each is answered with one `CommandResult` (`docs/specs/protocol.md`). Result tim
 **`REMOVE_APP`:**
 - `REJECTED` with `app <id> is not stopped; stop it first` unless the app is stopped. A control plane able to send one command can send both, so this guards against mistakes, not against a hostile control plane; only `forbid = ["delete"]` stops that.
 - Removes every container of the app, the images no other app's kept release uses, and the app's agent-state rows and identity binding. Its command records age out after 7 days as usual (`docs/specs/connection.md`).
-- Does not remove named volumes or `data_dirs`. W6-1 extends `REMOVE_APP` to the named volumes of the databases it creates.
+- Does not remove `data_dirs`. From W6-1c it removes named volumes as below; until then it removes none.
+- **Named volumes** (W6-1c, owner decision of 2026-11-19). After the containers, it removes each volume `mg.<project>.<environment>.<name>` that a release row of the app names in `volumes`, unless a kept release of another app names it too: two services of one environment may share a volume ("Volumes" in `docs/specs/release.md`), and a shared one stays until the last of them is removed. A volume that is already gone is not an error. A volume the Engine refuses to remove, because a container outside Moonglass uses it, fails the command with `volume <name> is in use by a container Moonglass does not manage`, and the app's state rows are kept so a retried purge can finish. The volumes are read from agent state before its rows are deleted.
 - Answers `SUCCEEDED` with an empty app state. An app the agent does not know also answers `SUCCEEDED`, so a retried purge finishes.
 
 ## Environments and projects (W5-8)
@@ -152,7 +153,7 @@ Conformance covers: a deleted service is gone from every list and lookup and fro
 
 ## Not in W5-5 or W5-8
 
-Deleting servers, secrets, releases or agent identities. Removing named volumes (W6-1). A configurable retention period. Deleting a service whose server is gone for good.
+Deleting servers, secrets, releases or agent identities. Removing named volumes (W6-1c). A configurable retention period. Deleting a service whose server is gone for good.
 
 ## Owner decisions
 

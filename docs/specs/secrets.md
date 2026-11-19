@@ -68,6 +68,16 @@ Names are visible everywhere. Values are write-only: no operation returns a valu
 - **At deploy,** `Deploy` gains `env_key` (this agent's wrapped record) and `secrets` (repeated `kind`, `name`, `ciphertext`). Together they must fit the 1 MiB envelope. The agent unwraps the record in memory, decrypts each value, puts `env` values into `policy.Spec.Env` for the app and its pre-deploy step, and keeps `registry` values for the pull only.
 - Plaintext, unwrapped keys and records are never written to disk, to agent state, or to a log. A value that does not decrypt fails the step with `secret <name> could not be decrypted`.
 
+## Secrets set by other commands (W6-1, W6-4)
+
+Owner decision of 2026-11-19 (week 6). `moonglass databases create` and `moonglass compose apply` set `env` secrets the same way `secrets set` does: in the CLI, encrypted to the environment's public key after the pin checks, with `secrets.set`. Neither sends a plaintext value to the control plane.
+
+- `databases create` makes the password in the CLI (32 characters from `[A-Za-z0-9]`, `crypto/rand`, rejection sampling) and sets two secrets per database: the password under the name its image reads (`POSTGRES_PASSWORD` or `REDISCLI_AUTH`) and the connection URL (`DATABASE_URL` or `REDIS_URL`). It prints the URL once (`docs/specs/managed-services.md`).
+- `compose apply` sets each Compose `environment` entry as a secret of that name (`docs/specs/compose.md`, "Environment values").
+- Every `env` secret reaches every service of the environment at deploy (W4-8). A secret is never scoped to one service.
+
+The delivery fields are `Deploy.env_key` = 11 and `Deploy.secrets` = 12 (`docs/specs/protocol.md`).
+
 ## Reveal (W4-9)
 
 Unchanged from ADR-0003 decision 8: the CLI sends a one-time X25519 recipient; an online agent in the environment re-encrypts the value to it; the control plane relays only ciphertext. Owner-only, step-up, refused for any token owned by an agent identity, audited.

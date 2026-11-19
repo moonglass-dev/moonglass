@@ -25,6 +25,8 @@ Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milest
 
 Amended 2026-11-17 by the weeks 2–3 preflight: 0001 (decision 3, the admin socket group), 0003 (decisions 2 and 5, new 11 to 13), 0004 (new 10 to 12) and 0010 (the agent database).
 
+Amended 2026-11-19 by the week 6 owner decisions: 0004 (new 15, a container joins only its project's network; new 16, Compose is resolved in the CLI and each service checked on the agent) and 0009 (the CLI reaches the Compose loader only through `internal/policy`).
+
 
 ## Changing a decision
 

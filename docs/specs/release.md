@@ -51,13 +51,14 @@ The machine compares ids and rejects the empty one. Id and image formats are che
 ### Order
 
 1. **Binding.** If the `app_id` is bound to a different project, environment or service, answer `REJECTED`. Nothing else happens.
-2. **Transition.** Apply `State.Deploy(release_id, image, has_pre_deploy)` to the stored state in memory. An illegal transition is `REJECTED`, and nothing is touched. (From W3-6 the disk guard can also refuse here: `docs/specs/disk.md`.)
-3. **Image.** Resolve the image as under "Images" below. A failure is `FAILED`.
-4. **Check.** Build the `policy.Spec` as under "The container" below and call `policy.Check`. A `Rejection` is `REJECTED` with the rendered rejection as `detail`. Nothing has been created.
-5. **Network.** Make sure the project network exists (below).
-6. **Create** the container from the `Checked` value and nothing else.
-7. **Start** it, unless `has_pre_deploy` is true; then it stays created until its pre-deploy step succeeds (W2-6). A started container must still be running when the start call returns, or the step is `FAILED`.
-8. **Record.** In one transaction, write the binding (first deploy), the `releases` row with status `candidate`, and the new state. Answer `SUCCEEDED` with `image_id`, `repo_digest` and the app state.
+2. **Transition.** Apply `State.Deploy(release_id, image, has_pre_deploy)` to the stored state in memory. An illegal transition is `REJECTED`, and nothing is touched. (From W3-6 the disk guard can also refuse here: `docs/specs/disk.md`. From W6-1c the volume rule refuses here too: "Volumes" below.)
+3. **Domains** (W2-4a). A domain of the `Deploy` that another app's current release routes is `REJECTED` with `domain <name> is already routed to app <app_id>`. "Another app's current release" means the release in that app's `current_release_id`; a candidate of another app does not hold its domains, and the app's own releases never conflict with it. This runs after the transition, so the refusal writes a `failed` row like any other after step 2.
+4. **Image.** Resolve the image as under "Images" below. A failure is `FAILED`.
+5. **Check.** Build the `policy.Spec` as under "The container" below and call `policy.Check`. A `Rejection` is `REJECTED` with the rendered rejection as `detail`. Nothing has been created.
+6. **Network.** Make sure the project network exists (below), and from W6-1c every named volume the release mounts ("Volumes" below).
+7. **Create** the container from the `Checked` value and nothing else.
+8. **Start** it, unless `has_pre_deploy` is true; then it stays created until its pre-deploy step succeeds (W2-6). A started container must still be running when the start call returns, or the step is `FAILED`.
+9. **Record.** In one transaction, write the binding (first deploy), the `releases` row with status `candidate`, and the new state. Answer `SUCCEEDED` with `image_id`, `repo_digest` and the app state.
 
 ### Images
 
@@ -77,14 +78,17 @@ The `policy.Spec` (`docs/specs/container-policy.md`):
 | `Kind` | `app` |
 | `Project`, `Environment`, `Service` | From the binding |
 | `Image` | `<repository>@<repo digest>` when there is a digest, otherwise the image ID. Both are immutable, so the checked image is the image that runs. |
-| `Cmd` | Empty: the image's own command and entrypoint |
+| `Cmd` | Empty: the image's own command and entrypoint. From W6-1c, `Deploy.command` when it is set |
 | `Env` | Empty until secret delivery (W4-8) |
-| `Labels` | Empty |
+| `Labels` | Empty. From W6-1c, `Deploy.labels` |
 | `AgentLabels` | `dev.moonglass.managed=true`, `dev.moonglass.project`, `dev.moonglass.environment`, `dev.moonglass.service`, `dev.moonglass.app`, `dev.moonglass.release` |
 | `Networks` | `mg-<project>` |
-| `RestartPolicy` | `unless-stopped` |
+| `RestartPolicy` | `unless-stopped`. From W6-1c, `Deploy.restart` when it is set (`no` or `on-failure`) |
 | `LogConfig` | driver `local`, `max-size=10m`, `max-file=3` (stack §3.8; the disk guard relies on this cap) |
-| everything else | zero: no mounts, no published ports, no capabilities |
+| `Mounts` | None. From W6-1c, one `volume` mount per `Deploy.volumes` entry ("Volumes" below) |
+| `Healthcheck` | None: the image's own. From W6-1c, `Deploy.healthcheck` when it is set |
+| `NetworkAliases`, `DNSSearch` | None. From W6-1c, the alias `<service>.<environment>.internal` and the search domain `<environment>.internal` ("Service names" below) |
+| everything else | zero: no bind mounts, no published ports, no capabilities |
 
 The container's name is `mg-<app_id>-<release_id>`. If a container with that name exists and carries `dev.moonglass.managed=true` with the same app and release, it is left over from an interrupted run: it is removed first. A container with that name and any other labels fails the step.
 
@@ -94,7 +98,7 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 
 ### Failure
 
-- Nothing that fails before step 6 creates anything. A container created in step 6 is force-removed when step 6, 7 or 8 fails.
+- Nothing that fails before step 7 creates anything, except the project network and a named volume, which are kept. A container created in step 7 is force-removed when step 7, 8 or 9 fails.
 - A pulled image is left in the store; the disk guard prunes it (`docs/specs/disk.md`).
 - On `FAILED` or `REJECTED` after step 2, a `releases` row is written with status `failed` and the `detail` as `error`, so the history shows it. The release state is unchanged, so the old release keeps serving.
 - **Start-up reconcile.** When the agent starts, every container labelled `dev.moonglass.managed=true` whose release is not the current, previous or candidate release of its app is removed, and the stops due by `stop_after` are carried out.
@@ -108,6 +112,7 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 - **With a `port` and no `health_path`:** a TCP connect to that address every second, 2 seconds per attempt.
 - **Without a port:** healthy once the container has been running for 10 consecutive seconds with an unchanged restart count (owner condition on D9).
 - Healthy means three passes in a row. The gate fails when 60 seconds pass without that, or when the container exits or restarts.
+- **With a healthcheck** (W6-1c): when the release's `Deploy.healthcheck` is set and its test is not `NONE`, this mode replaces the three above, whatever `port` and `health_path` say. The agent inspects the container every second. The gate passes the first time the Engine reports its health as `healthy`, and fails when the Engine reports `unhealthy`, when the container exits or restarts, or when 60 seconds pass. The Engine runs the check inside the container, with the timing the `Deploy` gave; the agent never execs into a container. A test of `NONE` turns off the image's own check, and the gate uses the three modes above.
 
 ### SwitchRelease
 
@@ -123,7 +128,7 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 
 ### Rollback
 
-1. Apply `State.Rollback` in memory. Illegal is `REJECTED`.
+1. Apply `State.Rollback` in memory. Illegal is `REJECTED`. From W6-1c, an app whose current or previous release mounts a named volume is also `REJECTED`, with `app <app_id> mounts a volume; Moonglass does not roll back a service with a volume`, before anything is touched ("Volumes" below).
 2. If the previous container is running, push the config with it routed. It finishes in under 5 seconds (G2).
 3. If it is stopped, start it, run the health gate, then push. This takes as long as the app takes to start.
 4. If it is gone, answer `FAILED` with `the previous release's container is gone; deploy again`.
@@ -134,8 +139,28 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 - `internal/deploy` never imports `internal/proxy`, which links Caddy (ADR-0011). The `admin` and `storage` values every pushed config must repeat (`docs/specs/proxy.md`) are read from the proxy's running config over the admin socket (`GET /config/admin`, `GET /config/storage`).
 - The agent builds the complete Caddy JSON from every app's current release that has domains, and pushes it with `POST /load` over the admin socket (`--proxy-socket`, ADR-0001 decision 3). A route is the release's domains, with the handlers `moonglass_counter` (`release` = the release id) and `reverse_proxy` to `<container IP>:<port>`.
 - Certificates: `--tls-issuer acme` (the default, Let's Encrypt production), `acme-staging` (the fleet), or `internal` (tests and CI, as in `docs/specs/proxy.md`).
-- A domain that is already routed to another app is `REJECTED` at `Deploy`.
-- The agent pushes the config again at start and whenever the proxy's admin socket comes back after a proxy restart.
+- A domain that another app's current release routes is `REJECTED` at `Deploy` (step 3 of "Order").
+- **One pusher** (W2-4a). `deploy.NewProxy(engine, db, deploy.ProxyConfig{Socket, Issuer})` returns the agent's one `*deploy.Proxy`. `Proxy.Push(ctx)` builds the complete config from agent state and the Engine and pushes it; pushes run one at a time, and each records the config it pushed as the last pushed. `Proxy.Run(ctx)` pushes once at start, then every second `GET`s `/config/` over the admin socket; when that answers and the running config, decoded as JSON, is not equal to the last pushed one decoded the same way, it pushes again. A probe that fails is not an error: the proxy is restarting, and the next probe tries again. `Run` returns only when `ctx` ends. A push that fails during `Run` is reported through the error callback the caller gives and retried at the next probe; it never stops `Run`.
+- `moonglass agent connect` runs `Proxy.Run` for its whole life (W2-4c, `docs/specs/connection.md`). The switch and rollback push through the same `Proxy` (W2-4b, W2-4d).
+
+### Service settings, volumes and names (W6-1c)
+
+Owner decision of 2026-11-19 (week 6). `Deploy` carries a service's settings (`docs/specs/protocol.md`, "Service settings"). The executor copies each into the `policy.Spec` as "The container" says, records them on the release row (`docs/specs/agent-state.md`), and builds the Engine request from the `Checked` value only. A field the `Deploy` leaves empty keeps the value in "The container".
+
+**Volumes.** Each `Deploy.volumes` entry is a `volume` mount of the Docker volume `mg.<project>.<environment>.<name>`, at its `target`, read-only when `read_only` is set. `<project>` and `<environment>` come from the binding, so a `Deploy` can name only its own environment's volumes. Project and environment names hold no `.`, so the name is never ambiguous. Two apps of one environment that name the same volume share it, as two services of one Compose project do.
+
+- In step 6 of "Order", a missing volume is created with the `local` driver, no driver options, and the labels `dev.moonglass.managed=true`, `dev.moonglass.project`, `dev.moonglass.environment` and `dev.moonglass.volume=<name>`. An existing volume of that name is used only when it carries those four labels with these values, the `local` driver and no driver options. Anything else fails the step with `volume mg.<project>.<environment>.<name> exists and is not managed by Moonglass`.
+- A redeploy reuses the volume. Volumes are never removed by a deploy, the start-up reconcile, retention or the disk guard. Only `REMOVE_APP` removes one (`docs/specs/delete.md`).
+- A `volume` mount of a plain named volume is never judged by the deny list (`docs/specs/container-policy.md`). That holds here because the agent created the volume itself, with no options that bind a host path.
+
+**One release per volume.** Two containers must never write one volume, so an app that mounts a named volume never runs two releases at once:
+- A `Deploy` whose release mounts a named volume, or for an app whose current release mounts one, is `REJECTED` in step 2 with `app <app_id> mounts a volume and is running; Moonglass never runs two releases on one volume`, unless the app has no current release or is stopped (W5-5b). A stopped app's containers are all stopped, so the restore path of `docs/specs/delete.md` still works.
+- `Rollback` of such an app is `REJECTED` (above), and auto-rollback (W4-3) leaves it alone, as it leaves a stopped app alone.
+- So a database or a Compose service with a volume is never redeployed while it runs. The MVP has no in-place change for one: `services.restore` of the stopped service is its only redeploy, with the same image digest and settings (`docs/specs/delete.md`). The CLI paths that create such services say so (`docs/specs/managed-services.md`, `docs/specs/compose.md`).
+
+**Service names.** Every app container joins `mg-<project>` with the network alias `<service>.<environment>.internal`, and gets the DNS search domain `<environment>.internal`. So an app reaches another service of its environment as `<service>`, or as `<service>.<environment>.internal` from anywhere in the project, and never reaches another environment's service by its bare name. `.internal` is reserved for private use and never delegated, so a name that does not resolve here is not looked up on the internet under a real domain. A pre-deploy step's container gets neither the alias nor the search domain.
+
+**Known trade-off, accepted by the owner (2026-11-19):** the alias names every running container of the service. A candidate in its health gate and the previous release in its 10-minute window (D11) answer on it too, so another service that calls this one directly can reach the old or the new release during a deploy. Traffic through the proxy moves at the switch. A service with a named volume never has two releases running, so a database's name always reaches its one container.
 
 ### Keep five
 

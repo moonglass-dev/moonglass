@@ -90,7 +90,7 @@ A present, empty list allows nothing of that kind: `registries = []` makes a ser
 
 - The check is on the reference as sent, not on the digest it resolves to. A digest's repository is the reference's own, so resolving adds nothing.
 - **A build's base images are not checked.** The `FROM` lines of a Dockerfile are the repository's choice, and parsing them (stages, `ARG` substitution) cannot be done reliably. `repositories` says which code is built, not which images it starts from (threat model §5, item 5).
-- Later commands that name an image or a repository (Compose in W6-4) check every one, in the ticket that adds them.
+- Later commands that name an image or a repository check every one, in the ticket that adds them. Compose import (W6-4) adds none: it sends one `DEPLOY` per service, so each image is checked as any `DEPLOY` is.
 
 A rejected source is answered `REJECTED` with `detail`:
 - `agent.toml on this server allows images only from [sources] registries; <normal form> matches none of them. Add a pattern to [sources] registries in /etc/moonglass/agent.toml and restart the agent.`

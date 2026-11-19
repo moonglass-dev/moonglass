@@ -80,7 +80,11 @@ The messages are `docs/specs/protocol.md`. The SSE routes are `docs/specs/live.m
 
 ## Commands
 
-- `moonglass agent connect [--data-dir DIR] [--policy FILE] [--proxy-socket PATH] --url URL` — `URL` is `https://` or `wss://`; `http://` is refused. The path `/v1/agent` is joined to it. Connection errors go to stderr. `--policy` and `--proxy-socket` arrive with W2-10 and W2-4.
+- `moonglass agent connect [--data-dir DIR] [--policy FILE] [--proxy-socket PATH] [--tls-issuer ISSUER] --url URL` — `URL` is `https://` or `wss://`; `http://` is refused. The path `/v1/agent` is joined to it. Connection errors go to stderr. `--proxy-socket` and `--tls-issuer` arrive with W2-4c, and `--policy` with W2-10.
+  - `--proxy-socket PATH` is the proxy's agent-facing admin socket, default `/run/moonglass-proxy/admin.sock` (`docs/specs/proxy.md`). An empty value prints the usage and exits 2.
+  - `--tls-issuer` is `acme` (the default, Let's Encrypt production), `acme-staging` (the fleet) or `internal` (tests and CI). Any other value prints the usage and exits 2, before anything is opened or dialled.
+  - From W2-4c, the command opens the Docker Engine (ADR-0014) and the agent state database (`docs/specs/agent-state.md`) before it connects, and runs `deploy.Proxy.Run` (`docs/specs/release.md`, "Proxy config") until it exits. A proxy that is down does not stop the agent or its connection; the push is retried every second. An Engine or a database that does not open stops the command with that error and exit code 1.
+  - Each ticket that adds a flag also updates the `agent connect` synopsis in `registry.LocalCommands` to this form, with the flags it has so far.
 - `moonglass server --agent-listen ADDR`.
 
 ## Route registration

@@ -43,6 +43,7 @@ Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry 
 | W3-2 | `secrets.list` | `GET /v1/secrets` | viewer | no | project, environment |
 
 - `services.create` takes `project`, `environment`, `name` and `server` (a server id of the caller's org).
+- From W6-4b, `services.list` returns each service's `compose_hash`: the hash stored on its current release, or empty when it has none (`docs/specs/compose.md`).
 - `environments.list` returns each environment's `public_key` once it has one, which the CLI pins (`docs/specs/secrets.md`). From W4-2 it also returns `protected`.
 - **`deploy`** takes `project`, `environment`, `service`, exactly one of `image` (a reference) or `git` (`<owner>/<repo>@<40-hex commit>`, from W3-4), and optional `port`, `health_path`, `domain` (repeated), `pre_deploy` (repeated, the argv) and `pre_deploy_reversible`. The rules of `docs/specs/protocol.md` apply to each. It mints the release id, then:
   - **One deploy per service.** At most one release per service is `running` and at most one `queued`. A new request while one is queued marks the queued one `superseded` (its caller gets that status) and queues itself. Rollbacks are not queued behind deploys.
@@ -50,6 +51,13 @@ Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry 
   - The call returns when the release reaches a final status, and returns that release.
   - For `git`, `image` sent to the agent's `DEPLOY` is the `moonglass.local/<project>/<service>:<release_id>` reference the build produced (`docs/specs/build.md`).
   - A service whose server is not connected fails at once with `server <id> is offline`.
+- **Service settings on `deploy`** (W6-1d, owner decision of 2026-11-19). `deploy` also takes these optional inputs, each sent in `DEPLOY` as the field `docs/specs/protocol.md` names ("Service settings") and refused with `ErrInvalidInput`, before a release is minted, when it breaks that field's rule. They are stored on the release (`docs/specs/storage.md`).
+  - `command` (repeated): the exec argv, `Deploy.command`.
+  - `volume` (repeated): `<name>:<target>` or `<name>:<target>:ro`, one `VolumeMount` each.
+  - `label` (repeated): `<key>=<value>`, split at the first `=`, one entry of `Deploy.labels` each.
+  - `restart`: empty, `no` or `on-failure`.
+  - `healthcheck` (repeated): the test, as `Healthcheck.test`. With it, `healthcheck_interval_ms`, `healthcheck_timeout_ms` and `healthcheck_retries` are required, and `healthcheck_start_period_ms` and `healthcheck_start_interval_ms` are optional. Without it all five must be absent.
+  - From W6-4b, `compose_hash`: empty, or 64 lowercase hex characters. It is stored on the release only and is not sent to the agent (`docs/specs/compose.md`).
 - **`rollback`** takes `project`, `environment`, `service`, sends `ROLLBACK`, and returns when its result arrives. Under the G2 conditions it finishes in under 5 seconds (`docs/specs/release.md`). It is audited like every call.
 - **`releases.list`** returns the service's releases, newest first, at most 50: id, status, `image_ref` or git source, `image_id`, `repo_digest`, `detail`, times, and which are current and previous. For a tag, `repo_digest` is the digest that actually ran.
 - **`servers.deploy-key`** takes `server` and returns its deploy public key (`docs/specs/build.md`), or a 404 that says the server has not reported one yet.
@@ -114,7 +122,7 @@ W5-1b adds `agent_id` to the event and the hash, and W5-5 adds `project_id`, `en
 
 ## Routes and commands that are not operations
 
-`registry.NonOperationRoutes` is the fixed list of routes outside the registry, with the authorisation each enforces: `GET /v1/agent` (agent listener, Ed25519 challenge), `POST /v1/enroll` (single-use enrolment token), `GET /v1/logs/stream` (viewer read of that project and environment) and `GET /v1/usage/stream` (viewer read of that project and environment). The two stream routes take `project`, `environment` and `service` (`docs/specs/live.md`). SSE is not a registry operation. `registry.LocalCommands` is the fixed list of local-only subcommands (`version`, `server`, `keys init`, `agent enroll`, `agent connect`, `proxy`, and `audit verify` from W5-5), each with what it touches. Tests fail when the server mounts a route, or the binary has a subcommand, that is on neither list nor in the registry.
+`registry.NonOperationRoutes` is the fixed list of routes outside the registry, with the authorisation each enforces: `GET /v1/agent` (agent listener, Ed25519 challenge), `POST /v1/enroll` (single-use enrolment token), `GET /v1/logs/stream` (viewer read of that project and environment) and `GET /v1/usage/stream` (viewer read of that project and environment). The two stream routes take `project`, `environment` and `service` (`docs/specs/live.md`). SSE is not a registry operation. `registry.LocalCommands` is the fixed list of local-only subcommands (`version`, `server`, `keys init`, `agent enroll`, `agent connect`, `proxy`, `audit verify` from W5-5, `databases create` from W6-1 and `compose apply` from W6-4), each with what it touches. Tests fail when the server mounts a route, or the binary has a subcommand, that is on neither list nor in the registry.
 
 ## Generation
 
@@ -135,6 +143,7 @@ An operation's `In` is a Go struct. Each field has a `json` tag in snake_case an
 - `registry.Target` carries names, `Project` and `Environment`. `internal/api` fills it from the input's `project` and `environment` fields, which every project- and environment-level operation has as required inputs. It never resolves a name itself.
 - `registry.Invoke` resolves the target with one `store.ResolveTarget` call in the caller's org, as the first half of the scope check: after the role check, before the scope rows are matched. A call the role check refuses reads nothing from the store.
 - A name that does not resolve stands for an id that no scope row names, so only a `*` in that column matches it. When no row matches, the call is denied exactly as for a target the token does not cover: 403, outcome `denied`, the same reason. So a scoped token cannot learn which names exist outside its scope.
+- **Which name did not resolve** (owner decision of 2026-11-19, W2-11h). `ResolveTarget` returns the project id with an error matching `store.ErrNotFound` when the project exists and the environment does not, and two empty ids when the project does not exist (`docs/specs/storage.md`). So the one call tells `Invoke` both which message applies and which column is unresolved: with an empty project id both columns are unresolved; with a project id, the project column is matched by that id and only the environment column is unresolved. `Invoke` never calls `ResolveTarget` a second time. A token scoped to another project gets the same denial whether or not the environment exists, because its row's project id differs either way.
 - When a row does match, the call is answered 404, `project "<name>" not found` or `environment "<name>" not found in project "<project>"`, and the handler does not run. The event has outcome `error` and reason `not found`.
 - On success the handler gets the ids in `Call.ProjectID` and `Call.EnvironmentID` and never resolves the target's names again. Other names, such as `service` or `server`, are the handler's to resolve in those ids, after authorisation.
 - A request that fails decoding or the input schema (below) is answered 400 by `internal/api` before `Invoke`, so it writes no audit event: no operation was called. Huma checks the shape before the handler authenticates, so a malformed request is 400 even with a bad token. The schema is public in `internal/api/openapi.json`, so this reveals nothing.
@@ -187,6 +196,8 @@ A command that needs work on the client, such as reading stdin, a file or a pin,
 
 - **W3-2** adds `secrets set` (reads stdin, encrypts, and may first call `environments.list`, `keys.recovery.list` and `environments.key.create`) and `environments key create` (makes the key pair and the wrapped copies) to `registry.LocalCommands`. `keys recovery add` stays generated: `moonglass keys recovery add --recipient age1…`, so `docs/specs/secrets.md` changes its retry line to that form.
 - **W3-4** moves `deploy` to `registry.LocalCommands` when it adds `moonglass.toml`, which the command reads. Until then `deploy` is generated (W2-5).
+- **W6-1** adds `databases create` (makes a password, encrypts two secrets, calls `secrets.list`, `releases.list`, `services.create`, `secrets.set` and `deploy`; `docs/specs/managed-services.md`). It is not an operation: every step is an existing operation with its own authorisation.
+- **W6-4** adds `compose apply` (reads Compose files, encrypts secrets, asks for confirmation on stdin, and calls `services.list`, `secrets.list`, `services.create`, `secrets.set`, `deploy` and `services.delete`; `docs/specs/compose.md`). It is not an operation either.
 
 ### Tests (W2-11c, W2-11f, W2-11g)
 

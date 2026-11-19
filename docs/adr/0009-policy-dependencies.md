@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-16
+- Amended: 2026-11-19 (week 6 owner decision): who calls the Compose loader
 
 ## Context
 
@@ -27,6 +28,10 @@ Both versions are recorded in `go.mod` and in the depguard allow list in `.golan
 - **A hand-rolled Compose parser.** Would have to reimplement interpolation, `extends`, `include`, anchors and profiles correctly; a gap is an escape. The official loader is the one ADR-0004 names.
 - **`BurntSushi/toml`.** Strict unknown-key errors and positions would need a second pass over metadata. `go-toml/v2` provides both on the decoder.
 - **`yaml` plus custom resolution.** Reimplements what compose-go already does, and would still leave TOML for `agent.toml` unsolved.
+
+## Amendment of 2026-11-19
+
+Compose import (W6-4) resolves Compose files in the CLI, because their environment values are secrets the control plane may not hold (ADR-0004 decision 16). It does so through `policy.ResolveCompose`. compose-go is still imported only by `internal/policy`, the `policy-deps` depguard rule in `.golangci.yml` is unchanged, and no package gains a direct import of it: `internal/compose` and `internal/cli` call `internal/policy`. The CLI is the same binary, which already links `internal/policy`, so the release binaries grow by nothing new.
 
 ## Open questions
 

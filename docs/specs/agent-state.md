@@ -41,6 +41,7 @@ One row per `app_id` that has ever been deployed here.
 | `image_id` | The image ID the container runs. |
 | `repo_digest` | The registry digest the reference resolved to, or empty for an image built here. For a tag it is the digest the pull resolved to at deploy time (owner condition on D4). |
 | `port`, `health_path`, `domains` | As sent. `domains` is a JSON array. |
+| `command`, `volumes`, `labels`, `restart`, `healthcheck` | W6-1c. As sent (`docs/specs/protocol.md`, "Service settings"), in the JSON forms of `docs/specs/storage.md` ("Service settings on releases"), with the same defaults. The volume rule (`docs/specs/release.md`) and `REMOVE_APP` (`docs/specs/delete.md`) read `volumes`. |
 | `has_pre_deploy`, `pre_deploy_reversible` | As sent. `pre_deploy_reversible` is filled by `RunPreDeploy`. |
 | `status` | `candidate`, `current`, `previous`, `retired`, `failed` or `aborted`. |
 | `container_id` | The release's container, or empty once removed. |

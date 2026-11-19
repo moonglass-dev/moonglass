@@ -4,6 +4,7 @@
 - **Date:** 2026-11-16
 - **Amended:** 2026-11-17, new decisions 10 to 12 (owner decision D8, weeks 2–3 preflight)
 - **Amended:** 2026-11-18, new decisions 13 and 14 (week 5 preflight, owner decisions D43 to D52, `docs/specs/local-policy.md`)
+- **Amended:** 2026-11-19, new decisions 15 and 16 (week 6 owner decisions, `docs/specs/compose.md`, `docs/specs/container-policy.md`)
 
 ## Context
 
@@ -38,6 +39,9 @@ Docker socket access is root-equivalent (S§2). A typed protocol is not enough o
 12. **Environment values stay out of every record** (2026-11-17). Environment variable values are never logged and never written into an error, a rejection, a command result or an audit record. Names may be.
 13. **Command classes are fixed per command type** (2026-11-18). Every command type the agent accepts has one class. A type sent by a destructive registry operation is `delete`; one that runs a process in an existing container is `exec`; the rest have none. A forbidden class is answered `REJECTED` before anything else is checked. Forbidding a class that has no command type yet is valid and does nothing. A test fails when a command type has no class (`docs/specs/local-policy.md`).
 14. **Sources are matched in one normal form** (2026-11-18). `registries` matches the image's repository without tag or digest, with the default registry `docker.io` and `library/` filled in; `repositories` matches `github.com/<owner>/<repo>`, lower-cased. Patterns must be written in that form, with a literal host, or the agent does not start. A present, empty list allows nothing of its kind. The check runs on `DEPLOY` and `BUILD` before any pull or clone. Images built on the server are never pulled, and are checked through the repository label the agent puts on each build. A build's base images are not checked (`docs/specs/local-policy.md`).
+
+15. **A container joins only its own project's network** (2026-11-19). No protocol message names a network: the agent attaches every container to `mg-<project>` and nothing else. Compose import refuses `networks`, so a Compose service cannot name another project's network, and no allow key exists for one. This closes open question 8 of `docs/specs/container-policy.md`. Services reach each other by the alias the agent sets from its binding (`docs/specs/release.md`, "Service names").
+16. **Compose is resolved in the CLI, and each service is checked on the agent** (2026-11-19). A Compose file's environment values are secrets, which the control plane may never hold in plaintext, so the file cannot travel to the agent. The CLI resolves it with `compose-go` through `internal/policy` (`policy.ResolveCompose`: interpolation, `extends`, `include` and profiles, as decision 7 requires), refuses everything outside the supported subset, and runs `CheckCompose` with the empty policy before anything is applied. Each service then reaches the agent as an ordinary `Deploy`, and the agent checks the spec it builds from that `Deploy` with `Check` against its own `agent.toml`. The agent's check is the one that counts; the CLI's only stops a file early.
 
 **`agent.toml` schema,** implemented by W1-1. `[update] channel` is `stable` or `canary`. `[commands] forbid` takes the classes `delete` (any command that carries out a destructive operation) and `exec` (container exec, v1). `[sources]` lists glob patterns; when present, deploys come only from them. Any other key or value stops the agent.
 
@@ -80,5 +84,5 @@ bind_mounts = ["/proc:/host/proc:ro", "/sys:/host/sys:ro"]
 ## Links
 
 - S§2, S§3.1, S§3.2, S§3.5, S§3.13, S§4, S§7, S§9; V§1; M§6
-- B§6: W1-1, W2-3, W2-6, W3-4, W5-3a, W5-3, W6-4
+- B§6: W1-1, W2-3, W2-6, W3-4, W5-3a, W5-3, W6-1b, W6-4a, W6-4
 - `docs/threat-model.md` §6 and checklist item 2

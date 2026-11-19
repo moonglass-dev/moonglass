@@ -64,6 +64,7 @@ The neutral description of one container or build the agent is about to create. 
 | `CgroupParent`, `Runtime` | Strings. |
 | `BuildEntitlements` | BuildKit entitlements for a build. |
 | `Cmd`, `Env`, `Labels`, `AgentLabels`, `Networks`, `RestartPolicy`, `LogConfig` | Pass-through fields (W2-9). See "Pass-through fields and agent labels". |
+| `Healthcheck`, `NetworkAliases`, `DNSSearch` | Pass-through fields (W6-1b). See "Healthcheck, aliases and DNS search". |
 
 A `Spec` with an empty `Project`, a relative bind source or an unknown `Mount.Type` is rejected as malformed (a violation with field `spec`), not defaulted.
 
@@ -162,6 +163,25 @@ Rules:
 
 The escape suite gains a fixture for a Compose service with a `dev.moonglass.project` label (rejected), and a table row for each pass-through field showing it is copied unchanged.
 
+## Healthcheck, aliases and DNS search (W6-1b)
+
+Owner decision of 2026-11-19 (week 6). Three more fields that the deny list does not judge, copied into `Checked` unchanged, so the Engine request built from `Checked` carries them (ADR-0004 decision 10).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `Healthcheck` | `*Healthcheck{Test []string; Interval, Timeout, StartPeriod, StartInterval time.Duration; Retries int}` | The Engine's healthcheck for the container. Nil means the image's own. It runs inside the container, never on the host. |
+| `NetworkAliases` | `[]string` | Aliases on the project network. Filled only by agent code, from the binding (`docs/specs/release.md`, "Service names"), never from a protocol message or a Compose file. |
+| `DNSSearch` | `[]string` | DNS search domains. Filled only by agent code, like `NetworkAliases`. |
+
+Rules, each a malformed spec (field `spec`) when broken:
+
+- `Healthcheck.Test` is `["NONE"]`, `["CMD", argv…]` with 1 to 31 argv entries, or `["CMD-SHELL", command]`. Every entry is non-empty and has no NUL. With `NONE` every duration and `Retries` are zero; otherwise `Interval` and `Timeout` are 1 s to 5 min, `StartPeriod` 0 to 10 min, `StartInterval` 0 or 1 s to 5 min, and `Retries` 1 to 10. These are the protocol's bounds (`docs/specs/protocol.md`, "Service settings").
+- Each `NetworkAliases` and `DNSSearch` entry is a lowercase DNS name: labels of 1 to 63 bytes of `[a-z0-9-]`, not starting or ending with `-`, at most 253 bytes, no trailing dot. At most 4 entries each.
+- `NetworkAliases` and `DNSSearch` set without `Networks` make the spec malformed: an alias needs a network.
+- `CheckCompose` fills none of the three; its output does not change. Import maps a Compose `healthcheck` itself (`ResolveCompose`, below).
+
+W6-1b names `TestHealthcheckAliasesAndSearchPassThrough` (each field copied unchanged into `Checked` and back out of `Spec()`, deep-copied), `TestMalformedHealthcheckRejected` (one row per rule) and `TestMalformedAliasOrSearchRejected`.
+
 ## Allow blocks
 
 ADR-0004 decision 5. All exceptions live in `[[containers.allow]]` blocks in `/etc/moonglass/agent.toml`.
@@ -253,6 +273,37 @@ Rules for `CheckCompose`:
 - Every service becomes a `Spec` (`Kind` `compose`, `Service` the service name, `Project` and `Environment` from the input). Relative bind sources are made absolute against `WorkDir`. Named volumes are resolved as described under "Named volumes that are really bind mounts".
 - **All services are checked and all violations are returned together**, so a fix does not take one deploy per field.
 - A loader error (unreadable file, unset required variable, invalid YAML, an unsupported or unknown field the loader rejects) is returned as an error. Nothing is checked or returned in that case.
+
+### Import resolution (W6-4a)
+
+Owner decision of 2026-11-19 (week 6). Compose import (`docs/specs/compose.md`) resolves a project in the CLI, not on the agent: a Compose file's environment values are secrets, and the control plane may never hold them in plaintext, so the file cannot travel to the agent through it. Each service then reaches the agent as an ordinary `Deploy`, whose spec the agent checks with `Check` against its own `agent.toml`, like every other container. compose-go is still imported only here (ADR-0009, as amended).
+
+```go
+type ComposeService struct {
+    Name        string
+    Image       string
+    Port        uint32            // the container port of the one `ports` entry, or 0
+    Command     []string
+    Environment map[string]string // names to values; the CLI sets them as secrets
+    Volumes     []ComposeVolume   // {Name, Target, ReadOnly}
+    Labels      map[string]string
+    Restart     string            // "", "no" or "on-failure"
+    Healthcheck *Healthcheck
+    DependsOn   []string          // sorted
+}
+
+func ResolveCompose(ctx context.Context, in ComposeInput) ([]ComposeService, error)
+```
+
+`ResolveCompose` runs, in order, and stops at the first step that fails:
+
+1. **Load** with the same loader and rules as `CheckCompose`: only `in.Env` interpolates, every profile is enabled. A loader error is returned as it is.
+2. **Supported subset.** Every service field outside `docs/specs/compose.md` "Supported fields" is refused, and so is every top-level key other than `services`, `volumes` and `x-` extensions. The error lists every refusal of every service together, each as `service <name>: <field> is not supported by Moonglass import`, so one run shows them all. An implicit `default` network that the loader adds counts as no network. A refusal never includes a value.
+3. **Shape.** Also refused, together with step 2's: a service name that is not a Moonglass name (`docs/specs/storage.md`); a missing `image`; a `build`; a `volumes` entry that is not a named volume (a bind mount, a tmpfs, an anonymous volume); a top-level volume with a `driver`, `driver_opts`, `external`, `labels` or `name`; a volume name outside the protocol's rule; more than one `ports` entry, a range or a `udp` entry; `restart: always`; a label in the `dev.moonglass.` namespace; a healthcheck outside the protocol's bounds; an `environment` entry with no value, or whose name is not a valid `env` secret name (`docs/specs/secrets.md`); and a `depends_on` cycle, named by the services in it.
+4. **Deny list.** `CheckCompose` with the empty policy (`(*Policy)(nil)`). Its `*Rejection` is returned as it is. After step 3 it finds nothing in a file that will pass, but it keeps the escape suite's guarantees true of every imported file before anything is applied.
+5. **Settings.** One `ComposeService` per service, in name order. `Port` is the target (container) port; the published host port is never used, because Moonglass publishes no ports and routes through the proxy. `Restart` is empty for an absent `restart` and for `unless-stopped`. `Healthcheck` is nil for an absent `healthcheck`, `NONE` for `disable: true`, and otherwise the service's test with Compose's defaults written out where it leaves one unset (interval and timeout 30 s, retries 3, start period and start interval 0); a value outside the bounds above is refused in step 3. `Command` is the loader's argv, never re-joined.
+
+W6-4a names `TestResolveComposeMapsSupportedFields` (a table, one row per supported field), `TestResolveComposeRefusesUnsupportedFields` (every refusal of several services in one error), `TestResolveComposeRefusesShapes` (one row per refusal of step 3), `TestResolveComposeRefusesNetworks`, `TestResolveComposeRunsDenyList`, `TestResolveComposeEnablesEveryProfile` and `TestResolveComposeUsesOnlyGivenEnv`. Its fixtures live in `testdata/compose/`.
 
 ## `agent.toml`
 
@@ -382,7 +433,7 @@ Each needs an owner decision before a ticket builds on it. None blocks W1-1; W1-
 6. **`pid: container:<id>` and `ipc: container:<id>`.** ADR-0004 decision 1 names `pid: host`, `ipc: host`, and only `network_mode: container:<id>` as a cross-project check. A spec that joins another project's PID or IPC namespace is therefore not denied by this ticket. Whether those forms should be checked the same way as `network_mode` is a later decision, and would amend the ADR.
 7. **`network_mode: service:<name>` inherits the target's network namespace.** The narrower behaviour allows it when the named service is in the same Compose project, with no further check of whether that service itself uses the host network or a cross-project `container:` mode. A later ticket may want to reject or require a block when the joined service would not itself pass without one.
 
-8. **Cross-project `Networks`.** Nothing in the protocol sets `Networks`; the executor attaches only the project's own network. A Compose service that names another project's network (W6-4) is not checked by W2-9. Whether to deny it is a decision for W6-4, with an ADR-0004 amendment.
+8. **Cross-project `Networks`.** Decided on 2026-11-19 (ADR-0004 decision 15): denied. No protocol message sets `Networks`, the executor attaches only `mg-<project>`, and Compose import refuses every `networks` entry (`ResolveCompose`, step 2), so a service can join no other project's network. No allow key exists for it.
 
 ## Not covered
 

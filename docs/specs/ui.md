@@ -171,7 +171,7 @@ The log stream, diff view, approval card and every other control live in the det
 
 **Surfaces the plan requires:**
 
-- Before confirming a deploy, the UI flags stop-then-start shapes and lists the Compose services that will restart (S§5.3).
+- Before confirming a deploy, the UI flags stop-then-start shapes and lists the Compose services that will restart (S§5.3). In the MVP Compose import runs only from the CLI, whose list before confirmation is that surface (`docs/specs/compose.md`, "The list"); the UI has no Compose screen.
 - A shadow-mode report shows the numbers and lets the user mark the call right or wrong (S§5.4).
 - A sanitizer rejection names the field and shows the `agent.toml` lines that would allow it (S§3.2).
 - After a server is removed, the UI lists the values to rotate at their source (S§3.11).

@@ -1,6 +1,6 @@
 # Sign-in, sessions and step-up
 
-What W4-1a, W4-1b, W4-1c, W4-1d and W4-1 build, per ADR-0005 as amended on 2026-11-18. The owner approved this spec on 2026-11-18, including the registry operations, the tables and the step-up rules below, which are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1.
+What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005 as amended on 2026-11-18. The owner approved this spec on 2026-11-18, including the registry operations, the tables and the step-up rules below, which are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1.
 
 ## Which ticket builds what
 
@@ -8,7 +8,9 @@ What W4-1a, W4-1b, W4-1c, W4-1d and W4-1 build, per ADR-0005 as amended on 2026-
 |---|---|
 | W4-1a | The tables: `session_hashes`, and the two new `audit_events` columns, on both backends with conformance |
 | W4-1d | The tables: `link_token_hashes` and `step_ups`, on both backends with conformance |
-| W4-1b | `internal/auth`: GitHub and Google sign-in, sessions, sign-out, the session cookie, session authentication in the registry, cross-origin protection |
+| W4-1e | Session authentication in the registry: `Registry.Authenticate` with the `__Host-mg_session` cookie and `Moonglass-Org`, or a bearer, never both; `Principal.SessionID`; the audit hash and event with `session_id` and `step_up_id`; `http.CrossOriginProtection` on every route of the HTTP listener |
+| W4-1f | `internal/auth` with GitHub: the operator variables with the pairing and public-URL rules, `state`, PKCE and the `__Host-mg_oauth` cookie, the GitHub exchange and `/user`, sign-in sessions, sign-out, the failure page and its CSP, the routes on `registry.NonOperationRoutes` mounted under `/auth`, and the read-only `Store.UserByIdentity` |
+| W4-1b | Google: the provider and its `nonce`, the ID-token `iss`, `aud`, `exp` and `nonce` checks, and the Google variables |
 | W4-1c | Step-up: the `StepUp` flag, the `step_up_required` answer, the step-up page, the CLI's `--step-up` |
 | W4-1 | `sessions.list`, `sessions.revoke`, `identities.list`, `identities.link`, the link landing, and `moonglass server --print-owner-link` |
 
@@ -70,6 +72,7 @@ One flow serves sign-in, step-up and linking. Its `purpose` says which.
 ## Sessions
 
 **Sign-in** (`purpose=sign-in`):
+- The identity is looked up with `Store.UserByIdentity` (W4-1f, owner decision of 2026-11-19). It reads `user_identities` and returns the `user_id`, or `ErrNotFound` for an identity linked to no user, and never writes. `Store.UserForIdentity`, which mints a user for an unseen identity, is never called on a sign-in. `UserByIdentity` adds no table or column, so the storage schema does not change. W4-1f names `TestUserByIdentityConformanceSQLite` and `TestUserByIdentityConformancePostgres` (a linked identity returns its user; an unknown one is `ErrNotFound` and leaves `user_identities` and `user_orgs` unchanged).
 - An identity linked to a user gets a session, and the browser is redirected to `return`.
 - An unknown identity is refused with: "This GitHub account is not linked to a Moonglass user. Ask an owner of your organisation to link it." The message names Google for a Google account.
 
@@ -78,7 +81,7 @@ One flow serves sign-in, step-up and linking. Its `purpose` says which.
 - It expires 14 days after sign-in, absolute. It is never extended.
 - It is sent as the cookie `__Host-mg_session` (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, `Max-Age` up to the expiry). Page script can never read it (`docs/specs/ui.md`).
 
-**Authentication.** `Registry.Authenticate` accepts a bearer token or a session cookie, never both. A request with both is answered 401 `send a bearer token or a session cookie, not both`.
+**Authentication.** A request authenticates with a bearer token or a session cookie, never both. A request with both is answered 401 `send a bearer token or a session cookie, not both`. `Registry.Authenticate(ctx, bearer)` authenticates a bearer, as it does today, and `Registry.AuthenticateSession(ctx, session, orgID)` (W4-1e) a session; `internal/api` reads the `Authorization` header, the `__Host-mg_session` cookie and `Moonglass-Org`, applies the rules below, and calls exactly one of them.
 - A session request must carry `Moonglass-Org: <org id>`, naming an org the user is a member of. Otherwise it gets 401.
 - The principal has the session ID, the user's role in that org, and the single scope row `* * *`.
 - A bearer token's org comes from the token. A `Moonglass-Org` header that differs from it gets 401.

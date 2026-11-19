@@ -101,7 +101,7 @@ Opening a payload rejects unknown fields at every nesting level, including insid
 
 **Identity binding.** `SwitchRelease`, `Rollback` and `RunPreDeploy` stay keyed by `app_id` and do not repeat the names. The agent binds an `app_id` to its `project`, `environment` and `service` at the first `Deploy` for it and stores the binding (`docs/specs/agent-state.md`). A later `Deploy` for that `app_id` that names a different project, environment or service is answered `REJECTED`, naming the stored triple, and nothing is done. A control plane cannot move an app into another project's `agent.toml` blocks.
 
-**Without a port** there is no route and no HTTP health check. The service counts as healthy once its container has been running for 10 seconds without a restart (`docs/specs/release.md`). This covers worker services and the databases of W6-1. There is no `UpdateRoutes` message: changing a domain needs a redeploy.
+**Without a port** there is no route and no HTTP health check. The service counts as healthy once its container has been running for 10 seconds without a restart (`docs/specs/release.md`). This covers worker services. A `Deploy` with a `healthcheck` (below) uses the Engine's health status instead, port or not; the databases of W6-1 do. There is no `UpdateRoutes` message: changing a domain needs a redeploy.
 
 ### CommandResult
 
@@ -192,9 +192,45 @@ Specified by the week 5 preflight (`docs/specs/delete.md`, owner decision D62). 
 
 Both are `delete` class for `agent.toml` (`docs/specs/local-policy.md`). What the agent does with them is `docs/specs/delete.md`.
 
+## Service settings (W6-1a)
+
+Owner decision of 2026-11-19 (week 6): the owner approved these fields, their rules and their numbers. They carry a service's container settings for the databases of W6-1 and the Compose services of W6-4 (`docs/specs/managed-services.md`, `docs/specs/compose.md`). How the agent applies them is `docs/specs/release.md` ("Service settings, volumes and names"). No field is a host path, and none is run by a host shell: `command` and `healthcheck.test` run inside the container.
+
+`Deploy` field numbers: W4-8 takes `env_key` = 11 and `secrets` = 12 (`docs/specs/secrets.md`); W6-1a adds `command` = 13, `volumes` = 14, `labels` = 15, `restart` = 16, `healthcheck` = 17. Either ticket may land first; the numbers do not move.
+
+| Field | Type | Rule |
+|---|---|---|
+| `command` | `repeated string` | Optional. An exec argv that replaces the image's command: 0 to 32 entries, each 1 to 1024 bytes with no NUL. Never joined, never passed to a host shell, as for `RunPreDeploy.args`. |
+| `volumes` | `repeated VolumeMount` | Optional, 0 to 8 entries, no two with the same `target`. |
+| `labels` | `map<string, string>` | Optional, 0 to 32 entries. A key is 1 to 128 bytes of `[A-Za-z0-9._/-]`, starting with a letter or digit, and never starting with `dev.moonglass.` (only the agent sets those: ADR-0004 decision 11). A value is at most 1024 bytes with no NUL. Labels are not secrets and may be shown. |
+| `restart` | `string` | Empty, `no` or `on-failure`. Empty means `unless-stopped`, the default of every app. |
+| `healthcheck` | `Healthcheck` | Optional. Absent means the image's own check, if it has one, which the agent ignores (`docs/specs/release.md`, "Health"). |
+
+`VolumeMount`: `name` = 1, `target` = 2, `read_only` = 3.
+
+| Field | Type | Rule |
+|---|---|---|
+| `name` | `string` | 1 to 63 bytes of `[a-z0-9_.-]`, starting with a letter or digit. The agent makes the Docker volume name from it and the binding (`docs/specs/release.md`); it is never a host path. |
+| `target` | `string` | The path in the container: 2 to 256 bytes, starting with `/`, no NUL, no empty, `.` or `..` element, no trailing `/`. |
+| `read_only` | `bool` | |
+
+`Healthcheck`: `test` = 1, `interval_ms` = 2, `timeout_ms` = 3, `start_period_ms` = 4, `start_interval_ms` = 5, `retries` = 6.
+
+| Field | Type | Rule |
+|---|---|---|
+| `test` | `repeated string` | Docker's form, each entry 1 to 1024 bytes with no NUL: `NONE` alone; `CMD` followed by 1 to 31 argv entries; or `CMD-SHELL` followed by exactly one entry, which the container's own shell runs. Anything else is rejected. |
+| `interval_ms`, `timeout_ms` | `uint32` | 1000 to 300000. Required unless `test` is `NONE`. |
+| `start_period_ms` | `uint32` | 0 to 600000. |
+| `start_interval_ms` | `uint32` | 0, or 1000 to 300000. |
+| `retries` | `uint32` | 1 to 10. Required unless `test` is `NONE`. |
+
+With `test` `NONE`, the other five fields must be 0.
+
+Opening a `Deploy` rejects unknown fields inside `VolumeMount` and `Healthcheck`, like everywhere else. W6-1a names `TestDeployServiceSettingsRoundTrip`, `TestDeployServiceSettingsRejectMalformed` (a table with one row per rule above), `TestDeployServiceSettingsRejectUnknownNestedFields` and the fuzz target `FuzzOpenDeployServiceSettings`.
+
 ## Secret delivery (W4-8) and reveal (W4-9)
 
-Those messages are specified in `docs/specs/secrets.md` and added to the `.proto` by those tickets.
+Those messages are specified in `docs/specs/secrets.md` and added to the `.proto` by those tickets. `Deploy.env_key` is field 11 and `Deploy.secrets` is field 12 (owner decision of 2026-11-19, so they cannot collide with the service settings above).
 
 ## Error codes
 

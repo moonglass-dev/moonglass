@@ -94,6 +94,34 @@ The rollback rules:
 W2-11e adds `runServiceReleaseStateConformance`, run as `TestServiceReleaseStateConformanceSQLite` and `TestServiceReleaseStateConformancePostgres`, covering: a new service reading back empty release ids from `CreateService`, `Services` and `ServiceByName`; `ServiceByName` returning every field of the service and `ErrNotFound` for an unknown name, a name in another environment of the org and a name asked by another org; `SetServiceReleases` reading back a current and a previous id through both reads, then a new current with an empty previous; and `ErrNotFound` for an unknown or another org's service, with the first org's ids kept. It also adds `runRollbacksConformance`, run as `TestRollbacksConformanceSQLite` and `TestRollbacksConformancePostgres`, covering: starting a rollback and reading it back in the in-flight list; refusing an unknown or another org's service with `ErrNotFound` and writing nothing; finishing as each final status, refusing a second finish with `ErrRollbackState` and a non-final status with an error that names the three final ones, leaving the rollback running; the in-flight read in created order with another server's and finished rollbacks left out; and a second org getting `ErrNotFound` from a finish, no rows from the in-flight reads of the first org's server and no change to the first org's rollback. `TestPostgresRLSOnRollbacks` checks the `org_isolation` policy on `rollbacks` as the application role (unset, empty and nonexistent `app.org_id` return nothing; an `INSERT` for another org is refused by `WITH CHECK`; `rowsecurity` is on), and `TestRollbackConstraintsEnforced` checks the `status` `CHECK` and the release-column defaults and nullability with raw SQL on a migrated SQLite database.
 
 
+**`ResolveTarget`** (owner decision of 2026-11-19, W2-11h) resolves a project name and an optional environment name in the org, in one org-bound transaction. It returns:
+
+| Case | Project id | Environment id | Error |
+|---|---|---|---|
+| The project, and the environment when one is named, exist in the org | the project's | the environment's, or empty when none is named | nil |
+| The project exists, the named environment does not | the project's | empty | matches `ErrNotFound` |
+| The project does not exist in the org (including a name only in another org) | empty | empty | matches `ErrNotFound` |
+| Any other failure | empty | empty | the wrapped error |
+
+The project id on the second row is not a lookup of another org's data: it is the caller's own project, resolved inside the caller's org. `registry.Invoke` uses it to tell which name did not resolve and to match the project column of a scope row (`docs/specs/registry.md`). W2-11h adds `TestResolveTargetReportsKnownProjectSQLite` and `TestResolveTargetReportsKnownProjectPostgres`, which check the four rows on both backends, including that a project known only to another org returns two empty ids.
+
+### Service settings on releases (W6-1d, W6-4b)
+
+Owner decision of 2026-11-19 (week 6). `releases` gains the settings a `deploy` sends in `DEPLOY` (`docs/specs/registry.md`, `docs/specs/protocol.md`). Every column is `TEXT NOT NULL` with the default shown, like the other release text columns:
+
+| Column | Ticket | Default | Holds |
+|---|---|---|---|
+| `command` | W6-1d | `''` | A JSON argv, or empty text for none, like `pre_deploy` |
+| `volumes` | W6-1d | `'[]'` | A JSON array of `{"name", "target", "read_only"}` objects, in the order sent |
+| `labels` | W6-1d | `'{}'` | A JSON object of label keys to values |
+| `restart` | W6-1d | `''` | Empty, `no` or `on-failure` |
+| `healthcheck` | W6-1d | `''` | A JSON object `{"test", "interval_ms", "timeout_ms", "start_period_ms", "start_interval_ms", "retries"}`, or empty text for none |
+| `compose_hash` | W6-4b | `''` | The Compose hash the release was deployed with, 64 lowercase hex, or empty (`docs/specs/compose.md`) |
+
+- `EnqueueRelease` stores them as given and every release read returns them. A label value is not a secret: secrets travel only as ciphertext (`docs/specs/secrets.md`).
+- W6-4b: `Services` returns each service's `ComposeHash`, the `compose_hash` of the release named by its `current_release_id`, or empty when there is none.
+- W6-1d adds `runReleaseSettingsConformance`, run as `TestReleaseSettingsConformanceSQLite` and `TestReleaseSettingsConformancePostgres` (every setting read back as enqueued; an absent setting read back as its default), and `TestReleaseSettingsDefaults`, which checks the defaults and `NOT NULL` with raw SQL on a migrated SQLite database. W6-4b adds `TestComposeHashConformanceSQLite` and `TestComposeHashConformancePostgres` (the hash read back on the release, and on the service only once that release is current).
+
 ### Recovery recipients, environment keys and secrets (W3-2)
 
 Specified by the weeks 2–3 preflight (`docs/specs/secrets.md`). Row-level tables; they hold public keys and ciphertext only.

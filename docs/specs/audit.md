@@ -19,7 +19,7 @@ From W5-5, each event also records the target the call acted on, so the trail sa
 - `project_id` and `environment_id`: the ids `Invoke` checked the scope against, empty when the operation's level has none (`docs/specs/agent-identities.md`, `Level`).
 - `principal_kind` is `human`, `agent`, or `system` for the retention purge (`docs/specs/delete.md`). A `system` event has empty `user_id`, `agent_id`, `token_id`, `session_id` and `step_up_id`.
 
-The hash, with the columns of W4-1b and W5-1b:
+The hash, with the columns of W4-1e and W5-1b:
 
 `SHA-256(JSON [prev_hash, org_id, seq, id, at, principal_kind, user_id, agent_id, token_id, session_id, step_up_id, operation, project_id, environment_id, outcome, reason])`
 
