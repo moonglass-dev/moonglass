@@ -330,3 +330,7 @@ moonglass.dev/moonglass/tools/pipeline TestStopFileHaltsStateChanges
 moonglass.dev/moonglass/tools/pipeline TestSummarizeChecks
 moonglass.dev/moonglass/tools/pipeline TestTicketLifecycleToMerge
 moonglass.dev/moonglass/tools/pipeline TestWithStatusChangesOnlyTheStatusLine
+moonglass.dev/moonglass/ui TestPackageJSONExactPins
+moonglass.dev/moonglass/ui TestScaffoldFilesPresent
+moonglass.dev/moonglass/ui TestViteConfigAdapterStatic
+moonglass.dev/moonglass/ui TestViteConfigTailwind

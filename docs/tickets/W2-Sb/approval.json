@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "The four named tests are in package ui (ui/scaffold_test.go) and fail while the scaffold files are absent. TestScaffoldFilesPresent requires package.json, bun.lock, vite.config.ts, tsconfig.json, src/app.html, src/routes/+layout.svelte and .gitignore to be non-empty regular files, and svelte.config.js to be absent. TestPackageJSONExactPins requires packageManager bun@1.4.4, exactly the ADR-0016 pins with no range prefix and no extra packages, and each name@version substring in bun.lock. TestViteConfigAdapterStatic and TestViteConfigTailwind require the adapter-static import, pages and assets at ../internal/ui/dist, the client-routing option, and both the SvelteKit and Tailwind plugins. They use package-relative paths and make no network, port, or timing assumptions. TestViteConfigAdapterStatic spells the word fallback; the words gate exempts that word only in ui/vite.config.ts, so ui/scaffold_test.go will fail the words gate after these tests are locked."
+}

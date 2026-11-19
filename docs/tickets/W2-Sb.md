@@ -1,7 +1,7 @@
 ---
 id: W2-Sb
 title: SvelteKit scaffold
-status: todo
+status: merged
 risk: standard
 depends_on: [W0-2]
 allowed_paths:
