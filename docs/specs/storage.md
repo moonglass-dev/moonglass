@@ -34,7 +34,7 @@ Every table has `org_id`, except the lookup tables listed in one file in `intern
 
 - `orgs` — `org_id` equals the org's `id`. Created with a row for itself.
 - `memberships` — `org_id`, `user_id`, `role`, uniqueness on `(org_id, user_id)`. `role` is one of `owner`, `admin`, `member`, `viewer` (ADR-0006). There is no separate `roles` table: the allowed values are the role list, enforced by a constraint on both backends.
-- `servers` — `org_id`, `id` (the `server_id`), `created_at`. The public key lives only in `agent_keys`.
+- `servers` — `org_id`, `id` (the `server_id`), `created_at`. The public key lives only in `agent_keys`. FR1-2 adds `agent_age_recipient` — text, `NOT NULL DEFAULT ''`, the agent's raw 32-byte X25519 public key as lowercase hex from `EnrollRequest.agent_age_recipient`, empty until FR1-2's migration.
 - `tokens` — `org_id`, `id`, `user_id` (the human owner), `name`, `last4`, `expires_at`, `created_at`. Never the secret; the `mg_` prefix is constant and not stored. W5-1a adds `agent_id`: empty for a person's token, otherwise the agent identity that holds it, whose owner is `user_id` (`docs/specs/agent-identities.md`).
 - `agent_identities` (W5-1a) — `org_id`, `id`, `name`, `owner_user_id`, `created_at`, `revoked_at`; unique `(org_id, name)` (`docs/specs/agent-identities.md`).
 - `token_scopes` — `org_id`, `token_id`, `project`, `environment`, `operation`; `*` is the wildcard. An owner token has exactly one row, `* * *`.

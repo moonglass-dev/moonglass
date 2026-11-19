@@ -62,6 +62,8 @@ No field is a host shell command.
 
 `Heartbeat` carries `agent_version` (string). `HeartbeatAck` has no fields. Both round-trip through the envelope. Opening a Heartbeat acknowledgement as an Enroll request is an error. The control plane is expected to see heartbeats about every 30 seconds (S§5); v0 does not schedule them.
 
+W7-6d adds `update_channel` to `Heartbeat`. It is `"STABLE"` or `"CANARY"` from `update.channel` in agent.toml. It is empty when the agent predates W7-6d or the field is unconfigured, and such an agent is never sent an `UpdateOffer`. Any other non-empty value is rejected. The field carries no `UNSPECIFIED` value; the zero value is empty (`docs/specs/update.md`).
+
 ## Deploy commands (W2-2)
 
 Four commands, each a protobuf type carried in the envelope. None has a field that is a host shell command or a host path. W2-2 gave them no response type. W2-8 adds `CommandResult` (below): an `ERROR` envelope reports a message that could not be accepted at all, and a `CommandResult` reports what happened when the agent acted on one. The legal order of these commands for one app is `docs/specs/release.md`.

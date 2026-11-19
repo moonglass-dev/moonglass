@@ -26,6 +26,10 @@ The agent stores its files under the data dir, all mode 0600 (directory 0700): `
 
 The server has an Ed25519 identity, generated into its `--data-dir` on first start and reused after that. `EnrollResponse.control_plane_public_key` is that raw 32-byte public key. The agent writes it to its data dir as the pin. A later successful enrol to a different control-plane key replaces the pin (re-enrol to another control plane is the portability path). An `ACCEPTED` response with a missing or wrong-length control-plane key is an error and must not pin or print a fingerprint.
 
+## Transport security
+
+FR1-1 (owner decision, 2026-11-18). `--listen` serves TLS 1.3 with the server's Ed25519 self-signed certificate (`keys.SelfSignedCert`). `POST /v1/enroll` and the registry REST routes share that listener. There is no plain-HTTP listener in production; loopback tests use `httptest`. `moonglass agent enroll --server-fingerprint FP` verifies the leaf key's SHA-256 against the fingerprint `moonglass server` prints at start. After a successful enrol, `control-plane.pub` is the pin for every later connection. The CLI and browser reach the REST routes over standard HTTPS. The CLI refuses `http://` except localhost.
+
 ## HTTP endpoint
 
 `moonglass server` listens on `--listen` (tests use `httptest` or a localhost port). `POST /v1/enroll` accepts one length-prefixed protocol envelope (`internal/protocol`) whose payload is an `EnrollRequest`, and replies with one `EnrollResponse` envelope. No WebSocket in this ticket. TLS is not required on loopback tests; production TLS and `wss` are W1-4.
