@@ -218,8 +218,10 @@ moonglass.dev/moonglass/internal/release TestPreDeployFailureLeavesOldServing
 moonglass.dev/moonglass/internal/release TestRollbackRestoresPrevious
 moonglass.dev/moonglass/internal/server TestAgentEndpointRejectsNonGet
 moonglass.dev/moonglass/internal/server TestAgentRoutesMatchTheDeclaredList
+moonglass.dev/moonglass/internal/server TestEnrollDuplicateKeyStoresNoRecipient
 moonglass.dev/moonglass/internal/server TestEnrollRejectsInvalidToken
 moonglass.dev/moonglass/internal/server TestEnrollRejectsReplay
+moonglass.dev/moonglass/internal/server TestEnrollStoresAgeRecipient
 moonglass.dev/moonglass/internal/server TestIssueOwnerTokenAddsOwnerBesideExistingAdmins
 moonglass.dev/moonglass/internal/server TestIssueOwnerTokenCreatesLocalOwner
 moonglass.dev/moonglass/internal/server TestIssueOwnerTokenRejectsEmptyNameWithoutWrites
@@ -256,6 +258,9 @@ moonglass.dev/moonglass/internal/store TestRollbackConstraintsEnforced
 moonglass.dev/moonglass/internal/store TestRollbacksConformancePostgres
 moonglass.dev/moonglass/internal/store TestRollbacksConformanceSQLite
 moonglass.dev/moonglass/internal/store TestSchemasMatch
+moonglass.dev/moonglass/internal/store TestServerAgeRecipientConformancePostgres
+moonglass.dev/moonglass/internal/store TestServerAgeRecipientConformanceSQLite
+moonglass.dev/moonglass/internal/store TestServerAgeRecipientMigration
 moonglass.dev/moonglass/internal/store TestServiceReleaseStateConformancePostgres
 moonglass.dev/moonglass/internal/store TestServiceReleaseStateConformanceSQLite
 moonglass.dev/moonglass/internal/store TestSessionStoredHashedOnly

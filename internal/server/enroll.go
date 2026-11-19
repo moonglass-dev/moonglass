@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"moonglass.dev/moonglass/internal/keys"
 	"moonglass.dev/moonglass/internal/protocol"
 	agentv1 "moonglass.dev/moonglass/internal/protocol/agentv1"
 	"moonglass.dev/moonglass/internal/store"
@@ -35,8 +36,13 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "enroll: agent public keys must be exactly 32 bytes", http.StatusBadRequest)
 		return
 	}
+	recipient, err := keys.AgreeRecipient(req.GetAgentAgeRecipient())
+	if err != nil {
+		http.Error(w, "enroll: agent_age_recipient is not an X25519 public key", http.StatusBadRequest)
+		return
+	}
 
-	result, err := s.enrol(r, &req)
+	result, err := s.enrol(r, &req, recipient)
 	if err != nil {
 		http.Error(w, "enroll: the control plane could not use its store; see its logs and retry", http.StatusInternalServerError)
 		return
@@ -61,7 +67,7 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 
 // enrol checks the bearer token and registers the agent. A non-nil error is a
 // store failure and becomes HTTP 500.
-func (s *Server) enrol(r *http.Request, req *agentv1.EnrollRequest) (agentv1.EnrollResult, error) {
+func (s *Server) enrol(r *http.Request, req *agentv1.EnrollRequest, recipient keys.Recipient) (agentv1.EnrollResult, error) {
 	token, ok := bearer(r)
 	if !ok || req.GetTokenId() != store.HashToken(token) {
 		return agentv1.EnrollResult_TOKEN_INVALID, nil
@@ -78,7 +84,7 @@ func (s *Server) enrol(r *http.Request, req *agentv1.EnrollRequest) (agentv1.Enr
 	}
 	// The token is already spent: a duplicate key is reported as TOKEN_INVALID
 	// and the operator issues a fresh token.
-	_, err = s.st.AddServer(r.Context(), orgID, hex.EncodeToString(req.GetAgentSigningPublicKey()))
+	_, err = s.st.AddServer(r.Context(), orgID, hex.EncodeToString(req.GetAgentSigningPublicKey()), recipient.String())
 	switch {
 	case err == nil:
 		return agentv1.EnrollResult_ACCEPTED, nil

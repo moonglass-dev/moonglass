@@ -61,7 +61,7 @@ func TestPostgresMissingOrgFilterReturnsNothing(t *testing.T) {
 		if err := s.AddMembership(ctx, id, u, store.RoleOwner); err != nil {
 			t.Fatalf("AddMembership error = %v, want nil", err)
 		}
-		if _, err := s.AddServer(ctx, id, "pub-"+randHex(t, 16)); err != nil {
+		if _, err := s.AddServer(ctx, id, "pub-"+randHex(t, 16), testRecipient(t)); err != nil {
 			t.Fatalf("AddServer error = %v, want nil", err)
 		}
 	}

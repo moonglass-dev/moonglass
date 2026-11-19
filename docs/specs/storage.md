@@ -35,7 +35,7 @@ Every table has `org_id`, except the lookup tables listed in one file in `intern
 
 - `orgs` — `org_id` equals the org's `id`. Created with a row for itself.
 - `memberships` — `org_id`, `user_id`, `role`, uniqueness on `(org_id, user_id)`. `role` is one of `owner`, `admin`, `member`, `viewer` (ADR-0006). There is no separate `roles` table: the allowed values are the role list, enforced by a constraint on both backends.
-- `servers` — `org_id`, `id` (the `server_id`), `created_at`. The public key lives only in `agent_keys`. FR1-2 adds `agent_age_recipient` — text, `NOT NULL DEFAULT ''`, the agent's raw 32-byte X25519 public key as lowercase hex from `EnrollRequest.agent_age_recipient`, empty until FR1-2's migration.
+- `servers` — `org_id`, `id` (the `server_id`), `created_at`, `agent_age_recipient` (the agent's age X25519 recipient in Bech32 form, `age1…`; empty for servers enrolled before FR1-2). The signing public key lives only in `agent_keys`.
 - `tokens` — `org_id`, `id`, `user_id` (the human owner), `name`, `last4`, `expires_at`, `created_at`. Never the secret; the `mg_` prefix is constant and not stored. W5-1a adds `agent_id`: empty for a person's token, otherwise the agent identity that holds it, whose owner is `user_id` (`docs/specs/agent-identities.md`).
 - `agent_identities` (W5-1a) — `org_id`, `id`, `name`, `owner_user_id`, `created_at`, `revoked_at`; unique `(org_id, name)` (`docs/specs/agent-identities.md`).
 - `token_scopes` — `org_id`, `token_id`, `project`, `environment`, `operation`; `*` is the wildcard. An owner token has exactly one row, `* * *`.
@@ -138,6 +138,12 @@ Specified by the week 5 preflight. `services` gains `deleted_at` and `purge_deta
 ### Server deploy keys (W3-8)
 
 `servers` gains `deploy_key`: the server's SSH deploy public key from its latest `Heartbeat` (`docs/specs/protocol.md`), or empty. It is a public key.
+
+### Agent age recipients (FR1-2)
+
+`servers` gains `agent_age_recipient`: `TEXT NOT NULL DEFAULT ''` on both backends. It is the agent's age X25519 recipient in Bech32 form, `age1…`, and it is a public key. Enrolment writes `keys.AgreeRecipient(EnrollRequest.agent_age_recipient).String()`. `AddServer` refuses an empty recipient before any SQL runs and writes it in the same transaction as the `agent_keys` row, so a duplicate signing key rolls the server row back. The store copies the text it is given and does not parse it. `ServerByPublicKey` and `Servers` return it on every server read.
+
+It lives on `servers`, not `agent_keys`, because a lookup row holds only its key and IDs. Servers enrolled before migration `0007` hold `''` until a re-enrolment or rotation ticket runs. Wrapping a key to this recipient is W4-8 and W3-3, and only after the owner's CLI fingerprint check in `docs/specs/secrets.md`.
 
 ### Sessions, links and step-ups (W4-1a, W4-1d)
 

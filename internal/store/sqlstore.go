@@ -174,16 +174,20 @@ func (s *SQLStore) UserOrgs(ctx context.Context, userID string) ([]string, error
 	return out, nil
 }
 
-// AddServer implements Store. The public key is stored only in agent_keys.
-func (s *SQLStore) AddServer(ctx context.Context, orgID, publicKey string) (Server, error) {
+// AddServer implements Store. The signing public key is stored only in
+// agent_keys; the age recipient only on servers.
+func (s *SQLStore) AddServer(ctx context.Context, orgID, publicKey, ageRecipient string) (Server, error) {
+	if ageRecipient == "" {
+		return Server{}, errors.New("add server: agent age recipient is empty: pass the age1… recipient the agent sent at enrolment")
+	}
 	id, err := NewID()
 	if err != nil {
 		return Server{}, err
 	}
-	srv := Server{OrgID: orgID, ID: id, PublicKey: publicKey, CreatedAt: formatTime(time.Now())}
+	srv := Server{OrgID: orgID, ID: id, PublicKey: publicKey, AgeRecipient: ageRecipient, CreatedAt: formatTime(time.Now())}
 	err = s.inOrg(ctx, orgID, func(tx *sql.Tx) error {
-		if _, insErr := tx.ExecContext(ctx, s.q("INSERT INTO servers (id, org_id, created_at) VALUES ($1, $2, $3)"),
-			srv.ID, orgID, srv.CreatedAt); insErr != nil {
+		if _, insErr := tx.ExecContext(ctx, s.q("INSERT INTO servers (id, org_id, created_at, agent_age_recipient) VALUES ($1, $2, $3, $4)"),
+			srv.ID, orgID, srv.CreatedAt, srv.AgeRecipient); insErr != nil {
 			return s.dupOr(insErr, "insert server")
 		}
 		if _, insErr := tx.ExecContext(ctx, s.q("INSERT INTO agent_keys (public_key, server_id, org_id) VALUES ($1, $2, $3)"),
@@ -211,8 +215,8 @@ func (s *SQLStore) ServerByPublicKey(ctx context.Context, publicKey string) (Ser
 		return Server{}, fmt.Errorf("select agent key: %w", err)
 	}
 	err = s.inOrg(ctx, srv.OrgID, func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, s.q("SELECT created_at FROM servers WHERE id = $1 AND org_id = $2"), srv.ID, srv.OrgID).
-			Scan(&srv.CreatedAt)
+		return tx.QueryRowContext(ctx, s.q("SELECT created_at, agent_age_recipient FROM servers WHERE id = $1 AND org_id = $2"), srv.ID, srv.OrgID).
+			Scan(&srv.CreatedAt, &srv.AgeRecipient)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Server{}, fmt.Errorf("server by public key: %w", ErrNotFound)
@@ -227,7 +231,7 @@ func (s *SQLStore) ServerByPublicKey(ctx context.Context, publicKey string) (Ser
 func (s *SQLStore) Servers(ctx context.Context, orgID string) ([]Server, error) {
 	var out []Server
 	err := s.inOrg(ctx, orgID, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, s.q(`SELECT s.id, s.org_id, s.created_at, k.public_key
+		rows, err := tx.QueryContext(ctx, s.q(`SELECT s.id, s.org_id, s.created_at, k.public_key, s.agent_age_recipient
 			FROM servers s JOIN agent_keys k ON k.server_id = s.id
 			WHERE s.org_id = $1 AND k.revoked_at IS NULL ORDER BY s.id`), orgID)
 		if err != nil {
@@ -236,7 +240,7 @@ func (s *SQLStore) Servers(ctx context.Context, orgID string) ([]Server, error) 
 		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var srv Server
-			if err := rows.Scan(&srv.ID, &srv.OrgID, &srv.CreatedAt, &srv.PublicKey); err != nil {
+			if err := rows.Scan(&srv.ID, &srv.OrgID, &srv.CreatedAt, &srv.PublicKey, &srv.AgeRecipient); err != nil {
 				return fmt.Errorf("scan server: %w", err)
 			}
 			out = append(out, srv)

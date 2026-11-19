@@ -83,12 +83,14 @@ type Membership struct {
 	Role   Role
 }
 
-// Server is a registered server and its agent public key.
+// Server is a registered server, its agent signing public key and its agent
+// age recipient (`age1…`).
 type Server struct {
-	OrgID     string
-	ID        string
-	PublicKey string
-	CreatedAt string
+	OrgID        string
+	ID           string
+	PublicKey    string
+	AgeRecipient string
+	CreatedAt    string
 }
 
 // Project is one project of an org.
@@ -258,7 +260,10 @@ type Store interface {
 	AddMembership(ctx context.Context, orgID, userID string, role Role) error
 	Memberships(ctx context.Context, orgID string) ([]Membership, error)
 	UserOrgs(ctx context.Context, userID string) ([]string, error)
-	AddServer(ctx context.Context, orgID, publicKey string) (Server, error)
+	// AddServer registers a server. ageRecipient is the agent's age recipient
+	// (`age1…`), copied and never parsed; an empty one is an error and nothing
+	// is written.
+	AddServer(ctx context.Context, orgID, publicKey, ageRecipient string) (Server, error)
 	ServerByPublicKey(ctx context.Context, publicKey string) (Server, error)
 	Servers(ctx context.Context, orgID string) ([]Server, error)
 	// CreateProject returns ErrInvalidName for a name outside the name format

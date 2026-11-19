@@ -55,7 +55,7 @@ func (f *fixture) controlPlanePub(t *testing.T) ed25519.PublicKey {
 func (f *fixture) enrolled(t *testing.T) ed25519.PrivateKey {
 	t.Helper()
 	pub, priv := mustKey(t)
-	if _, err := f.st.AddServer(context.Background(), f.org, hex.EncodeToString(pub)); err != nil {
+	if _, err := f.st.AddServer(context.Background(), f.org, hex.EncodeToString(pub), "age1"+hex.EncodeToString(pub)); err != nil {
 		t.Fatalf("AddServer: unexpected error %v", err)
 	}
 	return priv

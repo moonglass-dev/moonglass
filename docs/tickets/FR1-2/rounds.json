@@ -1,0 +1,14 @@
+{
+  "counts": {
+    "build": 1,
+    "done:approve": 2,
+    "done:build": 1,
+    "done:plan": 1,
+    "done:review": 1,
+    "done:tests": 2,
+    "done:ticket": 1,
+    "review": 1,
+    "worker": 1
+  },
+  "claim": null
+}

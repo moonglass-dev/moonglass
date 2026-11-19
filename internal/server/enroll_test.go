@@ -198,6 +198,83 @@ func TestEnrollRejectsInvalidToken(t *testing.T) {
 	}
 }
 
+func TestEnrollStoresAgeRecipient(t *testing.T) {
+	f := newFixture(t)
+	tok := f.issue(t)
+	req := newRequest(t, tok)
+
+	status, resp := post(t, f.ts.URL, "Bearer "+tok, req)
+	if status != http.StatusOK {
+		t.Fatalf("status: expected %d, got %d", http.StatusOK, status)
+	}
+	if resp.GetResult() != agentv1.EnrollResult_ACCEPTED {
+		t.Fatalf("result: expected %v, got %v", agentv1.EnrollResult_ACCEPTED, resp.GetResult())
+	}
+
+	want, err := keys.AgreeRecipient(req.GetAgentAgeRecipient())
+	if err != nil {
+		t.Fatalf("keys.AgreeRecipient: unexpected error %v", err)
+	}
+	if !strings.HasPrefix(want.String(), "age1") {
+		t.Errorf("recipient = %q, want an age1 prefix", want.String())
+	}
+
+	got := f.servers(t)
+	if len(got) != 1 {
+		t.Fatalf("registered servers: expected 1, got %d (%v)", len(got), got)
+	}
+	if got[0].AgeRecipient != want.String() {
+		t.Errorf("servers[0].AgeRecipient = %q, want %q", got[0].AgeRecipient, want.String())
+	}
+
+	srv, err := f.st.ServerByPublicKey(context.Background(), hex.EncodeToString(req.GetAgentSigningPublicKey()))
+	if err != nil {
+		t.Fatalf("ServerByPublicKey: unexpected error %v", err)
+	}
+	if srv.AgeRecipient != want.String() {
+		t.Errorf("ServerByPublicKey AgeRecipient = %q, want %q", srv.AgeRecipient, want.String())
+	}
+}
+
+func TestEnrollDuplicateKeyStoresNoRecipient(t *testing.T) {
+	f := newFixture(t)
+	tokA, tokB := f.issue(t), f.issue(t)
+	reqA := newRequest(t, tokA)
+	reqB := newRequest(t, tokB)
+	reqB.AgentSigningPublicKey = reqA.AgentSigningPublicKey
+
+	if bytes.Equal(reqA.AgentAgeRecipient, reqB.AgentAgeRecipient) {
+		t.Fatalf("test setup: the two requests must carry different age recipients")
+	}
+
+	if status, resp := post(t, f.ts.URL, "Bearer "+tokA, reqA); status != http.StatusOK || resp.GetResult() != agentv1.EnrollResult_ACCEPTED {
+		t.Fatalf("first enroll: expected 200 ACCEPTED, got %d %v", status, resp.GetResult())
+	}
+	if status, resp := post(t, f.ts.URL, "Bearer "+tokB, reqB); status != http.StatusOK || resp.GetResult() != agentv1.EnrollResult_TOKEN_INVALID {
+		t.Fatalf("second enroll: expected 200 %v, got %d %v", agentv1.EnrollResult_TOKEN_INVALID, status, resp.GetResult())
+	}
+
+	first, err := keys.AgreeRecipient(reqA.GetAgentAgeRecipient())
+	if err != nil {
+		t.Fatalf("keys.AgreeRecipient(reqA): unexpected error %v", err)
+	}
+	second, err := keys.AgreeRecipient(reqB.GetAgentAgeRecipient())
+	if err != nil {
+		t.Fatalf("keys.AgreeRecipient(reqB): unexpected error %v", err)
+	}
+
+	got := f.servers(t)
+	if len(got) != 1 {
+		t.Fatalf("registered servers: expected 1, got %d (%v)", len(got), got)
+	}
+	if got[0].AgeRecipient != first.String() {
+		t.Errorf("servers[0].AgeRecipient = %q, want the first recipient %q", got[0].AgeRecipient, first.String())
+	}
+	if got[0].AgeRecipient == second.String() {
+		t.Errorf("servers[0].AgeRecipient = %q, want the first recipient, not the second %q", got[0].AgeRecipient, second.String())
+	}
+}
+
 func TestEnrollRejectsReplay(t *testing.T) {
 	t.Run("same request twice", func(t *testing.T) {
 		f := newFixture(t)

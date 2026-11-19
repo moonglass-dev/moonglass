@@ -141,7 +141,7 @@ func runRollbacksConformance(t *testing.T, s store.Store) {
 
 	t.Run("in flight", func(t *testing.T) {
 		tgt := seedTarget(t, s)
-		srv2, err := s.AddServer(ctx, tgt.orgID, "pub-"+randHex(t, 16))
+		srv2, err := s.AddServer(ctx, tgt.orgID, "pub-"+randHex(t, 16), testRecipient(t))
 		if err != nil {
 			t.Fatalf("AddServer error = %v, want nil", err)
 		}

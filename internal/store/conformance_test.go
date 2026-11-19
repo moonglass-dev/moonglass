@@ -123,7 +123,7 @@ func runConformance(t *testing.T, s store.Store) {
 	t.Run("servers", func(t *testing.T) {
 		org := newOrg(t)
 		pub := "pub-" + randHex(t, 16)
-		srv, err := s.AddServer(ctx, org, pub)
+		srv, err := s.AddServer(ctx, org, pub, testRecipient(t))
 		if err != nil {
 			t.Fatalf("AddServer error = %v, want nil", err)
 		}
@@ -184,9 +184,9 @@ func runConformance(t *testing.T, s store.Store) {
 		}
 		must(s.AddMembership(ctx, a, ua, store.RoleOwner))
 		must(s.AddMembership(ctx, b, ub, store.RoleOwner))
-		sa, err := s.AddServer(ctx, a, "pub-"+randHex(t, 16))
+		sa, err := s.AddServer(ctx, a, "pub-"+randHex(t, 16), testRecipient(t))
 		must(err)
-		_, err = s.AddServer(ctx, b, "pub-"+randHex(t, 16))
+		_, err = s.AddServer(ctx, b, "pub-"+randHex(t, 16), testRecipient(t))
 		must(err)
 		must(s.AddEnrolmentToken(ctx, a, store.HashToken("mg_"+randHex(t, 16)), time.Now().UTC().Add(time.Hour)))
 

@@ -367,7 +367,7 @@ func runReleasesConformance(t *testing.T, s store.Store) {
 	t.Run("in flight", func(t *testing.T) {
 		tgt := seedTarget(t, s)
 		org := tgt.orgID
-		srv2, err := s.AddServer(ctx, org, "pub-"+randHex(t, 16))
+		srv2, err := s.AddServer(ctx, org, "pub-"+randHex(t, 16), testRecipient(t))
 		if err != nil {
 			t.Fatalf("AddServer error = %v, want nil", err)
 		}

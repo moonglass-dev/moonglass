@@ -26,7 +26,7 @@ func seedOrg(t *testing.T, s store.Store) (orgID, serverID string) {
 	if err != nil {
 		t.Fatalf("CreateOrg error = %v, want nil", err)
 	}
-	srv, err := s.AddServer(ctx, orgID, "pk-"+randHex(t, 16))
+	srv, err := s.AddServer(ctx, orgID, "pk-"+randHex(t, 16), testRecipient(t))
 	if err != nil {
 		t.Fatalf("AddServer in org %s error = %v, want nil", orgID, err)
 	}
