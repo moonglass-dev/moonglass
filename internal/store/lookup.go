@@ -9,4 +9,5 @@ var LookupTables = []string{
 	"agent_keys",
 	"enrolment_token_hashes",
 	"token_hashes",
+	"session_hashes",
 }

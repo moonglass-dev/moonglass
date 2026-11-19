@@ -205,6 +205,8 @@ moonglass.dev/moonglass/internal/server TestRunPrintsEnrolTokenBeforeOwnerToken
 moonglass.dev/moonglass/internal/server TestRunPrintsOwnerTokenOnce
 moonglass.dev/moonglass/internal/server TestServerClosesOnBadAgentFrame
 moonglass.dev/moonglass/internal/store TestAppRoleCannotBypassRLS
+moonglass.dev/moonglass/internal/store TestAuditSessionColumnsConformancePostgres
+moonglass.dev/moonglass/internal/store TestAuditSessionColumnsConformanceSQLite
 moonglass.dev/moonglass/internal/store TestConformancePostgres
 moonglass.dev/moonglass/internal/store TestConformanceSQLite
 moonglass.dev/moonglass/internal/store TestEnrolmentTokenStoredHashedOnly
@@ -221,6 +223,9 @@ moonglass.dev/moonglass/internal/store TestReleaseConstraintsEnforced
 moonglass.dev/moonglass/internal/store TestReleasesConformancePostgres
 moonglass.dev/moonglass/internal/store TestReleasesConformanceSQLite
 moonglass.dev/moonglass/internal/store TestSchemasMatch
+moonglass.dev/moonglass/internal/store TestSessionStoredHashedOnly
+moonglass.dev/moonglass/internal/store TestSessionsConformancePostgres
+moonglass.dev/moonglass/internal/store TestSessionsConformanceSQLite
 moonglass.dev/moonglass/internal/store TestTokenAuditTablesHaveRLS
 moonglass.dev/moonglass/internal/store TestTokensAndAuditSQLite
 moonglass.dev/moonglass/internal/store TestTokensAuditConformancePostgres

@@ -110,9 +110,10 @@ func (s *SQLStore) appendAuditOnce(ctx context.Context, orgID string, seal func(
 		}
 		ev := seal(prev, seq+1)
 		if _, err := tx.ExecContext(ctx,
-			s.q(`INSERT INTO audit_events (org_id, seq, id, at, principal_kind, user_id, token_id, operation, outcome, reason, prev_hash, hash)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`),
-			orgID, ev.Seq, ev.ID, ev.At, ev.PrincipalKind, ev.UserID, ev.TokenID, ev.Operation, ev.Outcome, ev.Reason, ev.PrevHash, ev.Hash); err != nil {
+			s.q(`INSERT INTO audit_events (org_id, seq, id, at, principal_kind, user_id, token_id, session_id, step_up_id, operation, outcome, reason, prev_hash, hash)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`),
+			orgID, ev.Seq, ev.ID, ev.At, ev.PrincipalKind, ev.UserID, ev.TokenID, ev.SessionID, ev.StepUpID,
+			ev.Operation, ev.Outcome, ev.Reason, ev.PrevHash, ev.Hash); err != nil {
 			return s.dupOr(err, "insert audit event")
 		}
 		return nil
@@ -124,7 +125,7 @@ func (s *SQLStore) AuditEvents(ctx context.Context, orgID string) ([]AuditEvent,
 	var out []AuditEvent
 	err := s.inOrg(ctx, orgID, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx,
-			s.q(`SELECT org_id, seq, id, at, principal_kind, user_id, token_id, operation, outcome, reason, prev_hash, hash
+			s.q(`SELECT org_id, seq, id, at, principal_kind, user_id, token_id, session_id, step_up_id, operation, outcome, reason, prev_hash, hash
 				FROM audit_events WHERE org_id = $1 ORDER BY seq`), orgID)
 		if err != nil {
 			return fmt.Errorf("select audit events: %w", err)
@@ -133,7 +134,7 @@ func (s *SQLStore) AuditEvents(ctx context.Context, orgID string) ([]AuditEvent,
 		for rows.Next() {
 			var ev AuditEvent
 			if err := rows.Scan(&ev.OrgID, &ev.Seq, &ev.ID, &ev.At, &ev.PrincipalKind, &ev.UserID, &ev.TokenID,
-				&ev.Operation, &ev.Outcome, &ev.Reason, &ev.PrevHash, &ev.Hash); err != nil {
+				&ev.SessionID, &ev.StepUpID, &ev.Operation, &ev.Outcome, &ev.Reason, &ev.PrevHash, &ev.Hash); err != nil {
 				return fmt.Errorf("scan audit event: %w", err)
 			}
 			out = append(out, ev)

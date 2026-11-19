@@ -172,6 +172,14 @@ type Token struct {
 	Revoked   bool
 }
 
+// Session is one sign-in session without its bearer: the bearer is stored only
+// as HashToken in session_hashes, so this type has no hash field.
+type Session struct {
+	ID        string
+	UserID    string
+	ExpiresAt string
+}
+
 // AuditEvent is one hash-chained audit row. PrevHash is empty for Seq 1.
 type AuditEvent struct {
 	OrgID         string
@@ -180,6 +188,8 @@ type AuditEvent struct {
 	PrincipalKind string
 	UserID        string
 	TokenID       string
+	SessionID     string
+	StepUpID      string
 	Operation     string
 	Outcome       string
 	Reason        string
@@ -261,6 +271,16 @@ type Store interface {
 	// TokenByHash finds a token by the hash of its text and returns it with
 	// its holder's role. It returns ErrNotFound when no token or membership matches.
 	TokenByHash(ctx context.Context, tokenHash string) (Token, Role, error)
+	// AddSession stores a session of userID under sessionHash (see HashToken)
+	// and returns it; a repeated hash is ErrDuplicate.
+	AddSession(ctx context.Context, userID, sessionHash string, expires time.Time) (Session, error)
+	// SessionByHash returns the session of sessionHash while it is live at now.
+	// It returns ErrNotFound for an unknown, revoked or expired session.
+	SessionByHash(ctx context.Context, sessionHash string, now time.Time) (Session, error)
+	// RevokeSession stamps revoked_at on one of userID's sessions. It returns
+	// nil for a session already revoked, and ErrNotFound when no session with
+	// that id belongs to userID.
+	RevokeSession(ctx context.Context, userID, sessionID string, now time.Time) error
 	// AppendAudit adds the event that seal builds for the next sequence number
 	// and the previous hash, in one transaction so the chain stays serial.
 	AppendAudit(ctx context.Context, orgID string, seal func(prevHash string, seq int64) AuditEvent) error

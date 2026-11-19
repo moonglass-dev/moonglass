@@ -23,6 +23,7 @@ func TestSchemasMatch(t *testing.T) {
 
 func TestLookupTablesMatchSchema(t *testing.T) {
 	want := []string{"agent_keys", "enrolment_token_hashes", "token_hashes", "user_identities", "user_orgs"}
+	want = append(want, "session_hashes")
 	if !sameStrings(store.LookupTables, want) {
 		t.Errorf("store.LookupTables = %v, want %v", store.LookupTables, want)
 	}
