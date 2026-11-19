@@ -282,7 +282,8 @@ registries   = ["ghcr.io/acme/*"]
 
 ### The file
 
-- `LoadFile` requires a regular file, not a symlink. It must be owned by `owner` (the agent passes `0`) and not writable by group or others. Otherwise it is an error that says to fix ownership or mode.
+- `LoadFile` requires a regular file, not a symlink, readable by its owner and not writable by group or others. It must be owned by `owner` (the agent passes `0`). Each check runs once; a file whose owner uid cannot be read is refused, so the owner comparison is never skipped. Otherwise it is an error that says to fix `chmod` or `chown`.
+- Every error `LoadFile` returns names the file's path, and never includes the file's contents.
 - **An absent file is an empty configuration:** no exceptions, nothing forbidden, no source restrictions, channel `stable`. A present file that cannot be read, parsed or validated is an error and the agent does not start.
 - The file is read once. There is no reload, watcher or signal handler. A change takes effect on agent restart.
 - Enrolment state and keys are not in this file and this package never reads or writes `/var/lib/moonglass`.

@@ -153,41 +153,19 @@ func Parse(data []byte, env Env) (*Policy, error) {
 }
 
 // LoadFile reads path as agent.toml. An absent file is the empty configuration.
-// The file must be a regular file owned by owner and not group- or world-writable.
+// The file must be a regular file and not a symlink, readable by its owner and
+// not writable by group or others, and owned by owner; a file whose owner
+// cannot be read is refused. Every error names the path.
 func LoadFile(file string, env Env, owner int) (*Policy, error) {
 	fi, err := os.Lstat(file)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return Parse(nil, env)
 		}
+		return nil, fmt.Errorf("stat %s: %w", file, err)
+	}
+	if err = checkAgentTOML(file, fi, owner); err != nil {
 		return nil, err
-	}
-	if fi.Mode()&os.ModeSymlink != 0 || !fi.Mode().IsRegular() {
-		// Lstat on a symlink reports ModeSymlink. On a non-regular file too.
-		if fi.Mode()&os.ModeSymlink != 0 {
-			return nil, fmt.Errorf("%s is a symlink; replace it with a regular file", file)
-		}
-		return nil, fmt.Errorf("%s is not a regular file", file)
-	}
-	st, ok := fi.Sys().(interface{ Uid() uint32 })
-	// UID comes from the file's stat below.
-	uid, uidOK := fileUID(fi)
-	if !uidOK && st != nil {
-		uid, uidOK = int(st.Uid()), true
-	}
-	mode := fi.Mode().Perm()
-	if mode&0o022 != 0 || mode&0o004 == 0 && mode&0o400 == 0 {
-		// group/other writable, or not owner-readable (including 000)
-		return nil, fmt.Errorf("%s has unsafe mode: fix chmod (mode %o)", file, mode)
-	}
-	if mode&0o022 != 0 {
-		return nil, fmt.Errorf("%s is group or world writable; fix chmod", file)
-	}
-	if uidOK && uid != owner {
-		return nil, fmt.Errorf("%s has the wrong owner (uid %d, want %d); fix chown", file, uid, owner)
-	}
-	if mode&0o400 == 0 {
-		return nil, fmt.Errorf("%s is not readable; fix chmod", file)
 	}
 	f, err := os.Open(filepath.Clean(file))
 	if err != nil {
@@ -196,10 +174,37 @@ func LoadFile(file string, env Env, owner int) (*Policy, error) {
 	defer func() { _ = f.Close() }()
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read %s: %w", file, err)
 	}
-	_ = ok
-	return Parse(data, env)
+	p, err := Parse(data, env)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", file, err)
+	}
+	return p, nil
+}
+
+// checkAgentTOML refuses a file that is a symlink, is not a regular file, is
+// writable by group or others, is not readable by its owner, or is not owned by
+// owner. Each rule is checked once, and an owner that cannot be read refuses
+// the file.
+func checkAgentTOML(file string, fi fs.FileInfo, owner int) error {
+	if fi.Mode()&fs.ModeSymlink != 0 {
+		return fmt.Errorf("%s is a symlink; replace it with a regular file", file)
+	}
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file; replace it with a regular file", file)
+	}
+	if mode := fi.Mode().Perm(); mode&0o022 != 0 || mode&0o400 == 0 {
+		return fmt.Errorf("%s has unsafe mode %#o: it must be readable by its owner and not writable by group or others; fix with chmod 0600", file, mode)
+	}
+	uid, ok := statUID(fi)
+	if !ok {
+		return fmt.Errorf("%s: cannot read the file owner, so it is refused; check the file system reports a uid", file)
+	}
+	if uid != owner {
+		return fmt.Errorf("%s has the wrong owner (uid %d, want %d); fix with chown", file, uid, owner)
+	}
+	return nil
 }
 
 func compileBlock(env Env, index int, rb rawAllow) (allowBlock, error) {
@@ -664,8 +669,4 @@ func formatTOMLError(data []byte, err error) error {
 		return fmt.Errorf("%s", msg)
 	}
 	return err
-}
-
-func fileUID(fi fs.FileInfo) (int, bool) {
-	return statUID(fi)
 }

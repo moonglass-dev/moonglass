@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All six named tests are in package policy in internal/policy/load_test.go. They cover unknown-owner refusal (Sys nil and a Uid() method type, including a matching uid), the listed mode table with no root skip, owner match/mismatch with both uids in the error, symlink vs directory/pipe, LoadFile path-in-error cases including ENOTDIR wrapping, and safe 0o600/0o400/0o644 loads with Config() equal to the parsed values. No existing test line changed. They do not compile yet, because checkAgentTOML is not in the tree."
+}

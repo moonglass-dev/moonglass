@@ -94,6 +94,10 @@ moonglass.dev/moonglass/internal/policy TestAllowEveryKeyAllowsItsField
 moonglass.dev/moonglass/internal/policy TestAllowNeverMatchesTagOrMissingDigest
 moonglass.dev/moonglass/internal/policy TestAllowOnlyListedFields
 moonglass.dev/moonglass/internal/policy TestAllowUnitesMatchingBlocks
+moonglass.dev/moonglass/internal/policy TestCheckAgentTOMLFileType
+moonglass.dev/moonglass/internal/policy TestCheckAgentTOMLMode
+moonglass.dev/moonglass/internal/policy TestCheckAgentTOMLOwner
+moonglass.dev/moonglass/internal/policy TestCheckAgentTOMLRefusesUnknownOwner
 moonglass.dev/moonglass/internal/policy TestCheckAllowsBenignSpec
 moonglass.dev/moonglass/internal/policy TestCheckBuildEntitlements
 moonglass.dev/moonglass/internal/policy TestCheckComposeBuildNetworkHostIsEntitlement
@@ -126,6 +130,8 @@ moonglass.dev/moonglass/internal/policy TestForbidsClasses
 moonglass.dev/moonglass/internal/policy TestImageSourceMatching
 moonglass.dev/moonglass/internal/policy TestImageSourceNormalForm
 moonglass.dev/moonglass/internal/policy TestLoadFileAbsentIsEmptyConfig
+moonglass.dev/moonglass/internal/policy TestLoadFileErrorsNamePath
+moonglass.dev/moonglass/internal/policy TestLoadFileLoadsSafeFile
 moonglass.dev/moonglass/internal/policy TestLoadFileRejectsUnsafeFile
 moonglass.dev/moonglass/internal/policy TestParseFullExample
 moonglass.dev/moonglass/internal/policy TestParseRejectsAgentLabelsAllowKey
