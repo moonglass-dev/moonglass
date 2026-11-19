@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All four named tests are in package protocol. Round-trip uses roundTrip (Wrap, Marshal, Unmarshal, Open, proto.Equal) for both messages at 1 byte, 64 bytes and a.b_c-D9, then checks the decoded envelope type is 15 or 16. RejectMalformed requires Open to return ErrMalformed naming app_id for the zero message, 65 bytes, slash, space, NUL, colon, a non-ASCII fixture and ../x. Protocol abuse covers an unknown field, the three Open mismatches, the three Wrap mismatches, Marshal and Unmarshal of an envelope carrying error, a single app_id string field and assertNoShellStringFields. The fuzz target is seeded with a valid payload, a 64-byte id, empty input, an unknown field and an id containing a slash, and requires nil or ErrMalformed, then validateID, a re-wrap and proto.Equal. They do not compile yet, because StopApp, RemoveApp, STOP_APP and REMOVE_APP are not in the tree. The only existing test line changed is the owner-allowed 15 to 2147483647 in TestDeployMessagesRejectUnknownType."
+}

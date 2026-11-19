@@ -105,7 +105,7 @@ Opening a payload rejects unknown fields at every nesting level, including insid
 
 ### CommandResult
 
-A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` is the `request_id` of the command it answers. The agent sends exactly one per command envelope it accepted: `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, and from W3-7 `BUILD`.
+A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` is the `request_id` of the command it answers. The agent sends exactly one per command envelope it accepted: `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, and from W3-7 `BUILD`, and from W5-5b `STOP_APP` and `REMOVE_APP`.
 
 | Field | Type | Rule |
 |---|---|---|
@@ -190,7 +190,7 @@ Specified by the week 5 preflight (`docs/specs/delete.md`, owner decision D62). 
 | `StopApp` | `STOP_APP` | `app_id` |
 | `RemoveApp` | `REMOVE_APP` | `app_id` |
 
-Both are `delete` class for `agent.toml` (`docs/specs/local-policy.md`). What the agent does with them is `docs/specs/delete.md`.
+Both are `delete` class for `agent.toml` (`docs/specs/local-policy.md`). In their `CommandResult`, `image_id` and `repo_digest` are empty. What the agent does with them is `docs/specs/delete.md`.
 
 ## Service settings (W6-1a)
 

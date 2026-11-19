@@ -163,6 +163,7 @@ moonglass.dev/moonglass/internal/protocol FuzzOpenBuild
 moonglass.dev/moonglass/internal/protocol FuzzOpenCommandResult
 moonglass.dev/moonglass/internal/protocol FuzzOpenDeploy
 moonglass.dev/moonglass/internal/protocol FuzzOpenHeartbeat
+moonglass.dev/moonglass/internal/protocol FuzzOpenStopAndRemoveApp
 moonglass.dev/moonglass/internal/protocol TestBuildProtocolAbuse
 moonglass.dev/moonglass/internal/protocol TestBuildRejectsInvalid
 moonglass.dev/moonglass/internal/protocol TestBuildRoundTrip
@@ -187,6 +188,9 @@ moonglass.dev/moonglass/internal/protocol TestHeartbeatReportsRoundTrip
 moonglass.dev/moonglass/internal/protocol TestHeartbeatRoundTrip
 moonglass.dev/moonglass/internal/protocol TestRollbackRoundTrip
 moonglass.dev/moonglass/internal/protocol TestRunPreDeployRoundTrip
+moonglass.dev/moonglass/internal/protocol TestStopAndRemoveAppProtocolAbuse
+moonglass.dev/moonglass/internal/protocol TestStopAndRemoveAppRejectMalformed
+moonglass.dev/moonglass/internal/protocol TestStopAndRemoveAppRoundTrip
 moonglass.dev/moonglass/internal/protocol TestSwitchReleaseRoundTrip
 moonglass.dev/moonglass/internal/protocol TestWrapRejectsTypeMismatch
 moonglass.dev/moonglass/internal/proxy TestAdminAPIOnUnixSocket

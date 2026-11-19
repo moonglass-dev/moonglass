@@ -36,6 +36,8 @@ const (
 	MessageType_RUN_PRE_DEPLOY           MessageType = 9
 	MessageType_COMMAND_RESULT           MessageType = 10
 	MessageType_BUILD                    MessageType = 11
+	MessageType_STOP_APP                 MessageType = 15
+	MessageType_REMOVE_APP               MessageType = 16
 )
 
 // Enum value maps for MessageType.
@@ -53,6 +55,8 @@ var (
 		9:  "RUN_PRE_DEPLOY",
 		10: "COMMAND_RESULT",
 		11: "BUILD",
+		15: "STOP_APP",
+		16: "REMOVE_APP",
 	}
 	MessageType_value = map[string]int32{
 		"MESSAGE_TYPE_UNSPECIFIED": 0,
@@ -67,6 +71,8 @@ var (
 		"RUN_PRE_DEPLOY":           9,
 		"COMMAND_RESULT":           10,
 		"BUILD":                    11,
+		"STOP_APP":                 15,
+		"REMOVE_APP":               16,
 	}
 )
 
@@ -1092,6 +1098,100 @@ func (x *Rollback) GetAppId() string {
 	return ""
 }
 
+// StopApp stops every container of an app and removes its routes, keeping its
+// containers, images, releases and volumes. A delete-class command answered with
+// one CommandResult. app_id is an identifier, never a host path or shell string.
+type StopApp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopApp) Reset() {
+	*x = StopApp{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopApp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopApp) ProtoMessage() {}
+
+func (x *StopApp) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopApp.ProtoReflect.Descriptor instead.
+func (*StopApp) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *StopApp) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+// RemoveApp removes a stopped app's containers, unused images and agent state.
+// A delete-class command answered with one CommandResult. app_id is an
+// identifier, never a host path or shell string.
+type RemoveApp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveApp) Reset() {
+	*x = RemoveApp{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveApp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveApp) ProtoMessage() {}
+
+func (x *RemoveApp) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveApp.ProtoReflect.Descriptor instead.
+func (*RemoveApp) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RemoveApp) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
 // RunPreDeploy runs the pre-deploy command of a candidate release. args is an exec argv, never a shell string.
 type RunPreDeploy struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1105,7 +1205,7 @@ type RunPreDeploy struct {
 
 func (x *RunPreDeploy) Reset() {
 	*x = RunPreDeploy{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[11]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1117,7 +1217,7 @@ func (x *RunPreDeploy) String() string {
 func (*RunPreDeploy) ProtoMessage() {}
 
 func (x *RunPreDeploy) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[11]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1130,7 +1230,7 @@ func (x *RunPreDeploy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunPreDeploy.ProtoReflect.Descriptor instead.
 func (*RunPreDeploy) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{11}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RunPreDeploy) GetAppId() string {
@@ -1176,7 +1276,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[12]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1188,7 +1288,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[12]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1201,7 +1301,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{12}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CommandResult) GetOutcome() CommandOutcome {
@@ -1251,7 +1351,7 @@ type AppState struct {
 
 func (x *AppState) Reset() {
 	*x = AppState{}
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[13]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1263,7 +1363,7 @@ func (x *AppState) String() string {
 func (*AppState) ProtoMessage() {}
 
 func (x *AppState) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[13]
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1276,7 +1376,7 @@ func (x *AppState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppState.ProtoReflect.Descriptor instead.
 func (*AppState) Descriptor() ([]byte, []int) {
-	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{13}
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AppState) GetCurrentReleaseId() string {
@@ -1372,6 +1472,10 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"release_id\x18\x02 \x01(\tR\treleaseId\"!\n" +
 	"\bRollback\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\" \n" +
+	"\aStopApp\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\"\"\n" +
+	"\tRemoveApp\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\"x\n" +
 	"\fRunPreDeploy\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1d\n" +
@@ -1392,7 +1496,7 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x12current_release_id\x18\x01 \x01(\tR\x10currentReleaseId\x12.\n" +
 	"\x13previous_release_id\x18\x02 \x01(\tR\x11previousReleaseId\x120\n" +
 	"\x14candidate_release_id\x18\x03 \x01(\tR\x12candidateReleaseId\x126\n" +
-	"\x05phase\x18\x04 \x01(\x0e2 .moonglass.agent.v1.ReleasePhaseR\x05phase*\xe2\x01\n" +
+	"\x05phase\x18\x04 \x01(\x0e2 .moonglass.agent.v1.ReleasePhaseR\x05phase*\x80\x02\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eENROLL_REQUEST\x10\x01\x12\x13\n" +
@@ -1407,7 +1511,10 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x0eRUN_PRE_DEPLOY\x10\t\x12\x12\n" +
 	"\x0eCOMMAND_RESULT\x10\n" +
 	"\x12\t\n" +
-	"\x05BUILD\x10\v*x\n" +
+	"\x05BUILD\x10\v\x12\f\n" +
+	"\bSTOP_APP\x10\x0f\x12\x0e\n" +
+	"\n" +
+	"REMOVE_APP\x10\x10*x\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aINVALID\x10\x01\x12\x10\n" +
@@ -1451,7 +1558,7 @@ func file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_moonglass_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_proto_moonglass_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_proto_moonglass_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_proto_moonglass_agent_v1_agent_proto_goTypes = []any{
 	(MessageType)(0),       // 0: moonglass.agent.v1.MessageType
 	(ErrorCode)(0),         // 1: moonglass.agent.v1.ErrorCode
@@ -1470,9 +1577,11 @@ var file_proto_moonglass_agent_v1_agent_proto_goTypes = []any{
 	(*Build)(nil),          // 14: moonglass.agent.v1.Build
 	(*SwitchRelease)(nil),  // 15: moonglass.agent.v1.SwitchRelease
 	(*Rollback)(nil),       // 16: moonglass.agent.v1.Rollback
-	(*RunPreDeploy)(nil),   // 17: moonglass.agent.v1.RunPreDeploy
-	(*CommandResult)(nil),  // 18: moonglass.agent.v1.CommandResult
-	(*AppState)(nil),       // 19: moonglass.agent.v1.AppState
+	(*StopApp)(nil),        // 17: moonglass.agent.v1.StopApp
+	(*RemoveApp)(nil),      // 18: moonglass.agent.v1.RemoveApp
+	(*RunPreDeploy)(nil),   // 19: moonglass.agent.v1.RunPreDeploy
+	(*CommandResult)(nil),  // 20: moonglass.agent.v1.CommandResult
+	(*AppState)(nil),       // 21: moonglass.agent.v1.AppState
 }
 var file_proto_moonglass_agent_v1_agent_proto_depIdxs = []int32{
 	0,  // 0: moonglass.agent.v1.Envelope.type:type_name -> moonglass.agent.v1.MessageType
@@ -1482,7 +1591,7 @@ var file_proto_moonglass_agent_v1_agent_proto_depIdxs = []int32{
 	12, // 4: moonglass.agent.v1.Heartbeat.disk:type_name -> moonglass.agent.v1.DiskReport
 	3,  // 5: moonglass.agent.v1.DiskReport.level:type_name -> moonglass.agent.v1.DiskLevel
 	4,  // 6: moonglass.agent.v1.CommandResult.outcome:type_name -> moonglass.agent.v1.CommandOutcome
-	19, // 7: moonglass.agent.v1.CommandResult.app:type_name -> moonglass.agent.v1.AppState
+	21, // 7: moonglass.agent.v1.CommandResult.app:type_name -> moonglass.agent.v1.AppState
 	5,  // 8: moonglass.agent.v1.AppState.phase:type_name -> moonglass.agent.v1.ReleasePhase
 	9,  // [9:9] is the sub-list for method output_type
 	9,  // [9:9] is the sub-list for method input_type
@@ -1502,7 +1611,7 @@ func file_proto_moonglass_agent_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_moonglass_agent_v1_agent_proto_rawDesc), len(file_proto_moonglass_agent_v1_agent_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

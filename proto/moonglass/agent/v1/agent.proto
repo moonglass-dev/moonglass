@@ -26,6 +26,8 @@ enum MessageType {
   RUN_PRE_DEPLOY = 9;
   COMMAND_RESULT = 10;
   BUILD = 11;
+  STOP_APP = 15;
+  REMOVE_APP = 16;
 }
 
 message Error {
@@ -124,6 +126,20 @@ message SwitchRelease {
 
 // Rollback promotes the previous release back to current.
 message Rollback {
+  string app_id = 1;
+}
+
+// StopApp stops every container of an app and removes its routes, keeping its
+// containers, images, releases and volumes. A delete-class command answered with
+// one CommandResult. app_id is an identifier, never a host path or shell string.
+message StopApp {
+  string app_id = 1;
+}
+
+// RemoveApp removes a stopped app's containers, unused images and agent state.
+// A delete-class command answered with one CommandResult. app_id is an
+// identifier, never a host path or shell string.
+message RemoveApp {
   string app_id = 1;
 }
 

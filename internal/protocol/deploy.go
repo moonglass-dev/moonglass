@@ -199,6 +199,14 @@ func validateRollback(m *agentv1.Rollback) error {
 	return validateID("app_id", m.GetAppId())
 }
 
+func validateStopApp(m *agentv1.StopApp) error {
+	return validateID("app_id", m.GetAppId())
+}
+
+func validateRemoveApp(m *agentv1.RemoveApp) error {
+	return validateID("app_id", m.GetAppId())
+}
+
 func validateRunPreDeploy(m *agentv1.RunPreDeploy) error {
 	if err := validateID("app_id", m.GetAppId()); err != nil {
 		return err
