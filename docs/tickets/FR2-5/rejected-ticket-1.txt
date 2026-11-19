@@ -1,0 +1,7 @@
+Rejected ticket round 1.
+
+Problems:
+- the ticket is incomplete: max_diff_lines is not set
+
+Changed files (discarded):
+- docs/tickets/FR2-5.md

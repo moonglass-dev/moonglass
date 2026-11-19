@@ -186,7 +186,7 @@ The pages are server-rendered by `html/template` with no script. They are sent w
 W4-1a adds `session_hashes` and the `session_id` and `step_up_id` columns of `audit_events` on both backends, with conformance. W4-1d adds `link_token_hashes` and `step_ups` on both backends, with conformance.
 
 **Lookup tables** (ADR-0002 decision 12, no RLS):
-- `session_hashes`: `hash` (SHA-256 hex of the bearer), `id`, `user_id`, `expires_at`, `revoked_at` (empty when live).
+- `session_hashes`: `hash` (SHA-256 hex of the bearer), `id`, `user_id`, `expires_at`, `revoked_at` (NULL while the session is live; set once, to the revocation time, when the session is revoked).
 - `link_token_hashes`: `hash`, `id`, `user_id`, `expires_at`, `used_at`.
 
 **Row-level table:**
