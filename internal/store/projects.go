@@ -235,9 +235,11 @@ func (s *SQLStore) SetServiceReleases(ctx context.Context, orgID, serviceID, cur
 	})
 }
 
-// ResolveTarget implements Store.
+// ResolveTarget implements Store. When the project exists and the named
+// environment does not, it returns the project id with ErrNotFound.
 func (s *SQLStore) ResolveTarget(ctx context.Context, orgID, project, environment string) (string, string, error) {
 	var projectID, environmentID string
+	var envMissing bool
 	err := s.inOrg(ctx, orgID, func(tx *sql.Tx) error {
 		selErr := tx.QueryRowContext(ctx,
 			s.q("SELECT id FROM projects WHERE org_id = $1 AND name = $2"), orgID, project).Scan(&projectID)
@@ -254,6 +256,7 @@ func (s *SQLStore) ResolveTarget(ctx context.Context, orgID, project, environmen
 			s.q("SELECT id FROM environments WHERE org_id = $1 AND project_id = $2 AND name = $3"),
 			orgID, projectID, environment).Scan(&environmentID)
 		if errors.Is(selErr, sql.ErrNoRows) {
+			envMissing = true
 			return fmt.Errorf("resolve target: environment %q not found in project %q: %w", environment, project, ErrNotFound)
 		}
 		if selErr != nil {
@@ -262,6 +265,9 @@ func (s *SQLStore) ResolveTarget(ctx context.Context, orgID, project, environmen
 		return nil
 	})
 	if err != nil {
+		if envMissing {
+			return projectID, "", err
+		}
 		return "", "", err
 	}
 	return projectID, environmentID, nil

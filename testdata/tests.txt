@@ -271,6 +271,8 @@ moonglass.dev/moonglass/internal/store TestProjectsConformanceSQLite
 moonglass.dev/moonglass/internal/store TestReleaseConstraintsEnforced
 moonglass.dev/moonglass/internal/store TestReleasesConformancePostgres
 moonglass.dev/moonglass/internal/store TestReleasesConformanceSQLite
+moonglass.dev/moonglass/internal/store TestResolveTargetReportsKnownProjectPostgres
+moonglass.dev/moonglass/internal/store TestResolveTargetReportsKnownProjectSQLite
 moonglass.dev/moonglass/internal/store TestRollbackConstraintsEnforced
 moonglass.dev/moonglass/internal/store TestRollbacksConformancePostgres
 moonglass.dev/moonglass/internal/store TestRollbacksConformanceSQLite

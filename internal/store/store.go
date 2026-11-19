@@ -283,9 +283,12 @@ type Store interface {
 	CreateService(ctx context.Context, orgID, environmentID, name, serverID string) (Service, error)
 	// Services returns the environment's services ordered by name.
 	Services(ctx context.Context, orgID, environmentID string) ([]Service, error)
-	// ResolveTarget resolves project and environment names to their ids in the
-	// org. An empty environment resolves the project only and returns an empty
-	// environment id. ErrNotFound when either name is not the org's.
+	// ResolveTarget resolves project and environment names to their ids in one
+	// transaction bound to orgID. Both exist: both ids, or an empty environment
+	// id when environment is empty, and nil. The project exists but the named
+	// environment does not: the project id, an empty environment id and
+	// ErrNotFound. The project is not the org's: two empty ids and ErrNotFound.
+	// Any other failure: two empty ids and the wrapped error.
 	ResolveTarget(ctx context.Context, orgID, project, environment string) (projectID, environmentID string, err error)
 	// EnqueueRelease queues r on its service, superseding the queued release in
 	// the same transaction and retrying a lost race; r's status, step, ids,
