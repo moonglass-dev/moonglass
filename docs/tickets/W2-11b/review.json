@@ -1,0 +1,23 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "2a97fe05d9749052e705fa2b2c16dd32f5229547",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/store/releases.go",
+      "line": 226,
+      "issue": "created_at has one-second resolution (formatTime is RFC3339), so the tie-break on a random id decides the order of releases created in the same second; InFlightReleases can return a service's queued release before its running one, and Releases can list an older same-second release as newest.",
+      "scenario": "A deploy is enqueued and started, and a second deploy is enqueued in the same second: InFlightReleases returns [queued, running] whenever the queued id sorts lower, so a W2-5 re-sender that walks the list in order sees the queued release first. This matches the spec's stated order, and the tests use distinct seconds, so it is noted for W2-5 rather than as a defect."
+    },
+    {
+      "file": "internal/store/releases.go",
+      "line": 79,
+      "issue": "EnqueueRelease returns the caller's nil Domains, but a read returns an empty non-nil slice decoded from []. The returned value and the stored value differ by nil versus empty.",
+      "scenario": "A caller that compares the enqueue result with Release(id) using reflect.DeepEqual gets a mismatch for a release with no domains. The suite compares with slices.Equal, so it does not notice. Harmless."
+    }
+  ]
+}

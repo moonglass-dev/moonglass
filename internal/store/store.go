@@ -32,6 +32,39 @@ func (r Role) Valid() bool {
 	return false
 }
 
+// ReleaseStatus is the queue state of one release.
+type ReleaseStatus string
+
+// The six release statuses.
+const (
+	ReleaseQueued     ReleaseStatus = "queued"
+	ReleaseRunning    ReleaseStatus = "running"
+	ReleaseSucceeded  ReleaseStatus = "succeeded"
+	ReleaseFailed     ReleaseStatus = "failed"
+	ReleaseRejected   ReleaseStatus = "rejected"
+	ReleaseSuperseded ReleaseStatus = "superseded"
+)
+
+// ReleaseStep is the command in flight on a running release.
+type ReleaseStep string
+
+// The four release steps.
+const (
+	StepBuild     ReleaseStep = "build"
+	StepDeploy    ReleaseStep = "deploy"
+	StepPreDeploy ReleaseStep = "pre_deploy"
+	StepSwitch    ReleaseStep = "switch"
+)
+
+// Valid reports whether s is one of the four release steps.
+func (s ReleaseStep) Valid() bool {
+	switch s {
+	case StepBuild, StepDeploy, StepPreDeploy, StepSwitch:
+		return true
+	}
+	return false
+}
+
 // Errors returned by Store methods. Test them with errors.Is.
 var (
 	ErrNotFound     = errors.New("store: not found")
@@ -39,6 +72,7 @@ var (
 	ErrInvalidName  = errors.New("store: invalid name")
 	ErrTokenUsed    = errors.New("store: enrolment token already used")
 	ErrTokenExpired = errors.New("store: enrolment token expired")
+	ErrReleaseState = errors.New("store: release is not in a status that allows this")
 )
 
 // Membership is one user's role in one org.
@@ -82,6 +116,33 @@ type Service struct {
 	Name          string
 	ServerID      string
 	CreatedAt     string
+}
+
+// Release is one queued, running or finished deploy of a service. Domains is
+// the host list the release answers on; PreDeploy is the argv run before the
+// switch, or nil for none. The fields are ordered so the garbage collector
+// scans the fewest bytes.
+type Release struct {
+	OrgID         string
+	ID            string
+	ServiceID     string
+	ImageRef      string
+	GitRepository string
+	GitCommit     string
+	HealthPath    string
+	Status        ReleaseStatus
+	Step          ReleaseStep
+	RequestID     string
+	ImageID       string
+	RepoDigest    string
+	Detail        string
+	CreatedAt     string
+	FinishedAt    string
+	Domains       []string
+	PreDeploy     []string
+	Port          int
+	// PreDeployReversible is last so the struct packs without padding.
+	PreDeployReversible bool
 }
 
 // TokenInfo describes an enrolment token without revealing its hash.
@@ -162,6 +223,33 @@ type Store interface {
 	// org. An empty environment resolves the project only and returns an empty
 	// environment id. ErrNotFound when either name is not the org's.
 	ResolveTarget(ctx context.Context, orgID, project, environment string) (projectID, environmentID string, err error)
+	// EnqueueRelease queues r on its service, superseding the queued release in
+	// the same transaction and retrying a lost race; r's status, step, ids,
+	// detail and times are ignored, and ErrNotFound means the service is not
+	// the org's.
+	EnqueueRelease(ctx context.Context, orgID string, r Release, now time.Time) (Release, error)
+	// StartRelease moves a queued release to running; ErrNotFound for another
+	// org's release, ErrReleaseState when it is not queued or one runs.
+	StartRelease(ctx context.Context, orgID, releaseID string) error
+	// SetReleaseStep records the step in flight and its request id on a running
+	// release; ErrNotFound, ErrReleaseState when not running, and an error
+	// naming the four steps for an unknown one.
+	SetReleaseStep(ctx context.Context, orgID, releaseID string, step ReleaseStep, requestID string) error
+	// SetReleaseImage records what the agent's CommandResult reported on a
+	// running release; ErrNotFound, ErrReleaseState when not running.
+	SetReleaseImage(ctx context.Context, orgID, releaseID, imageID, repoDigest string) error
+	// FinishRelease ends a queued or running release as succeeded, failed or
+	// rejected with detail and finished_at now; ErrNotFound, ErrReleaseState
+	// when final, and an error naming the three final statuses otherwise.
+	FinishRelease(ctx context.Context, orgID, releaseID string, status ReleaseStatus, detail string, now time.Time) error
+	// Release returns one release of the org. ErrNotFound when it is not the
+	// org's.
+	Release(ctx context.Context, orgID, releaseID string) (Release, error)
+	// Releases returns the service's releases newest first, at most 50.
+	Releases(ctx context.Context, orgID, serviceID string) ([]Release, error)
+	// InFlightReleases returns the queued and running releases of the org's
+	// services on serverID, oldest first. Another org's server returns none.
+	InFlightReleases(ctx context.Context, orgID, serverID string) ([]Release, error)
 	// AddEnrolmentToken stores tokenHash (see HashToken); the caller chooses expires.
 	AddEnrolmentToken(ctx context.Context, orgID, tokenHash string, expires time.Time) error
 	// UseEnrolmentToken marks the token used and returns its org. It returns
