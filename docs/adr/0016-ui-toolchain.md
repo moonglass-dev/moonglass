@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-17
+- Amended: 2026-11-19, decision 5: self-hosted Geist and Geist Mono font assets (owner decision, W2-Sa split)
 
 ## Context
 
@@ -31,13 +32,19 @@ Versions were checked upstream on 2026-11-17 (the package registry and the `oven
    Adding or upgrading a package is a change to this ADR, in one ticket.
 3. **Build integration.** `make ui` runs `bun install --frozen-lockfile` and `bun run build` in `ui/`. The output goes to `internal/ui/dist/`, which is git-ignored and embedded with `//go:embed` by `internal/ui`. `make build`, `make build-all`, `make test`, `make lint` and `make ci` run `make ui` first, so the binary always embeds a fresh build, and no build output is committed. CI installs Bun 1.4.4 with a pinned `oven-sh/setup-bun` (`bun-version: 1.4.4`).
 4. **Budgets in CI** (`docs/specs/ui.md` §10) are checked without a browser: initial JavaScript gzipped and the compressed embedded build are measured from the build output. The route-change and layout-shift budgets need a browser. They are not measured in CI until a ticket adds a headless browser under its own ADR, and until then they are checked in the weekly demo.
-5. **No runtime requests** to any other origin, and no third-party fonts (`docs/specs/ui.md` §11).
+5. **No runtime requests and self-hosted fonts** (`docs/specs/ui.md` §5, §11) (amended 2026-11-19). No runtime requests are made to any other origin or third-party CDN. Geist and Geist Mono are approved and self-hosted as static assets:
+   - Upstream source: Vercel Geist and Geist Mono.
+   - License: SIL Open Font License 1.1.
+   - Format: Latin-subsetted variable WOFF2 fonts embedded in the static build (~65 KB total, 0 KB JavaScript).
+   - Delivery: Loaded via local `@font-face` with `font-display: swap` and metric-matched system fallbacks (`system-ui` and `ui-monospace`) so the first paint does not shift (CLS 0).
+   - Invariant: Zero network requests to third-party CDNs or origins at runtime.
 
 ## Consequences
 
 - `make ci` needs Bun 1.4.4 on the machine. CI provides it, and developers install it once.
 - A clean clone builds the binary only after `make ui`. `go build` alone fails at the embed with a message pointing to `make ui`.
 - Dependency updates are deliberate and reviewed, like Go modules.
+- Self-hosted Latin-subsetted Geist and Geist Mono WOFF2 font files (~65 KB together) count toward the 1 MB static build budget (§10); zero third-party CDN or font requests are made at runtime.
 
 ## Alternatives rejected
 
@@ -53,4 +60,4 @@ None.
 ## Links
 
 - `docs/plan/stack.md` §3.16; `docs/specs/ui.md` §10, §11
-- B§6: W2-S, W4-5, W4-6, W7-7
+- B§6: W2-Sb, W2-Sc, W2-Sa, W2-S, W4-5, W4-6, W7-7
