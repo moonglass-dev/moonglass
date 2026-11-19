@@ -10,4 +10,5 @@ var LookupTables = []string{
 	"enrolment_token_hashes",
 	"token_hashes",
 	"session_hashes",
+	"link_token_hashes",
 }

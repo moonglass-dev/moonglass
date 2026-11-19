@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All seven named tests are in package store_test and match the ticket: shared runLinkTokensConformance / runStepUpsConformance (Postgres via openApp), hashed-only dump on both backends, RLS as TestPostgresRLSOnRollbacks, and SQLite CHECK plus defaults as TestRollbackConstraintsEnforced. TestLookupTablesMatchSchema only appends link_token_hashes; no existing test line was edited or removed. Refused CreateStepUp cases lock error text to the ticket’s rule fragments, which is the specified ‘error that names the rule’, not a guessed storage implementation."
+}

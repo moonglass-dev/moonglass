@@ -70,8 +70,8 @@ var (
 	ErrNotFound      = errors.New("store: not found")
 	ErrDuplicate     = errors.New("store: already exists")
 	ErrInvalidName   = errors.New("store: invalid name")
-	ErrTokenUsed     = errors.New("store: enrolment token already used")
-	ErrTokenExpired  = errors.New("store: enrolment token expired")
+	ErrTokenUsed     = errors.New("store: token already used")
+	ErrTokenExpired  = errors.New("store: token expired")
 	ErrReleaseState  = errors.New("store: release is not in a status that allows this")
 	ErrRollbackState = errors.New("store: rollback is not in a status that allows this")
 )
@@ -199,6 +199,36 @@ type Session struct {
 	ExpiresAt string
 }
 
+// LinkToken is one link token without its bearer: the bearer is stored only as
+// its HashToken in link_token_hashes, so this type has no hash field.
+type LinkToken struct {
+	ID        string
+	UserID    string
+	ExpiresAt string
+}
+
+// StepUp is one step-up request. It binds one user, one credential (exactly one
+// of TokenID and SessionID), one operation, one target and one input digest. An
+// unset marker column reads back as empty text. There is no confirmation-hash
+// field: this ticket never reads or writes confirm_hash.
+type StepUp struct {
+	OrgID         string
+	ID            string
+	UserID        string
+	TokenID       string
+	SessionID     string
+	Operation     string
+	ProjectID     string
+	EnvironmentID string
+	InputDigest   string
+	CreatedAt     string
+	ExpiresAt     string
+	SignedInAt    string
+	ApprovedAt    string
+	DeclinedAt    string
+	UsedAt        string
+}
+
 // AuditEvent is one hash-chained audit row. PrevHash is empty for Seq 1.
 type AuditEvent struct {
 	OrgID         string
@@ -318,6 +348,22 @@ type Store interface {
 	// nil for a session already revoked, and ErrNotFound when no session with
 	// that id belongs to userID.
 	RevokeSession(ctx context.Context, userID, sessionID string, now time.Time) error
+	// AddLinkToken stores tokenHash (see HashToken) for userID and returns the
+	// link token; a repeated hash is ErrDuplicate.
+	AddLinkToken(ctx context.Context, userID, tokenHash string, expires time.Time) (LinkToken, error)
+	// UseLinkToken marks a link token used and returns it. It returns
+	// ErrNotFound, ErrTokenUsed or ErrTokenExpired when the token cannot be used.
+	UseLinkToken(ctx context.Context, linkID string, now time.Time) (LinkToken, error)
+	// CreateStepUp stores one step-up in the org, bound to one user, one
+	// credential, one operation, one target and one input digest, with
+	// created_at now and expires_at the given expiry. The caller's org, id,
+	// times and markers are ignored. An empty user, operation or digest, or
+	// credentials that are both set or both empty, are refused before any SQL
+	// runs.
+	CreateStepUp(ctx context.Context, orgID string, su StepUp, now, expires time.Time) (StepUp, error)
+	// StepUp returns one step-up of the org. ErrNotFound when it is not the
+	// org's.
+	StepUp(ctx context.Context, orgID, id string) (StepUp, error)
 	// AppendAudit adds the event that seal builds for the next sequence number
 	// and the previous hash, in one transaction so the chain stays serial.
 	AppendAudit(ctx context.Context, orgID string, seal func(prevHash string, seq int64) AuditEvent) error

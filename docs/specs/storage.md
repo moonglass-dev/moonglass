@@ -27,6 +27,7 @@ Every table has `org_id`, except the lookup tables listed in one file in `intern
 - `enrolment_token_hashes` — lookup key is `SHA-256` of the bearer token. Maps to `org_id`, expiry, and a used/revoked marker. The plaintext token is never stored. Format of the bearer value is ADR-0005 (256 bits, `mg_` plus 52 lowercase unpadded base32); this ticket stores and looks up the hash only.
 - `token_hashes` — lookup key is `SHA-256` of an API token (`docs/specs/registry.md`). Maps to `org_id` and `token_id`, with a revoked marker. It has no RLS because the org is not known when it is read.
 - `session_hashes` — lookup key is `SHA-256` of a session bearer. Maps to the session `id` and `user_id`, with `expires_at` and a `revoked_at` marker. It has no RLS because the org is not known when it is read (`docs/specs/auth.md`).
+- `link_token_hashes` — lookup key is `SHA-256` of a link bearer. Maps to the link's `id` and `user_id`, with `expires_at` and a `used_at` marker. It has no RLS because the org is not known when it is read (`docs/specs/auth.md`).
 - `purge_due` (W5-5c) — lookup key is the id of a soft-deleted row. Maps to `org_id`, with the expiry at which it is purged. It lets the hourly purge find due rows without knowing their orgs (`docs/specs/delete.md`).
 
 
@@ -113,6 +114,24 @@ Specified by the week 5 preflight. `services` gains `deleted_at` and `purge_deta
 ### Sessions, links and step-ups (W4-1a, W4-1d)
 
 `session_hashes` (lookup table) and the `session_id` and `step_up_id` columns of `audit_events` are added by W4-1a. `link_token_hashes` (lookup table) and `step_ups` (row-level) are added by W4-1d. All four are specified in `docs/specs/auth.md`.
+
+`link_token_hashes` holds the `TEXT` key `hash`, the `SHA-256` hex of an `mg_` link bearer, mapped to the link's `id` and `user_id`, with `expires_at` and `used_at` (NULL until the link is used). It has no `org_id` and no RLS, because it is read before an org is known.
+
+`step_ups` has these columns: `org_id` (`TEXT NOT NULL REFERENCES orgs (id)`), `id` (the primary key), `user_id`, `operation`, `input_digest`, `created_at` and `expires_at` (`TEXT NOT NULL`); `token_id`, `session_id`, `project_id` and `environment_id` (`TEXT NOT NULL DEFAULT ''`); and `confirm_hash`, `signed_in_at`, `approved_at`, `declined_at` and `used_at` (nullable, NULL until set). A `CHECK` requires exactly one of `token_id` and `session_id` to be non-empty: `(token_id = '') <> (session_id = '')`, which is boolean SQL on Postgres and integer SQL on SQLite. On Postgres the table has `ENABLE ROW LEVEL SECURITY` and the `org_isolation` policy, `USING` and `WITH CHECK` both `(org_id = nullif(current_setting('app.org_id', true), ''))`; the application role gets its grants through `pg.Migrate`, which is unchanged.
+
+The link-token rules:
+
+- `AddLinkToken` mints the row's `id`, stores the hash with its expiry and returns the link token. `LinkToken` has no hash field, so no store method takes or returns the bearer. A repeated hash is `ErrDuplicate` and leaves the first token intact.
+- `UseLinkToken` consumes the row in one conditional `UPDATE` that matches only an unused token whose `expires_at` is after `now`, and returns the row. The comparison is lexical RFC3339 UTC text and strict, so a token is refused at the second it expires.
+- A refused use reports `ErrNotFound` for an unknown id, `ErrTokenUsed` for a token used before it expired, and `ErrTokenExpired` for an unused token at or after its expiry. The used check comes first, so a token used before it expired stays `ErrTokenUsed` whatever the expiry.
+- A token seen at or after its expiry is marked used at that expiry, so its expiry is final: every later use reports `ErrTokenExpired`, never a token whose window has closed. A use that succeeds always stamps a time before the expiry, which is how the two are told apart. No method extends `expires_at`.
+
+The step-up rules:
+
+- `CreateStepUp` mints the row's `id` and stores it in the org with `created_at` now and `expires_at` the given expiry, then returns the stored row. The caller's `OrgID`, `ID`, times and markers are ignored, and `confirm_hash` and the four markers stay NULL. An empty `UserID`, `Operation` or `InputDigest`, and credentials that are both set or both empty, are refused before any SQL runs, with an error that names the rule and no row written.
+- `StepUp` reads one row inside the org-bound transaction with `org_id` in the `WHERE`, so an id in another org is `ErrNotFound`. An unset marker column reads back as empty text.
+
+W4-1d adds `runLinkTokensConformance`, run as `TestLinkTokensConformanceSQLite` and `TestLinkTokensConformancePostgres`, covering: adding a link token by hash and reading back its id, user and expiry; using it once before expiry and refusing a second use with `ErrTokenUsed`, including after the expiry has passed; `ErrTokenExpired` for an unused token at and after its expiry, and on every later use; `ErrNotFound` for an unknown id; `ErrDuplicate` for a repeated hash with the first token still usable; and two tokens of one user staying independent. It also adds `TestLinkTokenStoredHashedOnly`, which proves on both backends that the dump of every table holds the hex SHA-256 and no plaintext or `mg_` value. `runStepUpsConformance`, run as `TestStepUpsConformanceSQLite` and `TestStepUpsConformancePostgres`, covers: creating a step-up with a token credential, a project and an environment target, and reading every field back with empty markers; a session credential with no target reading back empty credential and target columns; the caller's id, org, times and markers being ignored; the five refusals writing no row; `ErrNotFound` for an unknown id; and a second org reading none of the first's rows. `TestPostgresRLSOnStepUps` checks the `org_isolation` policy on `step_ups` as the application role (unset, empty and nonexistent `app.org_id` return nothing; an `INSERT` for another org is refused by `WITH CHECK`; `rowsecurity` is on), and `TestStepUpConstraintsEnforced` checks the credential `CHECK`, the empty-text defaults and the NULL markers with raw SQL on a migrated SQLite database.
 
 ## Transactions and isolation
 

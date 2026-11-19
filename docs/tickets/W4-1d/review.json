@@ -1,0 +1,17 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "4a686077b06bebc0b6302c8ca118ce6a598a4bff",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/store/linktokens.go",
+      "line": 49,
+      "issue": "A refused use of an expired token runs a second UPDATE that sets used_at = expires_at on an unused row. The ticket says the use is one UPDATE and 'Otherwise nothing changes'. The locked 'expired' subtest requires this, docs/specs/storage.md documents it, and auth.md does not contradict it, but the ticket text and the code disagree, and used_at now also means 'seen after expiry'.",
+      "scenario": "AddLinkToken with expiry T. UseLinkToken(id, T) returns ErrTokenExpired and the row's used_at is now T, not NULL. A later reader such as W4-1's /link landing that treats used_at IS NOT NULL as 'used' sees a token that was never used as used."
+    }
+  ]
+}
