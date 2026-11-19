@@ -260,9 +260,24 @@ func (e *Engine) containerIP(ctx context.Context, id, networkName string) (netip
 	return endpoint.IPAddress, nil
 }
 
+// CheckIssuer is the one decision on which TLS issuers the agent accepts:
+// acme, acme-staging and internal. Anything else is an error naming the value
+// and the three accepted ones.
+func CheckIssuer(issuer string) error {
+	switch issuer {
+	case "acme", "acme-staging", "internal":
+		return nil
+	}
+	return fmt.Errorf("TLS issuer %q is not one of acme, acme-staging or internal; pass one of those", issuer)
+}
+
 // issuerApps returns the apps.tls entry for issuer, plus apps.pki for the
-// internal issuer. Anything else is refused before any request is sent.
+// internal issuer. The issuer must pass CheckIssuer; a refused value is
+// returned as its error before any request is sent.
 func issuerApps(issuer string) (map[string]any, error) {
+	if err := CheckIssuer(issuer); err != nil {
+		return nil, err
+	}
 	var value map[string]any
 	apps := map[string]any{}
 	switch issuer {
@@ -275,8 +290,6 @@ func issuerApps(issuer string) (map[string]any, error) {
 		apps["pki"] = map[string]any{"certificate_authorities": map[string]any{
 			"local": map[string]any{"install_trust": false},
 		}}
-	default:
-		return nil, fmt.Errorf("TLS issuer %q is not one of acme, acme-staging or internal; pass one of those", issuer)
 	}
 	apps["tls"] = map[string]any{"automation": map[string]any{"policies": []any{
 		map[string]any{"issuers": []any{value}},

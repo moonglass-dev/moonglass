@@ -117,9 +117,7 @@ func parseAgentConnect(args []string) (agentConnectArgs, bool) {
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *url == "" || *socket == "" {
 		return agentConnectArgs{}, false
 	}
-	switch *issuer {
-	case "acme", "acme-staging", "internal":
-	default:
+	if err := deploy.CheckIssuer(*issuer); err != nil {
 		return agentConnectArgs{}, false
 	}
 	return agentConnectArgs{

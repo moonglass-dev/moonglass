@@ -253,3 +253,35 @@ func TestAgentConnectRunsProxyPush(t *testing.T) {
 		t.Errorf("db.Close() error = %v, want nil", err)
 	}
 }
+
+func TestAgentConnectIssuerFollowsDeployCheck(t *testing.T) {
+	tests := []struct {
+		name   string
+		issuer string
+	}{
+		{"acme", "acme"},
+		{"acme staging", "acme-staging"},
+		{"internal", "internal"},
+		{"letsencrypt", "letsencrypt"},
+		{"upper case", "ACME"},
+		{"leading space", " internal"},
+		{"empty", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := parseAgentConnect([]string{"--url", "https://x", "--tls-issuer", tt.issuer})
+			checkErr := deploy.CheckIssuer(tt.issuer)
+			wantOK := checkErr == nil
+			if ok != wantOK {
+				t.Fatalf("parseAgentConnect with --tls-issuer %q ok = %v, want %v (CheckIssuer(%q) = %v)",
+					tt.issuer, ok, wantOK, tt.issuer, checkErr)
+			}
+			if !ok {
+				return
+			}
+			if got.proxy.Issuer != tt.issuer {
+				t.Errorf("proxy Issuer = %q, want %q", got.proxy.Issuer, tt.issuer)
+			}
+		})
+	}
+}
