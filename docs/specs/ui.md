@@ -1,19 +1,18 @@
 # UI foundations
 
-_W0-2 · 2026-11-16 · Sources: `docs/plan/stack.md` (S§), `vision.md` (V§), `milestones.md` (M§), `build-plan.md` (B§). The owner accepted the routes, layout, keyboard model, tokens, components, live-data split and budgets below as the working spec on 2026-11-16, including the revised layout, keyboard model and tokens and the defaults chosen in §13. The choices still open are listed at the end._
+_W0-2 · Revised 2026-11-19 · Sources: `docs/plan/stack.md` (S§), `vision.md` (V§), `milestones.md` (M§), `build-plan.md` (B§). Working spec for routes, layout, keyboard model, tokens, components, motion, live-data split and budgets. The owner accepted the routes, keyboard model, live-data split and budgets on 2026-11-16, and on 2026-11-19 adopted the 2-pane inset canvas, the motion cut, contrast-checked tokens and a distinct "Waiting for approval" treatment. Open product choices are in §13._
 
-The stack is fixed by S§3.16: Svelte 5, SvelteKit in static mode, Tailwind and Bits UI, compiled to static files and embedded in the binary. The UI should feel calm, elegant, premium and soft (V§1.2), and serve the owner's priorities: speed, performance, UX and security. It is inspired by Linear's restraint and keyboard flow. Its layout details, icons, colours and typography are our own.
+The stack is fixed by S§3.16: Svelte 5, SvelteKit in static mode, Tailwind and Bits UI, compiled to static files and embedded in the Go binary. The UI is calm, tight, fast and quiet (V§1.2). It borrows Linear's discipline — a recessed sidebar framing an inset rounded canvas, flat hairlines, generous whitespace on resource pages, and keyboard-first flow — while keeping Moonglass's own palette, glass orb mark, typography and deploy workflows.
 
 ## 1. Principles
 
-1. **Keyboard first.** Every action is reachable without a pointer, and the fastest path is a key.
-2. **Nothing waits on a spinner that could be instant.** Show cached data at once, then update it.
-3. **One accent colour.** Colour otherwise means state, and only state.
-4. **Say what is true, with numbers.** "Zero failed requests across ten deploys", never "blazing-fast" (V§1.2).
-5. **Tell people before, not after.** Anything that will restart, stop or need approval is shown before the confirm (S§5.3).
-6. **Quiet by default.** No decoration that carries no information; motion only to show a change.
+Each principle is a pass/fail check in design and code review.
 
-Copy follows V§1.2: no war words, and always "Moonglass agent" or "coding agent", never bare "agent".
+1. **Keyboard complete.** Every operation in the UI is reachable without a pointer via `⌘K`, `g` chords or single-key list bindings, and every focusable element shows `:focus-visible`.
+2. **Instant over spinners.** Cached data renders on frame 1 (≤50 ms route transition); loading skeletons never appear before 150 ms.
+3. **Colour means state, never decoration.** One accent hue marks focus, the primary action and active selection; semantic hues appear only on state indicators and diff lines. No decorative gradients, hero banners or card grids.
+4. **Numbers over adjectives.** Copy states measurable facts ("0 failed requests across 10 deploys", "42s build"), never marketing words. No war words; always "Moonglass agent" or "coding agent", never bare "agent" (V§1.2).
+5. **Preview consequences before confirmation.** Any action that restarts, stops, deletes or requires approval displays the exact diff and the affected services before the confirm step (S§5.3).
 
 ## 2. Information architecture
 
@@ -39,50 +38,88 @@ SvelteKit's static output is one app shell; the server returns it for every UI r
 
 ## 3. Layout
 
-Four regions: **sidebar** (the "Moonglass" word mark, navigation, pending-approval count, and the organisation switcher, shown only when the signed-in user belongs to more than one organisation), **list** (the collection for the current route), **detail** (the highlighted or open item) and **inspector** (a read-only column of properties and live telemetry for that item). Which regions show depends on the route's kind and on the viewport.
+The shell is two panes: a recessed sidebar and a single inset rounded canvas (8 px radius, 8 px margin on the top, right and bottom, 1 px solid `--border-subtle` border). Resource routes may open a collapsible inspector inside the right edge of that canvas. There is no list-and-detail split.
+
+**Sidebar** (220 px; 48 px icon rail below 1200 px): the 22 px Moonglass orb and the "Moonglass" word mark, navigation, a pending-approval count, the organisation switcher (shown only when the signed-in user belongs to more than one organisation) and a control that opens `⌘K`.
 
 **Route kinds.** Every route in §2 has exactly one kind.
 
-| Kind | Routes | Regions |
+| Kind | Routes | Canvas (≥1200 px) |
 |---|---|---|
-| Collection | `/{org}/projects`, `/{org}/projects/{project}`, `/{org}/projects/{project}/{env}`, `/{org}/servers`, `/{org}/approvals` | Sidebar, list, detail |
-| Resource | `…/{env}/{service}`, `…/deploys/{deploy}`, `/{org}/servers/{server}`, `/{org}/approvals/{approval}` | Sidebar, detail, inspector. No list, so logs, diffs and approval controls get the full width |
-| Page | `/{org}/audit`, `/{org}/settings/{section}` | Sidebar and one full-width page; no inspector |
+| Collection | `/{org}/projects`, `/{org}/projects/{project}`, `/{org}/projects/{project}/{env}`, `/{org}/servers`, `/{org}/approvals` | A full-width list inside the inset canvas. No split detail pane and no inspector |
+| Resource | `…/{env}/{service}`, `…/deploys/{deploy}`, `/{org}/servers/{server}`, `/{org}/approvals/{approval}` | Main content, with an optional inspector (280 px, 1 px `--border-subtle` left hairline) at the right edge of the canvas |
+| Page | `/{org}/audit`, `/{org}/settings/{section}` | One full-width page inside the inset canvas; no inspector |
 
-On a collection route, `j`/`k` highlight a row and the detail follows it; `Enter` opens the row as its own resource route, and `Esc` returns to the collection with the row still highlighted.
+On a collection route, `j`/`k` highlight a row; `Enter` opens the row as its own resource route, and `Esc` returns to the collection with the row still highlighted. Selection, scroll position and filters survive navigating away and back.
 
 **Widths.**
 
-| Viewport | Collection route | Resource route |
+| Viewport | Collection or page route | Resource route |
 |---|---|---|
-| **1440 px and up** | Sidebar 232 px, list 320–440 px, detail the rest. The inspector (260–280 px) docks as a fourth column when toggled open, and is closed by default. While docked, the list is 320 px so the detail keeps at least 600 px | Sidebar 232 px, detail `1fr` with a minimum of 600 px, inspector 260–280 px, open by default |
-| **1200–1439 px** | Sidebar 232 px, list 320–440 px, detail the rest. No inspector, so the columns never cramp | As above |
-| **768–1199 px** | Sidebar collapses to a 48 px icon rail; list and detail side by side. No inspector | Rail and detail; the inspector's properties appear as the property strip |
-| **Under 768 px** | One column. The list is the page; opening an item replaces it with the detail and a back control. The sidebar becomes a drawer | One column, detail with the property strip and a back control; the sidebar is a drawer |
+| **1200 px and up** | Sidebar 220 px, inset canvas `1fr` | Sidebar 220 px, inset canvas as `1fr` main (minimum 600 px) plus a 280 px inspector, open by default, toggled with `⌘I` or `]` |
+| **768–1199 px** | Sidebar collapses to a 48 px icon rail; inset canvas `1fr`. No inspector | Rail and inset canvas; the inspector's properties appear in the page Properties block |
+| **Under 768 px** | One full-bleed column (the canvas margin and radius drop to 0). The list is the page; opening an item replaces it with the resource and a back control. The sidebar becomes a drawer | One column, the resource with the property strip and a back control; the sidebar is a drawer |
 
-**Detail header.** No hero. Two lines, in this order:
+**Canvas top bar.** No hero. 40 px high, with a 1 px bottom hairline:
 
-1. A **breadcrumb bar**, 40 px high: `Org > Project > Env > Service` on the left, ending at the open resource, and the contextual quick actions on the right. Quick actions come from the same server-supplied list as the palette (§4): at most two are shown, the rest are in the row-actions menu (`.`), and a destructive one opens its confirmation (§11). Under 768 px the bar shows the back control and the last segment.
-2. A **property row**, 32 px high, on one line: the three facts the header always answers first, namely what is live, since when, and who or what deployed it.
+1. A **breadcrumb** on the left: `Org › Project › Env › Service`, ending at the open resource. Under 768 px the bar shows the back control and the last segment.
+2. At most two contextual quick actions on the right, plus the row-actions menu (`.`) and, on a resource route, the inspector toggle. Quick actions come from the same server-supplied list as the palette (§4). A destructive one opens its confirmation (§11).
+
+**Pill tabs** (resource routes only). A 40 px bar under the top bar: `Overview`, `Releases`, `Logs`, `Settings` (or the tabs that resource actually has). The active pill moves in 160 ms (§7).
+
+**Resource header.** Inside the canvas, with 32 px padding: the page title (`--text-lg`, 22 px, weight 600), a one-line summary in `--text-secondary`, then an inline Properties row (a 100 px muted label column and value chips: live status, active commit, target server, environment protection, last deployed by and when).
 
 **Inspector.**
 
 - It holds passive and live information only: live CPU and memory sparklines, the active commit SHA, the environment's protection flags, timestamps, and the target server. It may link to a related resource, such as the server. It has no control that changes state.
-- Everything interactive stays in the detail pane: the log stream, the diff view, and the approve and decline buttons.
-- Layout is flat: a 1 px left hairline (`border-subtle`, §5), 16–20 px padding, label and value pairs in one column. No nested cards or boxes. Labels are 12/16 in step 11; values are 13/20 in step 12; identifiers are monospace 12/18. Groups are separated by 16 px of space, not by rules.
+- Everything interactive stays in the main canvas: the log stream, the diff view, and the approve and decline buttons.
+- Layout is flat: a 1 px left hairline (`--border-subtle`, §5), 20 px padding, label and value pairs in one column. No nested cards or boxes. Labels are `--text-sm` in `--text-tertiary`; values are `--text-base` in `--text-primary`; identifiers are monospace `--text-sm` at 12/18. Groups are separated by 16 px of space, not by rules.
 - Each sparkline is shown with its current value as text, and the graphic is hidden from assistive technology (§12).
-- **Property strip.** Below 1200 px on a resource route, the same properties appear as a compact horizontal strip between the detail header and the content. It wraps onto a second line rather than scrolling, shows current values as text, and has no sparklines.
-- **Toggle.** `⌘I` or `]` (§4). The open or closed state is stored per viewport class in the browser's local storage, as a user preference that is never sent to the server. Classes are 1200–1439 px and 1440 px and up, for resource routes and collection routes alike; there is no inspector to toggle below 1200 px. The state is read before the shell first renders, so toggling and loading never shift layout (§10). On a collection route below 1440 px the toggle does nothing, and its palette entry is disabled with that reason.
+- **Property strip.** Below 1200 px on a resource route, the same properties appear as a compact horizontal strip between the resource header and the content. It wraps onto a second line rather than scrolling, shows current values as text, and has no sparklines.
+- **Toggle.** `⌘I` or `]` (§4). The open or closed state is stored per viewport class in the browser's local storage, as a user preference that is never sent to the server. Classes are 768–1199 px and 1200 px and up, for resource routes; there is no inspector to toggle on a collection or page route, or below 768 px. The state is read before the shell first renders, so toggling and loading never shift layout (§10). On a collection or page route the toggle does nothing, and its palette entry is disabled with that reason.
 
-**Dividers.** Panes are separated by 1 px solid `border-subtle` lines (§5) and never by a shadow. Each pane draws one such line on its leading edge, except the first, so a boundary is never doubled.
+**Dividers.** The sidebar and the canvas are separated by the 8 px frame margin; the inspector is separated from main content by a 1 px `--border-subtle` line, never by a shadow. Each internal pane draws one such line on its leading edge, except the first, so a boundary is never doubled.
 
-Selection, scroll position and filters survive navigating away and back.
+```
+Projects (collection)                    ≥1200 px
+
++------------------+-----------------------------------------------+
+| (o) Moonglass    | Org › Projects              Filter    + New   |
+|                  |-----------------------------------------------|
+|  Projects        |  ●  billing    prod (protected)   3 svc  2m   |
+|  Servers         |  ◐  web-app    prod               2 svc  14s  |
+|  Approvals    2  |  ×  worker-eu  prod               1 svc  1h   |
+|  Audit           |  ○  docs       prod               1 svc  5d   |
+|  Settings        |                                               |
+|                  |                                               |
+|  [⌘K]            |                                               |
++------------------+-----------------------------------------------+
+ 220 px             inset canvas, 8 px radius and margin
+```
+
+```
+Service (resource)                       ≥1200 px
+
++------------------+--------------------------------+--------------+
+| (o) Moonglass    | billing › prod › api   Deploy .  [ ]          |
+|                  |--------------------------------+--------------+
+|  Projects        | (Overview) (Releases) (Logs)   | Telemetry    |
+|  Servers         |                                | CPU 14%      |
+|  Approvals    2  | api                            | RAM 312M     |
+|  Audit           | api.example.dev                | Disk 4.2/40G |
+|  Settings        |                                |              |
+|                  | Properties  [● Live]  #a8f31c2 | prod, locked |
+|                  |             vps-01    2m ago   |              |
+|  [⌘K]            | Recent releases                |              |
++------------------+--------------------------------+--------------+
+ 220 px             main (1fr, min 600 px)            inspector 280 px
+```
 
 ## 4. Keyboard model
 
 - **⌘K (Ctrl+K) opens the command palette.** Its commands are generated from the operation registry, and it shows only what the signed-in user may run (B W2-S, ADR-0006). The server supplies that list; hiding a command is a convenience, and the registry still enforces every call. The palette also searches projects, services and servers by name. Alongside the registry commands it lists the client-only ones, such as "Toggle inspector"; they come from the shortcut table below, carry no authority and make no registry call.
 - **`g` then a letter navigates:** `g p` projects, `g s` servers, `g a` approvals, `g l` audit log, `g o` organisation settings.
-- **Single keys inside lists:** `j`/`k` or the arrow keys move, `Enter` opens, `Esc` goes back or clears, `/` filters, `x` selects, `.` opens the row's actions.
+- **Single keys inside lists:** `j`/`k` or the arrow keys move, `Enter` opens, `Esc` goes back or clears, `/` filters, `x` selects, `.` opens the row's actions. In a log view, `G` jumps to the bottom and resumes follow.
 - **`⌘I` (Ctrl+I) or `]` toggles the inspector** where there is one (§3). `⌘I` works while a text input has focus; `]` is a single key and follows the rule below. The handler cancels the browser's own binding for `⌘I`. The open or closed state is kept per viewport class (§3).
 - **`?` opens a sheet of every shortcut,** generated from the same table the bindings use, so it cannot drift. The table includes the inspector toggle, which is also a palette command.
 - **Focus is always visible to a keyboard user:** a 2 px solid accent ring with a 2 px offset, drawn on `:focus-visible` and on no other state, on every focusable element, in both themes. Keyboard navigation (`Tab`, `j`/`k`, `⌘K`) shows the ring; a pointer click on a button or row does not. Scroll containers keep 4 px of padding so the ring is never clipped. Focus moves into a dialog when it opens and back to its trigger when it closes.
@@ -91,61 +128,105 @@ Selection, scroll position and filters survive navigating away and back.
 
 ## 5. Design tokens
 
-Components use semantic tokens only (`surface`, `text`, `border`, `accent`, `state-*`); the light and dark themes are two sets of values for the same names. The theme follows the operating system until the user chooses.
+Components use semantic tokens only (`--surface-*`, `--text-*`, `--border-*`, `--accent`, `--state-*`); the light and dark themes are two sets of values for the same names. Dark is the default in `:root`. The theme follows the operating system until the user chooses. Exact CSS custom properties live in `docs/specs/ui-tokens.css` and, once W2-Sa lands, in the UI build.
 
-**Typefaces:** the system UI stack, `system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif`, and the system monospace stack, `ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace`. No font files ship, so the embedded build spends nothing on fonts. Inter is excluded.
+**Typefaces:** self-hosted Latin-subsetted WOFF2 variable fonts, Geist and Geist Mono, embedded in the static build (about 65 KB together, 0 KB of JavaScript, no request to any other origin). They are loaded with `font-display: swap` and metric-matched `system-ui` / `ui-monospace` faces so the first paint does not shift (CLS 0). Inter is excluded. The files count toward the 1 MB embedded-build budget in §10.
 
-**Mark:** the word "Moonglass", in the UI face at weight 600, until the owner supplies a one-colour mark that works at 16 px.
+**Mark:** a 22 px dark polished glass orb, a static SVG, at the top-left of the sidebar beside the "Moonglass" word mark (weight 600). It has a 1 px specular rim and quiet teal and blue strands painted inside the sphere. It does not glow, and it does not move (§7). Paint-server IDs in the SVG (`id` on a gradient or filter) must be unique per instance, so two orbs on one page do not clash; they must not be fixed global IDs.
 
-**Type scale** (size / line height, px): 11/16, 12/16, **13/20 (base)**, 14/20, 16/24, 20/28, 24/32. Weights 400, 500 and 600. A monospace face at 12/18 for logs, digests, fingerprints and identifiers.
+**Type scale** (five sizes; size / line height, and tracking where it is not zero):
 
-**Spacing:** a 4 px grid: 0, 4, 8, 12, 16, 24, 32, 48, 64.
+| Token | Size / line height | Tracking | Weight | Use |
+|---|---|---|---|---|
+| `--text-xs` | 11/16 | +0.02em | 500 | Section labels, keyboard hints, table headers |
+| `--text-sm` | 12/16 (18 mono) | 0 | 400, 500 | Secondary metadata, inspector labels, log lines, SHAs |
+| `--text-base` | 13/20 | −0.005em | 400, 500 | Body, list rows, inputs, buttons, inspector values |
+| `--text-md` | 15/22 | −0.015em | 500, 600 | Dialog titles, section headings, empty-state titles |
+| `--text-lg` | 22/28 | −0.025em | 600 | Resource and page titles |
 
-**Radius:** 4 px (inputs, pills), 8 px (buttons, rows, cards), 12 px (dialogs, palette).
+Weights are 400, 500 and 600. `font-variant-numeric: tabular-nums` applies to timestamps, counts, durations and metrics.
 
-**Neutral grey ramp**, lightness in OKLCH, chroma 0.01 or less, with a slight cool tint:
+**Spacing:** a 4 px grid: 0, 4, 8, 12, 16, 20, 24, 32, 48.
 
-| Step | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Light | 0.99 | 0.975 | 0.955 | 0.93 | 0.90 | 0.86 | 0.80 | 0.70 | 0.56 | 0.48 | 0.40 | 0.20 |
-| Dark | 0.135 | 0.165 | 0.195 | 0.225 | 0.26 | 0.32 | 0.38 | 0.47 | 0.56 | 0.63 | 0.74 | 0.94 |
+**Radius:** `--radius-sm` 4 px (buttons, inputs, chips, nav items, `kbd`); `--radius-md` 6 px (popovers, dropdowns, approval cards); `--radius-lg` 8 px (inset canvas, dialogs, the `⌘K` palette); `--radius-full` 9999 px (the orb, pill tabs, status dots, status pills). List rows are square (0 px) and run edge to edge.
 
-Steps 1–2 are surfaces: step 1 is the app frame (the sidebar and the chrome around the panes) and step 2 is the canvas (list, detail and inspector). In dark, the frame is deeper than the canvas, so the canvas reads as raised without a shadow. Steps 3–4 are hover and selected, 5–7 borders, 8 disabled, 9 icons and control borders, 10–12 text. Text uses steps 10–12 only, and only on steps 1–4; step 5 is never a text background.
+**Elevation.** Borders over shadows. The inset canvas, the inspector and list rows use a 1 px `--border-subtle` line and no shadow. Only floating layers (dropdown, popover, dialog, `⌘K`) combine a 1 px `--border-strong` line with `--shadow-overlay`.
 
-**Borders.** Two border tokens, both 1 px solid:
+**Neutral grey ramp**, lightness in OKLCH, chroma 0.008 or less, hue 260. In both themes, step 1 (`--surface-frame`) is the recessed sidebar and the chrome around the canvas, and step 2 (`--surface-canvas`) is the inset working canvas. The frame is deeper than the canvas in both themes, so the canvas reads as raised without a shadow.
 
-- `border-subtle` (step 5): the structural hairline between the sidebar, list, detail and inspector panes (§3), and between list rows (§6). No shadow divides panes or rows.
-- `border-control` (step 9): the edge of an input, an unfilled button, a checkbox or a switch.
-
-**Contrast.** Approximate, computed from these lightness values at chroma 0.01 against steps 1–4 of the same theme; the token test (§12) uses the final values:
-
-| Pair | Light | Dark | Needs |
+| Step | Role | Dark `oklch(L C H)` | Light `oklch(L C H)` |
 |---|---|---|---|
-| Step 10 text | 5.3–6.3 | 4.9–5.7 | 4.5 |
-| Step 9 (icons, `border-control`) | 3.8–4.5 | 3.7–4.3 | 3 |
-| Accent text, steps 1–3 | 4.6–5.1 | 8.9–9.7 | 4.5 |
-| Accent focus ring, steps 1–4 | 4.3–5.1 | 8.3–9.7 | 3 |
-| `border-subtle` (step 5) | 1.1–1.3 | 1.1–1.3 | None: see below |
+| 1 | Frame / sidebar (`--surface-frame`) | 0.115 0.004 260 | 0.968 0.003 260 |
+| 2 | Inset canvas (`--surface-canvas`) | 0.145 0.005 260 | 0.992 0.002 260 |
+| 3 | Hover (`--surface-hover`) | 0.185 0.006 260 | 0.945 0.004 260 |
+| 4 | Active / selected (`--surface-active`) | 0.220 0.007 260 | 0.915 0.005 260 |
+| 5 | Structural hairline (`--border-subtle`) | 0.245 0.006 260 | 0.895 0.005 260 |
+| 6 | Strong hairline (`--border-strong`) | 0.315 0.007 260 | 0.820 0.006 260 |
+| 7 | Disabled text and icon (`--text-disabled`) | 0.440 0.007 260 | 0.680 0.007 260 |
+| 8 | Control borders and muted icons (`--border-control`) | 0.535 0.008 260 | 0.555 0.008 260 |
+| 9 | Tertiary text (`--text-tertiary`) | 0.635 0.008 260 | 0.475 0.008 260 |
+| 10 | Secondary text (`--text-secondary`) | 0.750 0.007 260 | 0.390 0.008 260 |
+| 11 | Primary text (`--text-primary`) | 0.935 0.004 260 | 0.200 0.006 260 |
 
-Step 11 and 12 text is higher still. Step 8 reaches at most 2.9, so it carries disabled states and nothing that must be seen. Light accent text on step 4 is 4.28, so accent text sits on steps 1–3.
+Text uses steps 9–11 only, and only on steps 1–4; step 5 is never a text background.
 
-`border-subtle` is below 3:1 by design. It divides regions and does not identify a control or its state, so WCAG 1.4.11 does not require 3:1 of it, and every region is also identifiable by its landmark and its place in the tab order. A control that is bordered uses `border-control`. The token test (§12) checks every pair above and fails the build if a value moves a pair under its threshold.
+**Borders.** All 1 px solid:
 
-**Accent:** one hue, used for the focus ring, the primary button, the selected navigation item and links. A muted sea-glass teal, `oklch(0.52 0.09 195)` on light and `oklch(0.76 0.10 195)` on dark, dark enough on light to carry link text and a white button label. The hue stays 195; if the contrast test fails 4.5:1 at W2-S, it moves only the lightness and chroma. Blue would sit too close to Building, amber to Waiting for approval, and indigo is Linear's.
+- `--border-subtle` (step 5): the structural hairline of the canvas, the inspector and list rows (§3, §6). No shadow divides panes or rows.
+- `--border-strong` (step 6): the edge of a floating layer.
+- `--border-control` (step 8): the edge of an input, an unfilled button, a checkbox or a switch, and muted icons.
 
-**Deploy states.** Each state has a hue, an icon shape and a label, so it never depends on colour alone.
+**Accent and semantic hues**, muted enough to sit in a dense list. Pill and banner tints use `color-mix(in oklch, var(--state-*) 10%, transparent)`.
 
-| State | Hue | Shape |
-|---|---|---|
-| Building | Blue (250) | Partial ring |
-| Live | Green (150) | Filled dot |
-| Failed | Red (25) | Cross |
-| Rolled back | Orange (55) | Return arrow |
-| Waiting for approval | Amber (85) | Pause |
-| Would have rolled back | Orange (55), outline only | Dashed return arrow |
-| Queued, superseded, stopped | Grey | Hollow dot |
+| Token | Role | Dark `oklch` | Light `oklch` |
+|---|---|---|---|
+| `--accent` | Focus ring, links, the active nav mark | 0.75 0.095 195 | 0.47 0.090 195 |
+| `--accent-solid` | Primary button fill (label `--accent-fg`) | 0.50 0.095 195 | 0.47 0.090 195 |
+| `--accent-fg` | Label on `--accent-solid` | 0.985 0.002 260 | 0.985 0.002 260 |
+| `--state-success` | Live, online, diff add | 0.72 0.110 152 | 0.46 0.100 152 |
+| `--state-info` | Building | 0.70 0.110 248 | 0.47 0.120 248 |
+| `--state-warn` | Switching | 0.77 0.110 80 | 0.47 0.100 75 |
+| `--state-danger` | Failed, offline, diff remove | 0.68 0.140 25 | 0.48 0.150 25 |
+| `--state-rollback` | Rolled back, shadow rollback | 0.72 0.120 52 | 0.48 0.120 52 |
+| `--state-approval` | Waiting for approval | 0.72 0.110 300 | 0.47 0.110 300 |
 
-"Would have rolled back" is the shadow-mode report (S§5.4); it shares the rolled-back hue in outline so it reads as a rollback that did not happen.
+The accent stays hue 195. If a later token test fails 4.5:1, it moves only lightness and chroma. Blue would sit too close to Building, amber to Switching, and indigo is Linear's. Waiting for approval has its own hue (300) so it cannot be confused with Switching.
+
+**Contrast.** Ratios below were computed by converting each OKLCH value to sRGB (clipping any channel that sits outside the gamut), then to relative luminance, then to the WCAG 2.2 contrast ratio. They are reported as the worst pair against steps 1–4, then against the canvas (step 2). These L values already meet the thresholds, so none were moved.
+
+| Pair | Dark (worst → canvas) | Light (worst → canvas) | Needs |
+|---|---|---|---|
+| `--text-primary` (step 11) | 14.3:1 → 16.4:1 | 14.1:1 → 17.7:1 | 4.5 |
+| `--text-secondary` (step 10) | 7.8:1 → 8.9:1 | 7.5:1 → 9.4:1 | 4.5 |
+| `--text-tertiary` (step 9) | 5.0:1 → 5.8:1 | 5.2:1 → 6.5:1 | 4.5 |
+| `--border-control` / muted icons (step 8) | 3.4:1 → 3.8:1 | 3.7:1 → 4.6:1 | 3 |
+| `--accent` text and focus ring | 8.1:1 → 9.3:1 | 5.0:1 → 6.3:1 | 4.5 text, 3 focus |
+| `--accent-fg` on `--accent-solid` | 5.4:1 | 6.2:1 | 4.5 |
+| `--state-success` text and glyph | 7.3:1 → 8.4:1 | 5.3:1 → 6.6:1 | 4.5 |
+| `--state-info` text and glyph | 6.5:1 → 7.5:1 | 5.3:1 → 6.6:1 | 4.5 |
+| `--state-warn` text and glyph | 8.3:1 → 9.5:1 | 5.4:1 → 6.8:1 | 4.5 |
+| `--state-danger` text and glyph | 5.6:1 → 6.5:1 | 5.5:1 → 6.9:1 | 4.5 |
+| `--state-rollback` text and glyph | 6.7:1 → 7.7:1 | 5.3:1 → 6.7:1 | 4.5 |
+| `--state-approval` text and glyph | 6.7:1 → 7.7:1 | 5.6:1 → 7.0:1 | 4.5 |
+| `--border-subtle` (step 5) | 1.1:1 | 1.1:1 | None: see below |
+
+Step 7 (`--text-disabled`) is for disabled states only and is not required to meet 4.5:1. `--border-subtle` is below 3:1 by design. It divides regions and does not identify a control or its state, so WCAG 1.4.11 does not require 3:1 of it, and every region is also identifiable by its landmark and its place in the tab order. A control that is bordered uses `--border-control`. The token test (§12) checks every pair above and fails the build if a value moves a pair under its threshold.
+
+**Deploy states.** Each state has a token, a 14 px glyph and a label, so it never depends on colour alone.
+
+| State | Token | Glyph | Motion | List treatment |
+|---|---|---|---|---|
+| Queued | `--text-tertiary` | Hollow circle | None | Glyph and muted label |
+| Building | `--state-info` | Spinner arc | Simple spinner arc only (§7) | Glyph and elapsed seconds |
+| Switching | `--state-warn` | Spinner arc | Simple spinner arc only (§7) | Glyph and "Switching" |
+| Live | `--state-success` | Filled dot | None | Glyph only (the quietest state) |
+| Failed | `--state-danger` | Cross | None | Glyph and exit or step reason |
+| Rolled back | `--state-rollback` | Return arrow | None | Glyph and target SHA |
+| Waiting for approval | `--state-approval` | Pause bars | None | Glyph and "Approval" |
+| Would have rolled back | `--state-rollback` | Dashed return arrow (outline) | None | Glyph and the shadow report link (S§5.4) |
+| Superseded / stopped | `--text-tertiary` | Hollow circle | None | Glyph and muted text |
+
+"Would have rolled back" is the shadow-mode report (S§5.4); it shares the rolled-back hue in outline so it reads as a rollback that did not happen. Waiting for approval must not share Switching's hue or glyph.
 
 ## 6. Components
 
@@ -155,11 +236,13 @@ Step 11 and 12 text is higher still. Step 8 reaches at most 2.9, so it carries d
 
 | Component | What it is |
 |---|---|
-| List row | One line: state shape, name, one secondary fact, relative time. 36 px high in every list, with no density setting; fully keyboard driven. Rows are divided by a 1 px `border-subtle` bottom edge that is inside the 36 px and turns transparent, rather than disappearing, on the highlighted, hovered and selected row and the row above, so no row changes height |
-| Detail header | A 40 px breadcrumb bar with quick actions on the right, then a 32 px property row: what is live, since when, who or what deployed it. §3 |
-| Inspector | Read-only column of properties and live telemetry, with a 1 px `border-subtle` left edge, 16–20 px padding and no nested boxes. Below 1200 px it is the property strip. §3 |
+| List row | One line: state glyph, name, one secondary fact, relative time. 36 px high in every list, with no density setting; fully keyboard driven. Rows are square and edge to edge, divided by a 1 px `--border-subtle` bottom edge that is inside the 36 px and turns transparent, rather than disappearing, on the highlighted, hovered and selected row and the row above, so no row changes height |
+| Canvas top bar | A 40 px breadcrumb bar with quick actions on the right. §3 |
+| Resource header | Title, one-line summary and the Properties row, with 32 px padding. §3 |
+| Pill tabs | Horizontal pills for the resource's views. The active pill moves in 160 ms. §3, §7 |
+| Inspector | Read-only column of properties and live telemetry, with a 1 px `--border-subtle` left edge, 20 px padding and no nested boxes, inside the canvas. Below 1200 px it is the property strip. §3 |
 | Sparkline | A small line of recent CPU or memory use inside the inspector, always beside its current value as text. It updates with the usage stream (§9) and never animates on its own |
-| Status pill | State shape plus label, in the state hue. The only place state colours appear |
+| Status pill | State glyph plus label, in the state token. The only place state colours appear |
 | Diff view | What a deploy or approval will change: image, config, environment variable names, services that will restart. Secret values never appear |
 | Log stream | Live, monospace, virtualised; pauses following when the reader scrolls up |
 | Command palette | §4 |
@@ -167,7 +250,9 @@ Step 11 and 12 text is higher still. Step 8 reaches at most 2.9, so it carries d
 | Secret input | Write-only field. After saving it shows only that a value is set and when (S§3.11) |
 | Typed confirmation | An Alert Dialog whose action is enabled once the resource's name has been typed |
 
-The log stream, diff view, approval card and every other control live in the detail pane, never in the inspector.
+The log stream, diff view, approval card and every other control live in the main canvas, never in the inspector.
+
+Every interactive component has default, hover, active, focus, disabled and loading states.
 
 **Surfaces the plan requires:**
 
@@ -181,7 +266,12 @@ The log stream, diff view, approval card and every other control live in the det
 
 ## 7. Motion
 
-At most 150 ms, ease-out. Motion shows a change of state or position and nothing else. With `prefers-reduced-motion`, transitions are replaced by an immediate change. Nothing animates in a loop.
+Motion is short and rare. It shows a change of state or position and nothing else.
+
+- **State transitions** use `--duration-micro` (90 ms) for colour, opacity and hairline changes, and `--duration-move` (160 ms) for the active pill, the inspector opening or closing, and other small moves. The easing is `--ease-out` (`cubic-bezier(0.2, 0, 0, 1)`), with no overshoot.
+- **Building and Switching** may use a simple spinner arc, and only that. No orbital path, no opposing-arc glide, and no other loop.
+- **Nothing else loops, ripples or sweeps.** The orb is a static SVG mark: no strand drift and no acceleration while a deploy is in flight. Live has no settle ripple. The header and tab-bar hairline has no luminous progress sweep.
+- With `prefers-reduced-motion`, transitions are an immediate change and the spinner arc does not animate.
 
 ## 8. States
 
@@ -216,12 +306,12 @@ W2-S measures the two size budgets in CI against the built output (ADR-0016). Th
 | Layout shift | None: cumulative layout shift of 0 |
 | The static build embedded in the binary, compressed | 1 MB or less |
 
-The age library for browser-side encryption loads only on screens that save a secret (B W4-5).
+The age library for browser-side encryption loads only on screens that save a secret (B W4-5). Self-hosted font files count toward the 1 MB budget and must not add JavaScript or a network request to another origin.
 
 ## 11. Security
 
 - **A strict Content Security Policy,** sent by the Go server as a header: neither `unsafe-inline` nor `unsafe-eval`. SvelteKit's one start-up script is allowed by its hash; no other inline script exists (B W2-S, B W4-5).
-- **No third-party scripts or fonts at run time.** The UI uses system fonts and makes no request to any other origin.
+- **No third-party scripts or fonts at run time.** Geist and Geist Mono are self-hosted WOFF2 files in the static build and make no request to any other origin.
 - **Secret inputs are write-only** and never echoed back, logged or kept in client state after the save (S§3.11).
 - **Destructive actions need a typed confirmation or an approval,** never a single click or a single key.
 - Sessions use `__Host-` cookies; the UI stores no token where page script can read it.
@@ -233,13 +323,13 @@ WCAG 2.2 AA. Text contrast of at least 4.5:1 in both themes, and non-text contra
 
 ## 13. Open choices
 
-The owner accepted the default stated in each item on 2026-11-16. Each stays listed because the first screens may show it should change.
+The owner accepted the 2026-11-16 defaults below where they still apply, and on 2026-11-19 adopted the 2-pane inset canvas, the recessed frame in both themes, self-hosted Geist, a static orb, the motion cut, contrast-checked token values and a distinct "Waiting for approval" glyph and hue. Each item that is still open stays listed because the first screens may show it should change.
 
-1. **Highlight versus open.** On a collection route, `j`/`k` highlight a row and the detail follows it without changing the URL; `Enter` opens the resource route and drops the list. The alternative is that selecting a row navigates, which would remove the list during a triage run through approvals.
-2. **Route kinds.** Only deploys and approvals were named as deep routes. The service and server routes are classed as resource routes too, and the project routes as collections, so every service and server has an inspector. Audit and settings are pages with none.
-3. **Ultra-wide default.** The inspector is closed by default on collection routes at 1440 px and up, because the request says "when toggled open". Opening it by default there is the other reading. Docked, it forces the list to 320 px.
+1. **Highlight versus open.** Decided 2026-11-19: on a collection route, `j`/`k` highlight a row in the full-width list; `Enter` opens the resource route. There is no side detail pane that follows the highlight.
+2. **Route kinds.** Only deploys and approvals were first named as deep routes. The service and server routes are classed as resource routes too, and the project and environment routes as collections, so every service and server has an inspector. Audit and settings are pages with none. That grouping still holds under the 2-pane shell.
+3. **Inspector default.** Decided 2026-11-19: there is no inspector on a collection route. On a resource route at 1200 px and up it is open by default, and the choice is stored per viewport class. Opening it closed by default is the other reading.
 4. **Toggle keys.** `⌘I` or `]`, both kept. Some browsers bind `⌘I` or Ctrl+I to their own features, so the handler cancels the default. `]` needs AltGr on some keyboard layouts, as `/` and `.` already may elsewhere.
-5. **Hairlines are faint.** At 1.1–1.3:1 the pane dividers are a quiet cue, not a conformance claim. Region identity rests on landmarks, and dark mode adds a surface step between frame and canvas. In light the frame (step 1) is lighter than the canvas (step 2), the reverse of dark. Light is unchanged here.
-6. **Rounded rows and divider lines.** Rows keep the 8 px radius with a hairline between them. Hiding the line beside the highlight is a rule to try in the first screens; if it looks fussy, drop the row dividers and keep the pane ones.
+5. **Hairlines are faint.** At about 1.1:1 the pane dividers are a quiet cue, not a conformance claim. Region identity rests on landmarks, and both themes keep the frame deeper than the canvas.
+6. **Row divider lines.** Rows are square and edge to edge, with a hairline between them. Hiding the line beside the highlight is a rule to try in the first screens; if it looks fussy, drop the row dividers and keep the pane ones.
 7. **Property strip.** It drops the sparklines; current values stay as text. A compact sparkline in the strip is possible if the first screens show it is wanted.
-8. **Step 8 and 9 roles changed.** Step 8 cannot reach 3:1 in either theme, so icons and control borders moved to step 9 and step 8 is disabled only. The light accent on step 4 is 4.28:1, below 4.5, so accent text sits on steps 1–3. Both were already true of the old values.
+8. **Token roles and contrast.** Contrast against steps 1–4 was recomputed from the OKLCH values on 2026-11-19 (method in §5). No L value had to move. Icons and control borders stay on step 8, which clears 3:1; disabled stays on step 7. Accent text may sit on steps 1–4.
