@@ -10,7 +10,7 @@ max_diff_lines: 400
 tests:
   - ./ui TestScaffoldFilesPresent
   - ./ui TestPackageJSONExactPins
-  - ./ui TestSvelteConfigAdapterStatic
+  - ./ui TestViteConfigAdapterStatic
   - ./ui TestViteConfigTailwind
 reads:
   - docs/adr/0016-ui-toolchain.md
@@ -39,8 +39,8 @@ This was split out of W2-Sa (owner decision, 2026-11-19) to keep ticket diffs wi
   - `typescript`: 6.0.3
   - `svelte-check`: 4.7.8
 - Create `ui/bun.lock` (text lockfile generated via Bun 1.4.4 with exact pins).
-- Create `ui/svelte.config.js` configured with `@sveltejs/adapter-static` outputting pages and assets to `../internal/ui/dist`, with `fallback: 'index.html'` for client-side routing.
-- Create `ui/vite.config.ts` configuring `@sveltejs/vite-plugin-svelte` (or `@sveltejs/kit/vite`) and `@tailwindcss/vite`.
+- Create `ui/vite.config.ts` configuring `@sveltejs/kit/vite` and `@tailwindcss/vite`, with the SvelteKit options (including the adapter) passed to `sveltekit(...)`:
+  `sveltekit({ adapter: adapter({ pages: '../internal/ui/dist', assets: '../internal/ui/dist', fallback: 'index.html' }) })`, where `adapter` is `@sveltejs/adapter-static`, giving static pages and assets in `../internal/ui/dist` with `fallback: 'index.html'` for client-side routing. Note: `ui/svelte.config.js` must NOT exist; SvelteKit 3.2 rejects it.
 - Create `ui/tsconfig.json` extending `./.svelte-kit/tsconfig.json` with strict type checking.
 - Create `ui/src/app.html` with basic HTML structure, viewport meta, and SvelteKit `%sveltekit.head%` and `%sveltekit.body%` placeholders.
 - Create root `ui/src/routes/+layout.svelte` with `{@render children()}` (Svelte 5 snippet syntax).
@@ -49,9 +49,9 @@ This was split out of W2-Sa (owner decision, 2026-11-19) to keep ticket diffs wi
 
 ## Acceptance criteria
 
-- `TestScaffoldFilesPresent`: asserts that all required project files (`package.json`, `bun.lock`, `svelte.config.js`, `vite.config.ts`, `tsconfig.json`, `src/app.html`, `src/routes/+layout.svelte`, `.gitignore`) exist and are non-empty.
+- `TestScaffoldFilesPresent`: asserts that all required project files (`package.json`, `bun.lock`, `vite.config.ts`, `tsconfig.json`, `src/app.html`, `src/routes/+layout.svelte`, `.gitignore`) exist and are non-empty, and asserts that `ui/svelte.config.js` does NOT exist.
 - `TestPackageJSONExactPins`: parses `ui/package.json`, asserts `"packageManager"` is `"bun@1.4.4"`, and verifies that every dependency listed matches the exact version in ADR-0016 without any `^` or `~` prefix.
-- `TestSvelteConfigAdapterStatic`: reads `ui/svelte.config.js` and asserts that `@sveltejs/adapter-static` is imported and configured to output to `../internal/ui/dist`.
+- `TestViteConfigAdapterStatic`: reads `ui/vite.config.ts` and asserts that `@sveltejs/adapter-static` is imported and configured to output to `../internal/ui/dist`.
 - `TestViteConfigTailwind`: verifies that `ui/vite.config.ts` configures both SvelteKit and `@tailwindcss/vite`.
 - `go test ./ui` passes.
 - `make ci` stays green with or without `ui/node_modules` present.

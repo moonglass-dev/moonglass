@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-17
+- Amended: 2026-11-19, decision 3: SvelteKit 3.2 passes kit options, including the adapter, via `sveltekit(...)` in `ui/vite.config.ts` rather than `svelte.config.js` (owner decision, ticket W2-Sb unblocked)
 - Amended: 2026-11-19, decision 5: self-hosted Geist and Geist Mono font assets (owner decision, W2-Sa split)
 
 ## Context
@@ -30,7 +31,7 @@ Versions were checked upstream on 2026-11-17 (the package registry and the `oven
    | `svelte-check` | 4.7.8 | Type and template checks |
 
    Adding or upgrading a package is a change to this ADR, in one ticket.
-3. **Build integration.** `make ui` runs `bun install --frozen-lockfile` and `bun run build` in `ui/`. The output goes to `internal/ui/dist/`, which is git-ignored and embedded with `//go:embed` by `internal/ui`. `make build`, `make build-all`, `make test`, `make lint` and `make ci` run `make ui` first, so the binary always embeds a fresh build, and no build output is committed. CI installs Bun 1.4.4 with a pinned `oven-sh/setup-bun` (`bun-version: 1.4.4`).
+3. **Build integration.** `make ui` runs `bun install --frozen-lockfile` and `bun run build` in `ui/`. SvelteKit 3.2 takes its options — including the adapter — from the `sveltekit(...)` plugin call in `ui/vite.config.ts`, not from `svelte.config.js`; `ui/svelte.config.js` does not exist. `@sveltejs/adapter-static` is configured there to emit its pages and assets to `../internal/ui/dist`, which is git-ignored and embedded with `//go:embed` by `internal/ui`. `make build`, `make build-all`, `make test`, `make lint` and `make ci` run `make ui` first, so the binary always embeds a fresh build, and no build output is committed. CI installs Bun 1.4.4 with a pinned `oven-sh/setup-bun` (`bun-version: 1.4.4`).
 4. **Budgets in CI** (`docs/specs/ui.md` §10) are checked without a browser: initial JavaScript gzipped and the compressed embedded build are measured from the build output. The route-change and layout-shift budgets need a browser. They are not measured in CI until a ticket adds a headless browser under its own ADR, and until then they are checked in the weekly demo.
 5. **No runtime requests and self-hosted fonts** (`docs/specs/ui.md` §5, §11) (amended 2026-11-19). No runtime requests are made to any other origin or third-party CDN. Geist and Geist Mono are approved and self-hosted as static assets:
    - Upstream source: Vercel Geist and Geist Mono.

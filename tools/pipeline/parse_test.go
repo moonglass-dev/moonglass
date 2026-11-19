@@ -151,6 +151,7 @@ func TestBannedWordsSkip(t *testing.T) {
 		"go.mod":                            true,
 		"go.sum":                            true,
 		"ui/svelte.config.js":               true,
+		"ui/vite.config.ts":                 true,
 		"internal/agent/agent.go":           false,
 		"ui/src/app.html":                   false,
 		"ui/svelte.config.ts":               false,
