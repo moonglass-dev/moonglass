@@ -440,7 +440,7 @@ func fileHash(path string) (string, error) {
 }
 
 // ownerTestEdits are existing test files the owner allowed a ticket to change
-// (W2-8 and W2-12 on 2026-11-17, W3-7, W5-3a, FR1-10, W2-3 and W2-11b on 2026-11-18). The lines on main no longer match the behaviour those tickets
+// (W2-8 and W2-12 on 2026-11-17, W3-7, W5-3a, FR1-10, W2-3, W2-11b, W2-6, W4-1d, W5-5a, W2-11c and FR1-2 on 2026-11-18). The lines on main no longer match the behaviour those tickets
 // have to build. Any other test file that existed on main is still untouchable.
 var ownerTestEdits = map[string]map[string]bool{
 	"W2-8": {
@@ -464,6 +464,26 @@ var ownerTestEdits = map[string]map[string]bool{
 	},
 	"W2-11b": {
 		"internal/store/releases_conformance_test.go": true,
+	},
+	"W2-6": {
+		"internal/deploy/predeploy_test.go": true,
+	},
+	"W4-1d": {
+		"internal/store/linktokens_conformance_test.go": true,
+	},
+	"W5-5a": {
+		"internal/protocol/deploy_test.go": true,
+	},
+	"W2-11c": {
+		"internal/registry/registry_test.go": true,
+	},
+	"FR1-2": {
+		"internal/store/conformance_test.go":           true,
+		"internal/store/projects_conformance_test.go":  true,
+		"internal/store/releases_conformance_test.go":  true,
+		"internal/store/rollbacks_conformance_test.go": true,
+		"internal/store/pg_rls_test.go":                true,
+		"internal/server/agent_test.go":                true,
 	},
 }
 
