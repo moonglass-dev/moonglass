@@ -16,8 +16,12 @@ const (
 	base64Chars     = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 )
 
-// validateHeartbeat checks the server reports. agent_version has no rule.
+// validateHeartbeat checks the server reports and the update channel.
+// agent_version has no rule.
 func validateHeartbeat(m *agentv1.Heartbeat) error {
+	if err := validateUpdateChannel(m.GetUpdateChannel()); err != nil {
+		return err
+	}
 	if disk := m.GetDisk(); disk != nil {
 		if err := validateDiskReport(disk); err != nil {
 			return err
@@ -27,6 +31,17 @@ func validateHeartbeat(m *agentv1.Heartbeat) error {
 		return validateDeployKey(key)
 	}
 	return nil
+}
+
+// validateUpdateChannel checks the channel byte for byte: empty, STABLE or
+// CANARY, so no case-folded or padded value reaches the control plane.
+func validateUpdateChannel(s string) error {
+	switch s {
+	case "", "STABLE", "CANARY":
+		return nil
+	default:
+		return fmt.Errorf("update_channel %s, expected empty, STABLE or CANARY: %w", quoteOrLen(s), ErrMalformed)
+	}
 }
 
 // validateDiskReport checks the two filesystem pairs and the level. The level is

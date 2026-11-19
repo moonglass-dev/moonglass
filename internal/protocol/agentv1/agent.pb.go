@@ -38,6 +38,8 @@ const (
 	MessageType_BUILD                    MessageType = 11
 	MessageType_STOP_APP                 MessageType = 15
 	MessageType_REMOVE_APP               MessageType = 16
+	MessageType_UPDATE_OFFER             MessageType = 17
+	MessageType_UPDATE_REPORT            MessageType = 18
 )
 
 // Enum value maps for MessageType.
@@ -57,6 +59,8 @@ var (
 		11: "BUILD",
 		15: "STOP_APP",
 		16: "REMOVE_APP",
+		17: "UPDATE_OFFER",
+		18: "UPDATE_REPORT",
 	}
 	MessageType_value = map[string]int32{
 		"MESSAGE_TYPE_UNSPECIFIED": 0,
@@ -73,6 +77,8 @@ var (
 		"BUILD":                    11,
 		"STOP_APP":                 15,
 		"REMOVE_APP":               16,
+		"UPDATE_OFFER":             17,
+		"UPDATE_REPORT":            18,
 	}
 )
 
@@ -369,6 +375,161 @@ func (ReleasePhase) EnumDescriptor() ([]byte, []int) {
 	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{5}
 }
 
+type UpdateOutcome int32
+
+const (
+	UpdateOutcome_UPDATE_OUTCOME_UNSPECIFIED   UpdateOutcome = 0
+	UpdateOutcome_UPDATE_OUTCOME_REJECTED      UpdateOutcome = 1
+	UpdateOutcome_UPDATE_OUTCOME_VERIFY_FAILED UpdateOutcome = 2
+	UpdateOutcome_UPDATE_OUTCOME_SWITCHING     UpdateOutcome = 3
+	UpdateOutcome_UPDATE_OUTCOME_PASSED        UpdateOutcome = 4
+	UpdateOutcome_UPDATE_OUTCOME_REVERTED      UpdateOutcome = 5
+	UpdateOutcome_UPDATE_OUTCOME_CHECK_FAILED  UpdateOutcome = 6
+)
+
+// Enum value maps for UpdateOutcome.
+var (
+	UpdateOutcome_name = map[int32]string{
+		0: "UPDATE_OUTCOME_UNSPECIFIED",
+		1: "UPDATE_OUTCOME_REJECTED",
+		2: "UPDATE_OUTCOME_VERIFY_FAILED",
+		3: "UPDATE_OUTCOME_SWITCHING",
+		4: "UPDATE_OUTCOME_PASSED",
+		5: "UPDATE_OUTCOME_REVERTED",
+		6: "UPDATE_OUTCOME_CHECK_FAILED",
+	}
+	UpdateOutcome_value = map[string]int32{
+		"UPDATE_OUTCOME_UNSPECIFIED":   0,
+		"UPDATE_OUTCOME_REJECTED":      1,
+		"UPDATE_OUTCOME_VERIFY_FAILED": 2,
+		"UPDATE_OUTCOME_SWITCHING":     3,
+		"UPDATE_OUTCOME_PASSED":        4,
+		"UPDATE_OUTCOME_REVERTED":      5,
+		"UPDATE_OUTCOME_CHECK_FAILED":  6,
+	}
+)
+
+func (x UpdateOutcome) Enum() *UpdateOutcome {
+	p := new(UpdateOutcome)
+	*p = x
+	return p
+}
+
+func (x UpdateOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (UpdateOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_moonglass_agent_v1_agent_proto_enumTypes[6].Descriptor()
+}
+
+func (UpdateOutcome) Type() protoreflect.EnumType {
+	return &file_proto_moonglass_agent_v1_agent_proto_enumTypes[6]
+}
+
+func (x UpdateOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use UpdateOutcome.Descriptor instead.
+func (UpdateOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{6}
+}
+
+type UpdateReason int32
+
+const (
+	UpdateReason_UPDATE_REASON_UNSPECIFIED       UpdateReason = 0
+	UpdateReason_UPDATE_REASON_NOT_NEWER         UpdateReason = 1
+	UpdateReason_UPDATE_REASON_NOT_ON_CHANNEL    UpdateReason = 2
+	UpdateReason_UPDATE_REASON_REVERTED_BEFORE   UpdateReason = 3
+	UpdateReason_UPDATE_REASON_TRIAL_IN_PROGRESS UpdateReason = 4
+	UpdateReason_UPDATE_REASON_POINTER           UpdateReason = 5
+	UpdateReason_UPDATE_REASON_DISK              UpdateReason = 6
+	UpdateReason_UPDATE_REASON_DOWNLOAD          UpdateReason = 7
+	UpdateReason_UPDATE_REASON_TOO_LARGE         UpdateReason = 8
+	UpdateReason_UPDATE_REASON_SIGNATURE         UpdateReason = 9
+	UpdateReason_UPDATE_REASON_CHECKSUM          UpdateReason = 10
+	UpdateReason_UPDATE_REASON_POINTER_MISMATCH  UpdateReason = 11
+	UpdateReason_UPDATE_REASON_WRITE             UpdateReason = 12
+	UpdateReason_UPDATE_REASON_RESTARTED         UpdateReason = 13
+	UpdateReason_UPDATE_REASON_NOT_CONNECTED     UpdateReason = 14
+	UpdateReason_UPDATE_REASON_EXE_MISMATCH      UpdateReason = 15
+	UpdateReason_UPDATE_REASON_PROXY             UpdateReason = 16
+	UpdateReason_UPDATE_REASON_DEADLINE          UpdateReason = 17
+)
+
+// Enum value maps for UpdateReason.
+var (
+	UpdateReason_name = map[int32]string{
+		0:  "UPDATE_REASON_UNSPECIFIED",
+		1:  "UPDATE_REASON_NOT_NEWER",
+		2:  "UPDATE_REASON_NOT_ON_CHANNEL",
+		3:  "UPDATE_REASON_REVERTED_BEFORE",
+		4:  "UPDATE_REASON_TRIAL_IN_PROGRESS",
+		5:  "UPDATE_REASON_POINTER",
+		6:  "UPDATE_REASON_DISK",
+		7:  "UPDATE_REASON_DOWNLOAD",
+		8:  "UPDATE_REASON_TOO_LARGE",
+		9:  "UPDATE_REASON_SIGNATURE",
+		10: "UPDATE_REASON_CHECKSUM",
+		11: "UPDATE_REASON_POINTER_MISMATCH",
+		12: "UPDATE_REASON_WRITE",
+		13: "UPDATE_REASON_RESTARTED",
+		14: "UPDATE_REASON_NOT_CONNECTED",
+		15: "UPDATE_REASON_EXE_MISMATCH",
+		16: "UPDATE_REASON_PROXY",
+		17: "UPDATE_REASON_DEADLINE",
+	}
+	UpdateReason_value = map[string]int32{
+		"UPDATE_REASON_UNSPECIFIED":       0,
+		"UPDATE_REASON_NOT_NEWER":         1,
+		"UPDATE_REASON_NOT_ON_CHANNEL":    2,
+		"UPDATE_REASON_REVERTED_BEFORE":   3,
+		"UPDATE_REASON_TRIAL_IN_PROGRESS": 4,
+		"UPDATE_REASON_POINTER":           5,
+		"UPDATE_REASON_DISK":              6,
+		"UPDATE_REASON_DOWNLOAD":          7,
+		"UPDATE_REASON_TOO_LARGE":         8,
+		"UPDATE_REASON_SIGNATURE":         9,
+		"UPDATE_REASON_CHECKSUM":          10,
+		"UPDATE_REASON_POINTER_MISMATCH":  11,
+		"UPDATE_REASON_WRITE":             12,
+		"UPDATE_REASON_RESTARTED":         13,
+		"UPDATE_REASON_NOT_CONNECTED":     14,
+		"UPDATE_REASON_EXE_MISMATCH":      15,
+		"UPDATE_REASON_PROXY":             16,
+		"UPDATE_REASON_DEADLINE":          17,
+	}
+)
+
+func (x UpdateReason) Enum() *UpdateReason {
+	p := new(UpdateReason)
+	*p = x
+	return p
+}
+
+func (x UpdateReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (UpdateReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_moonglass_agent_v1_agent_proto_enumTypes[7].Descriptor()
+}
+
+func (UpdateReason) Type() protoreflect.EnumType {
+	return &file_proto_moonglass_agent_v1_agent_proto_enumTypes[7]
+}
+
+func (x UpdateReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use UpdateReason.Descriptor instead.
+func (UpdateReason) EnumDescriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{7}
+}
+
 // Envelope wraps every agent ↔ control-plane message.
 type Envelope struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -612,12 +773,13 @@ func (x *EnrollResponse) GetResult() EnrollResult {
 
 // Heartbeat reports what the agent knows about itself and its server. disk absent
 // means not measured. deploy_key is the server's public SSH deploy key, empty
-// until it exists.
+// until it exists. update_channel is empty, STABLE or CANARY.
 type Heartbeat struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AgentVersion  string                 `protobuf:"bytes,1,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
 	Disk          *DiskReport            `protobuf:"bytes,2,opt,name=disk,proto3" json:"disk,omitempty"`
 	DeployKey     string                 `protobuf:"bytes,3,opt,name=deploy_key,json=deployKey,proto3" json:"deploy_key,omitempty"`
+	UpdateChannel string                 `protobuf:"bytes,4,opt,name=update_channel,json=updateChannel,proto3" json:"update_channel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -669,6 +831,13 @@ func (x *Heartbeat) GetDisk() *DiskReport {
 func (x *Heartbeat) GetDeployKey() string {
 	if x != nil {
 		return x.DeployKey
+	}
+	return ""
+}
+
+func (x *Heartbeat) GetUpdateChannel() string {
+	if x != nil {
+		return x.UpdateChannel
 	}
 	return ""
 }
@@ -1407,6 +1576,129 @@ func (x *AppState) GetPhase() ReleasePhase {
 	return ReleasePhase_RELEASE_PHASE_UNSPECIFIED
 }
 
+// UpdateOffer offers an agent release. version is its only field: an offer names
+// no URL, path, channel, hash or older version.
+type UpdateOffer struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       string                 `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateOffer) Reset() {
+	*x = UpdateOffer{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateOffer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateOffer) ProtoMessage() {}
+
+func (x *UpdateOffer) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateOffer.ProtoReflect.Descriptor instead.
+func (*UpdateOffer) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UpdateOffer) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+// UpdateReport says what the agent did with an offer. It has no free-text field.
+type UpdateReport struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Version        string                 `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	Sha256         string                 `protobuf:"bytes,2,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	Outcome        UpdateOutcome          `protobuf:"varint,3,opt,name=outcome,proto3,enum=moonglass.agent.v1.UpdateOutcome" json:"outcome,omitempty"`
+	Reason         UpdateReason           `protobuf:"varint,4,opt,name=reason,proto3,enum=moonglass.agent.v1.UpdateReason" json:"reason,omitempty"`
+	ProxyRestarted bool                   `protobuf:"varint,5,opt,name=proxy_restarted,json=proxyRestarted,proto3" json:"proxy_restarted,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *UpdateReport) Reset() {
+	*x = UpdateReport{}
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateReport) ProtoMessage() {}
+
+func (x *UpdateReport) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_moonglass_agent_v1_agent_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateReport.ProtoReflect.Descriptor instead.
+func (*UpdateReport) Descriptor() ([]byte, []int) {
+	return file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *UpdateReport) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *UpdateReport) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *UpdateReport) GetOutcome() UpdateOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return UpdateOutcome_UPDATE_OUTCOME_UNSPECIFIED
+}
+
+func (x *UpdateReport) GetReason() UpdateReason {
+	if x != nil {
+		return x.Reason
+	}
+	return UpdateReason_UPDATE_REASON_UNSPECIFIED
+}
+
+func (x *UpdateReport) GetProxyRestarted() bool {
+	if x != nil {
+		return x.ProxyRestarted
+	}
+	return false
+}
+
 var File_proto_moonglass_agent_v1_agent_proto protoreflect.FileDescriptor
 
 const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
@@ -1428,12 +1720,13 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x13agent_age_recipient\x18\x03 \x01(\fR\x11agentAgeRecipient\"\x83\x01\n" +
 	"\x0eEnrollResponse\x127\n" +
 	"\x18control_plane_public_key\x18\x01 \x01(\fR\x15controlPlanePublicKey\x128\n" +
-	"\x06result\x18\x02 \x01(\x0e2 .moonglass.agent.v1.EnrollResultR\x06result\"\x83\x01\n" +
+	"\x06result\x18\x02 \x01(\x0e2 .moonglass.agent.v1.EnrollResultR\x06result\"\xaa\x01\n" +
 	"\tHeartbeat\x12#\n" +
 	"\ragent_version\x18\x01 \x01(\tR\fagentVersion\x122\n" +
 	"\x04disk\x18\x02 \x01(\v2\x1e.moonglass.agent.v1.DiskReportR\x04disk\x12\x1d\n" +
 	"\n" +
-	"deploy_key\x18\x03 \x01(\tR\tdeployKey\"\x0e\n" +
+	"deploy_key\x18\x03 \x01(\tR\tdeployKey\x12%\n" +
+	"\x0eupdate_channel\x18\x04 \x01(\tR\rupdateChannel\"\x0e\n" +
 	"\fHeartbeatAck\"\x89\x02\n" +
 	"\n" +
 	"DiskReport\x12/\n" +
@@ -1496,7 +1789,15 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x12current_release_id\x18\x01 \x01(\tR\x10currentReleaseId\x12.\n" +
 	"\x13previous_release_id\x18\x02 \x01(\tR\x11previousReleaseId\x120\n" +
 	"\x14candidate_release_id\x18\x03 \x01(\tR\x12candidateReleaseId\x126\n" +
-	"\x05phase\x18\x04 \x01(\x0e2 .moonglass.agent.v1.ReleasePhaseR\x05phase*\x80\x02\n" +
+	"\x05phase\x18\x04 \x01(\x0e2 .moonglass.agent.v1.ReleasePhaseR\x05phase\"'\n" +
+	"\vUpdateOffer\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\"\xe0\x01\n" +
+	"\fUpdateReport\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\x12\x16\n" +
+	"\x06sha256\x18\x02 \x01(\tR\x06sha256\x12;\n" +
+	"\aoutcome\x18\x03 \x01(\x0e2!.moonglass.agent.v1.UpdateOutcomeR\aoutcome\x128\n" +
+	"\x06reason\x18\x04 \x01(\x0e2 .moonglass.agent.v1.UpdateReasonR\x06reason\x12'\n" +
+	"\x0fproxy_restarted\x18\x05 \x01(\bR\x0eproxyRestarted*\xa5\x02\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eENROLL_REQUEST\x10\x01\x12\x13\n" +
@@ -1514,7 +1815,9 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x05BUILD\x10\v\x12\f\n" +
 	"\bSTOP_APP\x10\x0f\x12\x0e\n" +
 	"\n" +
-	"REMOVE_APP\x10\x10*x\n" +
+	"REMOVE_APP\x10\x10\x12\x10\n" +
+	"\fUPDATE_OFFER\x10\x11\x12\x11\n" +
+	"\rUPDATE_REPORT\x10\x12*x\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aINVALID\x10\x01\x12\x10\n" +
@@ -1543,7 +1846,35 @@ const file_proto_moonglass_agent_v1_agent_proto_rawDesc = "" +
 	"\x19RELEASE_PHASE_UNSPECIFIED\x10\x00\x12\b\n" +
 	"\x04NONE\x10\x01\x12\v\n" +
 	"\aPENDING\x10\x02\x12\t\n" +
-	"\x05READY\x10\x03B3Z1moonglass.dev/moonglass/internal/protocol/agentv1b\x06proto3"
+	"\x05READY\x10\x03*\xe5\x01\n" +
+	"\rUpdateOutcome\x12\x1e\n" +
+	"\x1aUPDATE_OUTCOME_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17UPDATE_OUTCOME_REJECTED\x10\x01\x12 \n" +
+	"\x1cUPDATE_OUTCOME_VERIFY_FAILED\x10\x02\x12\x1c\n" +
+	"\x18UPDATE_OUTCOME_SWITCHING\x10\x03\x12\x19\n" +
+	"\x15UPDATE_OUTCOME_PASSED\x10\x04\x12\x1b\n" +
+	"\x17UPDATE_OUTCOME_REVERTED\x10\x05\x12\x1f\n" +
+	"\x1bUPDATE_OUTCOME_CHECK_FAILED\x10\x06*\xa9\x04\n" +
+	"\fUpdateReason\x12\x1d\n" +
+	"\x19UPDATE_REASON_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17UPDATE_REASON_NOT_NEWER\x10\x01\x12 \n" +
+	"\x1cUPDATE_REASON_NOT_ON_CHANNEL\x10\x02\x12!\n" +
+	"\x1dUPDATE_REASON_REVERTED_BEFORE\x10\x03\x12#\n" +
+	"\x1fUPDATE_REASON_TRIAL_IN_PROGRESS\x10\x04\x12\x19\n" +
+	"\x15UPDATE_REASON_POINTER\x10\x05\x12\x16\n" +
+	"\x12UPDATE_REASON_DISK\x10\x06\x12\x1a\n" +
+	"\x16UPDATE_REASON_DOWNLOAD\x10\a\x12\x1b\n" +
+	"\x17UPDATE_REASON_TOO_LARGE\x10\b\x12\x1b\n" +
+	"\x17UPDATE_REASON_SIGNATURE\x10\t\x12\x1a\n" +
+	"\x16UPDATE_REASON_CHECKSUM\x10\n" +
+	"\x12\"\n" +
+	"\x1eUPDATE_REASON_POINTER_MISMATCH\x10\v\x12\x17\n" +
+	"\x13UPDATE_REASON_WRITE\x10\f\x12\x1b\n" +
+	"\x17UPDATE_REASON_RESTARTED\x10\r\x12\x1f\n" +
+	"\x1bUPDATE_REASON_NOT_CONNECTED\x10\x0e\x12\x1e\n" +
+	"\x1aUPDATE_REASON_EXE_MISMATCH\x10\x0f\x12\x17\n" +
+	"\x13UPDATE_REASON_PROXY\x10\x10\x12\x1a\n" +
+	"\x16UPDATE_REASON_DEADLINE\x10\x11B3Z1moonglass.dev/moonglass/internal/protocol/agentv1b\x06proto3"
 
 var (
 	file_proto_moonglass_agent_v1_agent_proto_rawDescOnce sync.Once
@@ -1557,8 +1888,8 @@ func file_proto_moonglass_agent_v1_agent_proto_rawDescGZIP() []byte {
 	return file_proto_moonglass_agent_v1_agent_proto_rawDescData
 }
 
-var file_proto_moonglass_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_proto_moonglass_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_proto_moonglass_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_proto_moonglass_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_proto_moonglass_agent_v1_agent_proto_goTypes = []any{
 	(MessageType)(0),       // 0: moonglass.agent.v1.MessageType
 	(ErrorCode)(0),         // 1: moonglass.agent.v1.ErrorCode
@@ -1566,38 +1897,44 @@ var file_proto_moonglass_agent_v1_agent_proto_goTypes = []any{
 	(DiskLevel)(0),         // 3: moonglass.agent.v1.DiskLevel
 	(CommandOutcome)(0),    // 4: moonglass.agent.v1.CommandOutcome
 	(ReleasePhase)(0),      // 5: moonglass.agent.v1.ReleasePhase
-	(*Envelope)(nil),       // 6: moonglass.agent.v1.Envelope
-	(*Error)(nil),          // 7: moonglass.agent.v1.Error
-	(*EnrollRequest)(nil),  // 8: moonglass.agent.v1.EnrollRequest
-	(*EnrollResponse)(nil), // 9: moonglass.agent.v1.EnrollResponse
-	(*Heartbeat)(nil),      // 10: moonglass.agent.v1.Heartbeat
-	(*HeartbeatAck)(nil),   // 11: moonglass.agent.v1.HeartbeatAck
-	(*DiskReport)(nil),     // 12: moonglass.agent.v1.DiskReport
-	(*Deploy)(nil),         // 13: moonglass.agent.v1.Deploy
-	(*Build)(nil),          // 14: moonglass.agent.v1.Build
-	(*SwitchRelease)(nil),  // 15: moonglass.agent.v1.SwitchRelease
-	(*Rollback)(nil),       // 16: moonglass.agent.v1.Rollback
-	(*StopApp)(nil),        // 17: moonglass.agent.v1.StopApp
-	(*RemoveApp)(nil),      // 18: moonglass.agent.v1.RemoveApp
-	(*RunPreDeploy)(nil),   // 19: moonglass.agent.v1.RunPreDeploy
-	(*CommandResult)(nil),  // 20: moonglass.agent.v1.CommandResult
-	(*AppState)(nil),       // 21: moonglass.agent.v1.AppState
+	(UpdateOutcome)(0),     // 6: moonglass.agent.v1.UpdateOutcome
+	(UpdateReason)(0),      // 7: moonglass.agent.v1.UpdateReason
+	(*Envelope)(nil),       // 8: moonglass.agent.v1.Envelope
+	(*Error)(nil),          // 9: moonglass.agent.v1.Error
+	(*EnrollRequest)(nil),  // 10: moonglass.agent.v1.EnrollRequest
+	(*EnrollResponse)(nil), // 11: moonglass.agent.v1.EnrollResponse
+	(*Heartbeat)(nil),      // 12: moonglass.agent.v1.Heartbeat
+	(*HeartbeatAck)(nil),   // 13: moonglass.agent.v1.HeartbeatAck
+	(*DiskReport)(nil),     // 14: moonglass.agent.v1.DiskReport
+	(*Deploy)(nil),         // 15: moonglass.agent.v1.Deploy
+	(*Build)(nil),          // 16: moonglass.agent.v1.Build
+	(*SwitchRelease)(nil),  // 17: moonglass.agent.v1.SwitchRelease
+	(*Rollback)(nil),       // 18: moonglass.agent.v1.Rollback
+	(*StopApp)(nil),        // 19: moonglass.agent.v1.StopApp
+	(*RemoveApp)(nil),      // 20: moonglass.agent.v1.RemoveApp
+	(*RunPreDeploy)(nil),   // 21: moonglass.agent.v1.RunPreDeploy
+	(*CommandResult)(nil),  // 22: moonglass.agent.v1.CommandResult
+	(*AppState)(nil),       // 23: moonglass.agent.v1.AppState
+	(*UpdateOffer)(nil),    // 24: moonglass.agent.v1.UpdateOffer
+	(*UpdateReport)(nil),   // 25: moonglass.agent.v1.UpdateReport
 }
 var file_proto_moonglass_agent_v1_agent_proto_depIdxs = []int32{
 	0,  // 0: moonglass.agent.v1.Envelope.type:type_name -> moonglass.agent.v1.MessageType
-	7,  // 1: moonglass.agent.v1.Envelope.error:type_name -> moonglass.agent.v1.Error
+	9,  // 1: moonglass.agent.v1.Envelope.error:type_name -> moonglass.agent.v1.Error
 	1,  // 2: moonglass.agent.v1.Error.code:type_name -> moonglass.agent.v1.ErrorCode
 	2,  // 3: moonglass.agent.v1.EnrollResponse.result:type_name -> moonglass.agent.v1.EnrollResult
-	12, // 4: moonglass.agent.v1.Heartbeat.disk:type_name -> moonglass.agent.v1.DiskReport
+	14, // 4: moonglass.agent.v1.Heartbeat.disk:type_name -> moonglass.agent.v1.DiskReport
 	3,  // 5: moonglass.agent.v1.DiskReport.level:type_name -> moonglass.agent.v1.DiskLevel
 	4,  // 6: moonglass.agent.v1.CommandResult.outcome:type_name -> moonglass.agent.v1.CommandOutcome
-	21, // 7: moonglass.agent.v1.CommandResult.app:type_name -> moonglass.agent.v1.AppState
+	23, // 7: moonglass.agent.v1.CommandResult.app:type_name -> moonglass.agent.v1.AppState
 	5,  // 8: moonglass.agent.v1.AppState.phase:type_name -> moonglass.agent.v1.ReleasePhase
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	6,  // 9: moonglass.agent.v1.UpdateReport.outcome:type_name -> moonglass.agent.v1.UpdateOutcome
+	7,  // 10: moonglass.agent.v1.UpdateReport.reason:type_name -> moonglass.agent.v1.UpdateReason
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_proto_moonglass_agent_v1_agent_proto_init() }
@@ -1610,8 +1947,8 @@ func file_proto_moonglass_agent_v1_agent_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_moonglass_agent_v1_agent_proto_rawDesc), len(file_proto_moonglass_agent_v1_agent_proto_rawDesc)),
-			NumEnums:      6,
-			NumMessages:   16,
+			NumEnums:      8,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

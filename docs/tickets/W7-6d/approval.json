@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All eight named tests live in package protocol and lock the ticket: four offer versions plus descriptor/shell checks via roundTrip (proto.Equal); the listed invalid versions (plus extra trailing-space and second NUL cases); the independent 24-pair table, proxy_restarted true, and string-field descriptor; unspecified/unknown outcome and reason, the binding complement, sha256 and proxy_restarted rejects, and four bad versions; empty/STABLE/CANARY alone and with disk/deploy_key plus the nine bad channels; unknown fields, type mismatches, error-on-envelope, and oversize Marshal/Unmarshal; fuzz seeds and Open/validator/re-wrap. Compile errors until proto and validators exist are expected. Outcome UNSPECIFIED cases also leave sha256 empty, so they assume the plan's check order."
+}

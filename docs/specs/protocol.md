@@ -62,7 +62,7 @@ No field is a host shell command.
 
 `Heartbeat` carries `agent_version` (string). `HeartbeatAck` has no fields. Both round-trip through the envelope. Opening a Heartbeat acknowledgement as an Enroll request is an error. The control plane is expected to see heartbeats about every 30 seconds (S§5); v0 does not schedule them.
 
-W7-6d adds `update_channel` to `Heartbeat`. It is `"STABLE"` or `"CANARY"` from `update.channel` in agent.toml. It is empty when the agent predates W7-6d or the field is unconfigured, and such an agent is never sent an `UpdateOffer`. Any other non-empty value is rejected. The field carries no `UNSPECIFIED` value; the zero value is empty (`docs/specs/update.md`).
+W7-6d adds `update_channel` to `Heartbeat`. It is `"STABLE"` or `"CANARY"` from `update.channel` in agent.toml, byte for byte. It is empty when the agent predates W7-6d or the field is unconfigured, and such an agent is never sent an `UpdateOffer`. Any other non-empty value is rejected: `stable`, `UNSPECIFIED` and whitespace are not accepted. The field carries no `UNSPECIFIED` value; the zero value is empty (`docs/specs/update.md`).
 
 ## Deploy commands (W2-2)
 
@@ -239,7 +239,16 @@ Specified by `docs/specs/update.md` §1 and §6 (owner decision 5 of its §10). 
 - `UpdateOutcome`: `UPDATE_OUTCOME_UNSPECIFIED` = 0, `UPDATE_OUTCOME_REJECTED` = 1, `UPDATE_OUTCOME_VERIFY_FAILED` = 2, `UPDATE_OUTCOME_SWITCHING` = 3, `UPDATE_OUTCOME_PASSED` = 4, `UPDATE_OUTCOME_REVERTED` = 5, `UPDATE_OUTCOME_CHECK_FAILED` = 6.
 - `UpdateReason`: `UPDATE_REASON_UNSPECIFIED` = 0, `NOT_NEWER` = 1, `NOT_ON_CHANNEL` = 2, `REVERTED_BEFORE` = 3, `TRIAL_IN_PROGRESS` = 4, `POINTER` = 5, `DISK` = 6, `DOWNLOAD` = 7, `TOO_LARGE` = 8, `SIGNATURE` = 9, `CHECKSUM` = 10, `POINTER_MISMATCH` = 11, `WRITE` = 12, `RESTARTED` = 13, `NOT_CONNECTED` = 14, `EXE_MISMATCH` = 15, `PROXY` = 16, `DEADLINE` = 17, each with the prefix `UPDATE_REASON_`.
 
-Protobuf enum values share the package scope, so every value of both new enums carries its prefix (`REJECTED` and `TOO_LARGE` already exist). In prose the names appear without the prefix. `docs/specs/update.md` §1 and §6 give the behaviour and the rule that binds each outcome to its allowed reasons; W7-6d's plan records the validation rules.
+Protobuf enum values share the package scope, so every value of both new enums carries its prefix (`REJECTED` and `TOO_LARGE` already exist). In prose the names appear without the prefix. `docs/specs/update.md` §1 and §6 give the behaviour.
+
+The validation rules, checked when a payload is opened:
+
+- `version` in both messages: `vMAJOR.MINOR.PATCH`, three numeric identifiers of one or more ASCII digits, no leading zero unless the identifier is exactly `0`. No pre-release, no build metadata, no whitespace and no other character.
+- `sha256`: empty when `outcome` is `REJECTED`; exactly 64 lowercase hex characters for every other outcome.
+- `outcome`: one of the six values. `UNSPECIFIED` and unknown numbers are rejected.
+- `reason`: unknown numbers are rejected, and each reason belongs to one outcome. `NOT_NEWER`, `NOT_ON_CHANNEL`, `REVERTED_BEFORE`, `TRIAL_IN_PROGRESS` and `POINTER` belong to `REJECTED`; `DISK`, `DOWNLOAD`, `TOO_LARGE`, `SIGNATURE`, `CHECKSUM`, `POINTER_MISMATCH` and `WRITE` to `VERIFY_FAILED`; `RESTARTED`, `NOT_CONNECTED`, `EXE_MISMATCH`, `PROXY` and `DEADLINE` to `REVERTED` and `CHECK_FAILED`; `SWITCHING` and `PASSED` allow `UNSPECIFIED` only.
+- `proxy_restarted`: `false` with `REJECTED` and `VERIFY_FAILED`; either value otherwise.
+- Unknown fields are rejected at every nesting level, as for every other payload.
 
 ## Secret delivery (W4-8) and reveal (W4-9)
 

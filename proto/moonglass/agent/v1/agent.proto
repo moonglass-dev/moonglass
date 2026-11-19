@@ -28,6 +28,8 @@ enum MessageType {
   BUILD = 11;
   STOP_APP = 15;
   REMOVE_APP = 16;
+  UPDATE_OFFER = 17;
+  UPDATE_REPORT = 18;
 }
 
 message Error {
@@ -64,11 +66,12 @@ enum EnrollResult {
 
 // Heartbeat reports what the agent knows about itself and its server. disk absent
 // means not measured. deploy_key is the server's public SSH deploy key, empty
-// until it exists.
+// until it exists. update_channel is empty, STABLE or CANARY.
 message Heartbeat {
   string agent_version = 1;
   DiskReport disk = 2;
   string deploy_key = 3;
+  string update_channel = 4;
 }
 
 message HeartbeatAck {}
@@ -180,4 +183,50 @@ enum ReleasePhase {
   NONE = 1;
   PENDING = 2;
   READY = 3;
+}
+
+// UpdateOffer offers an agent release. version is its only field: an offer names
+// no URL, path, channel, hash or older version.
+message UpdateOffer {
+  string version = 1;
+}
+
+// UpdateReport says what the agent did with an offer. It has no free-text field.
+message UpdateReport {
+  string version = 1;
+  string sha256 = 2;
+  UpdateOutcome outcome = 3;
+  UpdateReason reason = 4;
+  bool proxy_restarted = 5;
+}
+
+enum UpdateOutcome {
+  UPDATE_OUTCOME_UNSPECIFIED = 0;
+  UPDATE_OUTCOME_REJECTED = 1;
+  UPDATE_OUTCOME_VERIFY_FAILED = 2;
+  UPDATE_OUTCOME_SWITCHING = 3;
+  UPDATE_OUTCOME_PASSED = 4;
+  UPDATE_OUTCOME_REVERTED = 5;
+  UPDATE_OUTCOME_CHECK_FAILED = 6;
+}
+
+enum UpdateReason {
+  UPDATE_REASON_UNSPECIFIED = 0;
+  UPDATE_REASON_NOT_NEWER = 1;
+  UPDATE_REASON_NOT_ON_CHANNEL = 2;
+  UPDATE_REASON_REVERTED_BEFORE = 3;
+  UPDATE_REASON_TRIAL_IN_PROGRESS = 4;
+  UPDATE_REASON_POINTER = 5;
+  UPDATE_REASON_DISK = 6;
+  UPDATE_REASON_DOWNLOAD = 7;
+  UPDATE_REASON_TOO_LARGE = 8;
+  UPDATE_REASON_SIGNATURE = 9;
+  UPDATE_REASON_CHECKSUM = 10;
+  UPDATE_REASON_POINTER_MISMATCH = 11;
+  UPDATE_REASON_WRITE = 12;
+  UPDATE_REASON_RESTARTED = 13;
+  UPDATE_REASON_NOT_CONNECTED = 14;
+  UPDATE_REASON_EXE_MISMATCH = 15;
+  UPDATE_REASON_PROXY = 16;
+  UPDATE_REASON_DEADLINE = 17;
 }

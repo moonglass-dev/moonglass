@@ -246,6 +246,10 @@ func validatePayload(msg proto.Message) error {
 		return validateRemoveApp(m)
 	case *agentv1.Heartbeat:
 		return validateHeartbeat(m)
+	case *agentv1.UpdateOffer:
+		return validateUpdateOffer(m)
+	case *agentv1.UpdateReport:
+		return validateUpdateReport(m)
 	default:
 		return nil
 	}
@@ -265,7 +269,9 @@ func validateType(t agentv1.MessageType) error {
 		agentv1.MessageType_COMMAND_RESULT,
 		agentv1.MessageType_BUILD,
 		agentv1.MessageType_STOP_APP,
-		agentv1.MessageType_REMOVE_APP:
+		agentv1.MessageType_REMOVE_APP,
+		agentv1.MessageType_UPDATE_OFFER,
+		agentv1.MessageType_UPDATE_REPORT:
 		return nil
 	case agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED:
 		return fmt.Errorf("unspecified message type: %w", ErrMalformed)
@@ -330,6 +336,10 @@ func typeOf(msg proto.Message) (agentv1.MessageType, error) {
 		return agentv1.MessageType_STOP_APP, nil
 	case *agentv1.RemoveApp:
 		return agentv1.MessageType_REMOVE_APP, nil
+	case *agentv1.UpdateOffer:
+		return agentv1.MessageType_UPDATE_OFFER, nil
+	case *agentv1.UpdateReport:
+		return agentv1.MessageType_UPDATE_REPORT, nil
 	default:
 		return agentv1.MessageType_MESSAGE_TYPE_UNSPECIFIED, fmt.Errorf("unsupported message %T: %w", msg, ErrUnknownType)
 	}
