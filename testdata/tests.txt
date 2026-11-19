@@ -215,6 +215,7 @@ moonglass.dev/moonglass/internal/store TestMigrateIdempotent
 moonglass.dev/moonglass/internal/store TestPostgresMissingOrgFilterReturnsNothing
 moonglass.dev/moonglass/internal/store TestPostgresRLSOnProjectTables
 moonglass.dev/moonglass/internal/store TestPostgresRLSOnReleases
+moonglass.dev/moonglass/internal/store TestPostgresRLSOnRollbacks
 moonglass.dev/moonglass/internal/store TestPostgresRLSOnTokenAndAuditTables
 moonglass.dev/moonglass/internal/store TestProjectNamesValidated
 moonglass.dev/moonglass/internal/store TestProjectsConformancePostgres
@@ -222,7 +223,12 @@ moonglass.dev/moonglass/internal/store TestProjectsConformanceSQLite
 moonglass.dev/moonglass/internal/store TestReleaseConstraintsEnforced
 moonglass.dev/moonglass/internal/store TestReleasesConformancePostgres
 moonglass.dev/moonglass/internal/store TestReleasesConformanceSQLite
+moonglass.dev/moonglass/internal/store TestRollbackConstraintsEnforced
+moonglass.dev/moonglass/internal/store TestRollbacksConformancePostgres
+moonglass.dev/moonglass/internal/store TestRollbacksConformanceSQLite
 moonglass.dev/moonglass/internal/store TestSchemasMatch
+moonglass.dev/moonglass/internal/store TestServiceReleaseStateConformancePostgres
+moonglass.dev/moonglass/internal/store TestServiceReleaseStateConformanceSQLite
 moonglass.dev/moonglass/internal/store TestSessionStoredHashedOnly
 moonglass.dev/moonglass/internal/store TestSessionsConformancePostgres
 moonglass.dev/moonglass/internal/store TestSessionsConformanceSQLite

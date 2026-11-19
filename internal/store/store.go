@@ -67,12 +67,13 @@ func (s ReleaseStep) Valid() bool {
 
 // Errors returned by Store methods. Test them with errors.Is.
 var (
-	ErrNotFound     = errors.New("store: not found")
-	ErrDuplicate    = errors.New("store: already exists")
-	ErrInvalidName  = errors.New("store: invalid name")
-	ErrTokenUsed    = errors.New("store: enrolment token already used")
-	ErrTokenExpired = errors.New("store: enrolment token expired")
-	ErrReleaseState = errors.New("store: release is not in a status that allows this")
+	ErrNotFound      = errors.New("store: not found")
+	ErrDuplicate     = errors.New("store: already exists")
+	ErrInvalidName   = errors.New("store: invalid name")
+	ErrTokenUsed     = errors.New("store: enrolment token already used")
+	ErrTokenExpired  = errors.New("store: enrolment token expired")
+	ErrReleaseState  = errors.New("store: release is not in a status that allows this")
+	ErrRollbackState = errors.New("store: rollback is not in a status that allows this")
 )
 
 // Membership is one user's role in one org.
@@ -108,14 +109,18 @@ type Environment struct {
 }
 
 // Service is one service of an environment, on exactly one server.
+// CurrentReleaseID and PreviousReleaseID copy the app state of the latest
+// CommandResult; both are empty when there is no such release.
 type Service struct {
-	OrgID         string
-	ID            string
-	ProjectID     string
-	EnvironmentID string
-	Name          string
-	ServerID      string
-	CreatedAt     string
+	OrgID             string
+	ID                string
+	ProjectID         string
+	EnvironmentID     string
+	Name              string
+	ServerID          string
+	CurrentReleaseID  string
+	PreviousReleaseID string
+	CreatedAt         string
 }
 
 // Release is one queued, running or finished deploy of a service. Domains is
@@ -143,6 +148,20 @@ type Release struct {
 	Port          int
 	// PreDeployReversible is last so the struct packs without padding.
 	PreDeployReversible bool
+}
+
+// Rollback is one rollback of a service, from its start to its final status.
+// Its Status is running, succeeded, failed or rejected, from ReleaseStatus;
+// FinishedAt is empty until the rollback is final.
+type Rollback struct {
+	OrgID      string
+	ID         string
+	ServiceID  string
+	RequestID  string
+	Status     ReleaseStatus
+	Detail     string
+	CreatedAt  string
+	FinishedAt string
 }
 
 // TokenInfo describes an enrolment token without revealing its hash.
@@ -260,6 +279,24 @@ type Store interface {
 	// InFlightReleases returns the queued and running releases of the org's
 	// services on serverID, oldest first. Another org's server returns none.
 	InFlightReleases(ctx context.Context, orgID, serverID string) ([]Release, error)
+	// ServiceByName returns the service of that name in the environment.
+	// ErrNotFound when no service of that name is in that environment of the org.
+	ServiceByName(ctx context.Context, orgID, environmentID, name string) (Service, error)
+	// SetServiceReleases writes both release ids of one service in one UPDATE.
+	// An empty previousReleaseID is stored as NULL. The ids are copied, never
+	// interpreted. ErrNotFound when the service is not the org's.
+	SetServiceReleases(ctx context.Context, orgID, serviceID, currentReleaseID, previousReleaseID string) error
+	// StartRollback records a running rollback for a service of the org at now
+	// and returns the stored row. ErrNotFound when the service is not the org's.
+	StartRollback(ctx context.Context, orgID, serviceID, requestID string, now time.Time) (Rollback, error)
+	// FinishRollback ends a running rollback as succeeded, failed or rejected
+	// with detail and finished_at now, and returns the finished row. ErrNotFound
+	// when it is not the org's, ErrRollbackState when it is already final, and
+	// an error naming the three final statuses otherwise.
+	FinishRollback(ctx context.Context, orgID, rollbackID string, status ReleaseStatus, detail string, now time.Time) (Rollback, error)
+	// InFlightRollbacks returns the running rollbacks of the org's services on
+	// serverID, oldest first. Another org's server returns none.
+	InFlightRollbacks(ctx context.Context, orgID, serverID string) ([]Rollback, error)
 	// AddEnrolmentToken stores tokenHash (see HashToken); the caller chooses expires.
 	AddEnrolmentToken(ctx context.Context, orgID, tokenHash string, expires time.Time) error
 	// UseEnrolmentToken marks the token used and returns its org. It returns

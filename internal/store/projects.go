@@ -111,6 +111,21 @@ func (s *SQLStore) Environments(ctx context.Context, orgID, projectID string) ([
 	return out, err
 }
 
+// serviceColumns is every column of services, in scanService order.
+// previous_release_id is nullable, so it is coalesced to empty text.
+const serviceColumns = `org_id, id, project_id, environment_id, name, server_id,
+	current_release_id, COALESCE(previous_release_id, ''), created_at`
+
+// scanService reads one row of serviceColumns.
+func scanService(row interface{ Scan(...any) error }) (Service, error) {
+	var svc Service
+	if err := row.Scan(&svc.OrgID, &svc.ID, &svc.ProjectID, &svc.EnvironmentID, &svc.Name, &svc.ServerID,
+		&svc.CurrentReleaseID, &svc.PreviousReleaseID, &svc.CreatedAt); err != nil {
+		return Service{}, fmt.Errorf("scan service: %w", err)
+	}
+	return svc, nil
+}
+
 // CreateService implements Store. The environment and the server are read
 // inside the org-bound transaction, so a parent of another org is reported as
 // ErrNotFound: Postgres referential checks do not apply row-level security.
@@ -162,23 +177,62 @@ func (s *SQLStore) Services(ctx context.Context, orgID, environmentID string) ([
 	var out []Service
 	err := s.inOrg(ctx, orgID, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx,
-			s.q(`SELECT org_id, id, project_id, environment_id, name, server_id, created_at
-				FROM services WHERE org_id = $1 AND environment_id = $2 ORDER BY name`),
+			s.q("SELECT "+serviceColumns+` FROM services WHERE org_id = $1 AND environment_id = $2 ORDER BY name`),
 			orgID, environmentID)
 		if err != nil {
 			return fmt.Errorf("select services: %w", err)
 		}
 		defer func() { _ = rows.Close() }()
 		for rows.Next() {
-			var svc Service
-			if err := rows.Scan(&svc.OrgID, &svc.ID, &svc.ProjectID, &svc.EnvironmentID, &svc.Name, &svc.ServerID, &svc.CreatedAt); err != nil {
-				return fmt.Errorf("scan service: %w", err)
+			svc, scanErr := scanService(rows)
+			if scanErr != nil {
+				return scanErr
 			}
 			out = append(out, svc)
 		}
 		return rows.Err()
 	})
 	return out, err
+}
+
+// ServiceByName implements Store.
+func (s *SQLStore) ServiceByName(ctx context.Context, orgID, environmentID, name string) (Service, error) {
+	var out Service
+	err := s.inOrg(ctx, orgID, func(tx *sql.Tx) error {
+		svc, scanErr := scanService(tx.QueryRowContext(ctx,
+			s.q("SELECT "+serviceColumns+" FROM services WHERE org_id = $1 AND environment_id = $2 AND name = $3"),
+			orgID, environmentID, name))
+		if errors.Is(scanErr, sql.ErrNoRows) {
+			return fmt.Errorf("service by name: service %q not found in environment %s: %w", name, environmentID, ErrNotFound)
+		}
+		if scanErr != nil {
+			return fmt.Errorf("select service: %w", scanErr)
+		}
+		out = svc
+		return nil
+	})
+	return out, err
+}
+
+// SetServiceReleases implements Store. The ids are copied as data: they are
+// never checked against releases. An empty previous id is stored as NULL.
+func (s *SQLStore) SetServiceReleases(ctx context.Context, orgID, serviceID, currentReleaseID, previousReleaseID string) error {
+	return s.inOrg(ctx, orgID, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx,
+			s.q("UPDATE services SET current_release_id = $1, previous_release_id = $2 WHERE id = $3 AND org_id = $4"),
+			currentReleaseID, sql.NullString{String: previousReleaseID, Valid: previousReleaseID != ""}, serviceID, orgID)
+		if err != nil {
+			return fmt.Errorf("set service releases: %w", err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("set service releases: count changed rows: %w", err)
+		}
+		if n == 0 {
+			return fmt.Errorf("set service releases: service %s is not in org %s: %w", serviceID, orgID, ErrNotFound)
+		}
+		return nil
+	})
 }
 
 // ResolveTarget implements Store.
