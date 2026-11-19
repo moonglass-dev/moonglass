@@ -130,7 +130,7 @@ Service (resource)                       ≥1200 px
 
 Components use semantic tokens only (`--surface-*`, `--text-*`, `--border-*`, `--accent`, `--state-*`); the light and dark themes are two sets of values for the same names. Dark is the default in `:root`. The theme follows the operating system until the user chooses. Exact CSS custom properties live in `docs/specs/ui-tokens.css` and, once W2-Sa lands, in the UI build.
 
-**Typefaces:** self-hosted Latin-subsetted WOFF2 variable fonts, Geist and Geist Mono, embedded in the static build (about 65 KB together, 0 KB of JavaScript, no request to any other origin). They are loaded with `font-display: swap` and metric-matched `system-ui` / `ui-monospace` faces so the first paint does not shift (CLS 0). Inter is excluded. The files count toward the 1 MB embedded-build budget in §10.
+**Typefaces:** self-hosted Latin-subsetted WOFF2 variable fonts, Geist and Geist Mono, embedded in the static build (about 65 KB together, 0 KB of JavaScript, no request to any other origin). They are loaded with `font-display: swap` and system fallbacks (`system-ui` and `ui-monospace`) so the first paint does not shift (CLS 0). Inter is excluded. The files count toward the 1 MB embedded-build budget in §10.
 
 **Mark:** a 22 px dark polished glass orb, a static SVG, at the top-left of the sidebar beside the "Moonglass" word mark (weight 600). It has a 1 px specular rim and quiet teal and blue strands painted inside the sphere. It does not glow, and it does not move (§7). Paint-server IDs in the SVG (`id` on a gradient or filter) must be unique per instance, so two orbs on one page do not clash; they must not be fixed global IDs.
 

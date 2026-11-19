@@ -22,7 +22,7 @@ Every message is wrapped in an envelope before it is sent.
 | `payload` | `bytes` | Encoded payload message for that type, possibly empty. |
 | `error` | `Error` | Required when `type` is `ERROR`, and forbidden on any other type. This is the only place an error travels; it is not also encoded in `payload`. |
 
-`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `COMMAND_RESULT`, `BUILD`. W4-4 adds `LOG_REQUEST`, `LOG_CHUNK` and `USAGE`, and W5-5a adds `STOP_APP` and `REMOVE_APP` (below).
+`MessageType` values: `ENROLL_REQUEST`, `ENROLL_RESPONSE`, `HEARTBEAT`, `HEARTBEAT_ACK`, `ERROR`, `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `COMMAND_RESULT`, `BUILD`. W4-4 adds `LOG_REQUEST`, `LOG_CHUNK` and `USAGE`, and W5-5a adds `STOP_APP` and `REMOVE_APP` (below), and W7-6d adds `UPDATE_OFFER` and `UPDATE_REPORT` (below).
 
 Encode (`Marshal`) and decode (`Unmarshal`) round-trip a well-formed envelope. `Marshal` is deterministic. The on-the-wire encoding is a 4-byte big-endian length of the protobuf payload, followed by that many bytes of protobuf. The length must match the rest of the buffer exactly, so a truncated or trailing-garbage input is rejected.
 
@@ -227,6 +227,19 @@ Owner decision of 2026-11-19 (week 6): the owner approved these fields, their ru
 With `test` `NONE`, the other five fields must be 0.
 
 Opening a `Deploy` rejects unknown fields inside `VolumeMount` and `Healthcheck`, like everywhere else. W6-1a names `TestDeployServiceSettingsRoundTrip`, `TestDeployServiceSettingsRejectMalformed` (a table with one row per rule above), `TestDeployServiceSettingsRejectUnknownNestedFields` and the fuzz target `FuzzOpenDeployServiceSettings`.
+
+## Update messages (W7-6d)
+
+Specified by `docs/specs/update.md` §1 and §6 (owner decision 5 of its §10). W7-6d adds them to the `.proto`. The owner approved these numbers and names on 2026-11-19. They are wire format: once released they never change.
+
+- `MessageType`: `UPDATE_OFFER` = 17, `UPDATE_REPORT` = 18. Numbers 12 to 16 stay reserved for the live, delete and secrets messages (`docs/specs/live.md`, `docs/specs/delete.md`); the tickets that add those take numbers after 18.
+- `UpdateOffer`: `version` = 1. An offer names no URL, path, channel, hash or older version.
+- `UpdateReport`: `version` = 1, `sha256` = 2, `outcome` = 3 (`UpdateOutcome`), `reason` = 4 (`UpdateReason`), `proxy_restarted` = 5. The report has no free-text field.
+- `Heartbeat`: `update_channel` = 4 (see "Heartbeat" above).
+- `UpdateOutcome`: `UPDATE_OUTCOME_UNSPECIFIED` = 0, `UPDATE_OUTCOME_REJECTED` = 1, `UPDATE_OUTCOME_VERIFY_FAILED` = 2, `UPDATE_OUTCOME_SWITCHING` = 3, `UPDATE_OUTCOME_PASSED` = 4, `UPDATE_OUTCOME_REVERTED` = 5, `UPDATE_OUTCOME_CHECK_FAILED` = 6.
+- `UpdateReason`: `UPDATE_REASON_UNSPECIFIED` = 0, `NOT_NEWER` = 1, `NOT_ON_CHANNEL` = 2, `REVERTED_BEFORE` = 3, `TRIAL_IN_PROGRESS` = 4, `POINTER` = 5, `DISK` = 6, `DOWNLOAD` = 7, `TOO_LARGE` = 8, `SIGNATURE` = 9, `CHECKSUM` = 10, `POINTER_MISMATCH` = 11, `WRITE` = 12, `RESTARTED` = 13, `NOT_CONNECTED` = 14, `EXE_MISMATCH` = 15, `PROXY` = 16, `DEADLINE` = 17, each with the prefix `UPDATE_REASON_`.
+
+Protobuf enum values share the package scope, so every value of both new enums carries its prefix (`REJECTED` and `TOO_LARGE` already exist). In prose the names appear without the prefix. `docs/specs/update.md` §1 and §6 give the behaviour and the rule that binds each outcome to its allowed reasons; W7-6d's plan records the validation rules.
 
 ## Secret delivery (W4-8) and reveal (W4-9)
 

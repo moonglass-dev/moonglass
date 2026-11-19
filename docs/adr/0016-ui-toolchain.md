@@ -37,7 +37,7 @@ Versions were checked upstream on 2026-11-17 (the package registry and the `oven
    - Upstream source: Vercel Geist and Geist Mono.
    - License: SIL Open Font License 1.1.
    - Format: Latin-subsetted variable WOFF2 fonts embedded in the static build (~65 KB total, 0 KB JavaScript).
-   - Delivery: Loaded via local `@font-face` with `font-display: swap` and metric-matched system fallbacks (`system-ui` and `ui-monospace`) so the first paint does not shift (CLS 0).
+   - Delivery: Loaded via local `@font-face` with `font-display: swap` and system fallbacks (`system-ui` and `ui-monospace`) so the first paint does not shift (CLS 0).
    - Invariant: Zero network requests to third-party CDNs or origins at runtime.
 
 ## Consequences
