@@ -1,0 +1,10 @@
+{
+  "round": 0,
+  "verdict": "approve",
+  "skipped": true,
+  "reason": "review ticket: docs only",
+  "commit": "e1483f1d0f833bc4e20cd7794ee82ab88cf96394",
+  "blockers": [],
+  "majors": [],
+  "minors": []
+}
