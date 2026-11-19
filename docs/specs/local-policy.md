@@ -59,6 +59,8 @@ The image reference, in one normal form, without its tag or digest. The same nor
 | `localhost:5000/web` | `localhost:5000/web` |
 | `ghcr.io/acme/team/web` | `ghcr.io/acme/team/web` (`ghcr.io/acme/*` does not match it; `ghcr.io/acme/*/*` does) |
 
+An image with upper case in its normal form's path is rejected whatever the patterns, `moonglass.local` included: the Docker Engine reads a first element with upper case as the registry host and never accepts an upper-case path, so the normal form would name a host the Engine does not pull from.
+
 **Patterns must be written in the normal form,** checked when `agent.toml` loads. A `registries` pattern that is not lower case, whose first element is not a literal host (it contains `*`, `?` or `[`, or has no `.` or `:` and is not `localhost`), that names `index.docker.io`, or that names `moonglass.local` is an error and the agent does not start. The message shows the normal form, such as `docker.io/library/nginx`. `docker.io/*` matches nothing an image can normalise to; official images need `docker.io/library/*`.
 
 **`moonglass.local` images** are built on the server (`docs/specs/build.md`) and are never matched against `registries`:
@@ -92,7 +94,7 @@ A present, empty list allows nothing of that kind: `registries = []` makes a ser
 
 A rejected source is answered `REJECTED` with `detail`:
 - `agent.toml on this server allows images only from [sources] registries; <normal form> matches none of them. Add a pattern to [sources] registries in /etc/moonglass/agent.toml and restart the agent.`
-- or the same sentence with `repositories` and `github.com/<owner>/<repo>`.
+- `agent.toml on this server allows builds only from [sources] repositories; github.com/<owner>/<repo> matches none of them. Add a pattern to [sources] repositories in /etc/moonglass/agent.toml and restart the agent.`
 
 The detail names the rejected source and never lists the patterns.
 

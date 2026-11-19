@@ -74,8 +74,10 @@ type Spec struct {
 	Privileged bool
 }
 
-// Config is the non-allow part of agent.toml. Enforcing ForbidCommands and
-// the source lists is a later ticket; this package only loads and validates them.
+// Config is the non-allow part of agent.toml. A list is nil when its key is
+// absent and empty when the key is present and lists nothing. Forbids,
+// CheckImageSource and CheckRepositorySource answer from this parsed
+// configuration alone; enforcing them is the agent's job.
 type Config struct {
 	Channel        string
 	ForbidCommands []string
@@ -173,8 +175,8 @@ func (s Spec) clone() Spec {
 
 func (c Config) clone() Config {
 	out := c
-	out.ForbidCommands = append([]string(nil), c.ForbidCommands...)
-	out.Repositories = append([]string(nil), c.Repositories...)
-	out.Registries = append([]string(nil), c.Registries...)
+	out.ForbidCommands = slices.Clone(c.ForbidCommands)
+	out.Repositories = slices.Clone(c.Repositories)
+	out.Registries = slices.Clone(c.Registries)
 	return out
 }

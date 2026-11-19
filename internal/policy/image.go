@@ -73,18 +73,24 @@ func validDigest(d string) bool {
 	return true
 }
 
+// normalizeRepo returns the normal form of a repository: the registry host
+// lower-cased with index.docker.io folded to docker.io, docker.io filled in
+// for a bare name, and library/ implied for a one-element Docker Hub name
+// (docs/specs/local-policy.md, "What registries is matched against").
 func normalizeRepo(name string) string {
-	name = strings.TrimPrefix(name, "docker.io/")
-	slash := strings.Index(name, "/")
-	if slash < 0 {
-		return "docker.io/library/" + name
+	host, rest, ok := strings.Cut(name, "/")
+	// A first path element with a "." or ":" is a registry, as is localhost.
+	if !ok || (!strings.ContainsAny(host, ".:") && host != "localhost") {
+		host, rest = "docker.io", name
 	}
-	first := name[:slash]
-	// A first path element with a "." or ":" is a registry.
-	if strings.ContainsAny(first, ".:") {
-		return name
+	host = strings.ToLower(host)
+	if host == "index.docker.io" {
+		host = "docker.io"
 	}
-	return "docker.io/" + name
+	if host == "docker.io" && !strings.Contains(rest, "/") {
+		rest = "library/" + rest
+	}
+	return host + "/" + rest
 }
 
 func imagesMatch(block, spec imageRef) bool {

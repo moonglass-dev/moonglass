@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All seven named tests are in package policy. They cover the spec normal-form table plus the extra D46 cases, CheckImageSource/CheckRepositorySource including exact SourceRejection sentences, load-time pattern validation, empty-list deny-all vs absent, Forbids for all three classes including D44 exec, and allow-block matching through Check. The only existing-test edit is the owner-allowed removal of the two empty-list rows in config_test.go. They do not compile yet, because imageSource, SourceRejection, CheckImageSource, CheckRepositorySource, Forbids and Class* are not in the tree. TestAllowBlockImageUsesSourceNormalForm lives in source_test.go rather than allow_test.go; the repositories Error() asserts \"allows builds only from\" per the plan's spec wording fix; the leftover duplicate-entry fixture still uses a/*."
+}

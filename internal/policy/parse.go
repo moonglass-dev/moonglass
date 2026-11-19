@@ -125,24 +125,14 @@ func Parse(data []byte, env Env) (*Policy, error) {
 	}
 	if raw.Sources != nil {
 		if raw.Sources.Repositories != nil {
-			repos, err := validateStringList("repositories", raw.Sources.Repositories, func(s string) error {
-				if _, err := path.Match(s, ""); err != nil {
-					return fmt.Errorf("bad repositories glob %q", s)
-				}
-				return nil
-			})
+			repos, err := sourcePatterns("repositories", raw.Sources.Repositories, validRepositoryPattern)
 			if err != nil {
 				return nil, err
 			}
 			cfg.Repositories = repos
 		}
 		if raw.Sources.Registries != nil {
-			regs, err := validateStringList("registries", raw.Sources.Registries, func(s string) error {
-				if _, err := path.Match(s, ""); err != nil {
-					return fmt.Errorf("bad registries glob %q", s)
-				}
-				return nil
-			})
+			regs, err := sourcePatterns("registries", raw.Sources.Registries, validRegistryPattern)
 			if err != nil {
 				return nil, err
 			}
@@ -411,6 +401,73 @@ func blockHasAllowKey(b allowBlock) bool {
 		return true
 	}
 	return false
+}
+
+// sourcePatterns validates a [sources] list. A present, empty list is the
+// explicit deny-all (D52) and is kept as an empty, non-nil slice.
+func sourcePatterns(key string, list []string, valid func(string) error) ([]string, error) {
+	if len(list) == 0 {
+		return []string{}, nil
+	}
+	return validateStringList(key, list, valid)
+}
+
+const normalFormHint = "; write patterns in the normal form, such as docker.io/library/nginx"
+
+// validRegistryPattern accepts only a pattern in the image normal form, so a
+// pattern that could never match a reference stops the agent (D47).
+func validRegistryPattern(s string) error {
+	if _, err := path.Match(s, ""); err != nil {
+		return fmt.Errorf("bad glob %q%s", s, normalFormHint)
+	}
+	if s != strings.ToLower(s) {
+		return fmt.Errorf("%q is not lower case%s", s, normalFormHint)
+	}
+	host, rest, ok := strings.Cut(s, "/")
+	if !ok || rest == "" {
+		return fmt.Errorf("%q has no path after its host%s", s, normalFormHint)
+	}
+	if strings.ContainsAny(host, "*?[") {
+		return fmt.Errorf("%q has a glob in its registry host%s", s, normalFormHint)
+	}
+	if !strings.ContainsAny(host, ".:") && host != "localhost" {
+		return fmt.Errorf("%q has no registry host before its path%s", s, normalFormHint)
+	}
+	if host == "index.docker.io" {
+		return fmt.Errorf("%q names index.docker.io, which is docker.io%s", s, normalFormHint)
+	}
+	if host == "moonglass.local" {
+		return fmt.Errorf("%q names moonglass.local, which is never matched against registries%s", s, normalFormHint)
+	}
+	return nil
+}
+
+// validRepositoryPattern accepts only a github.com/<owner>/<repo> pattern in
+// lower case, so a pattern that could never match a build stops the agent (D47).
+func validRepositoryPattern(s string) error {
+	if _, err := path.Match(s, ""); err != nil {
+		return fmt.Errorf("bad glob %q", s)
+	}
+	if s != strings.ToLower(s) {
+		return fmt.Errorf("%q is not lower case", s)
+	}
+	if rest, ok := strings.CutPrefix(s, "github.com/"); ok {
+		if parts := strings.Split(rest, "/"); len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+			return nil
+		}
+	}
+	return fmt.Errorf("%q must be github.com/<owner>/<repo>, such as %s", s, repositoryPatternSuggestion(s))
+}
+
+func repositoryPatternSuggestion(s string) string {
+	// A pattern with a github.com/ host and one owner element is one element
+	// short; suggesting s+"/*" names the owner the user wrote.
+	if rest, ok := strings.CutPrefix(s, "github.com/"); ok {
+		if parts := strings.Split(rest, "/"); len(parts) == 1 && parts[0] != "" {
+			return s + "/*"
+		}
+	}
+	return "github.com/acme/*"
 }
 
 func validateStringList(key string, list []string, extra func(string) error) ([]string, error) {

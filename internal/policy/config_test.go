@@ -99,8 +99,6 @@ func TestParseRejectsInvalidUpdateCommandsSources(t *testing.T) {
 		{"empty forbid entry", "[commands]\nforbid = [\"\"]\n", "forbid"},
 		{"bad repository glob", "[sources]\nrepositories = [\"github.com/[acme\"]\n", "repositories"},
 		{"bad registry glob", "[sources]\nregistries = [\"ghcr.io/[\"]\n", "registries"},
-		{"empty repositories", "[sources]\nrepositories = []\n", "repositories"},
-		{"empty registries", "[sources]\nregistries = []\n", "registries"},
 		{"empty entry", "[sources]\nregistries = [\"\"]\n", "registries"},
 		{"duplicate entry", "[sources]\nrepositories = [\"a/*\", \"a/*\"]\n", "repositories"},
 	}

@@ -181,7 +181,7 @@ bind_mounts = ["/proc:/host/proc:ro", "/sys:/host/sys:ro"]
 A block applies to a spec only when **every key it names matches**:
 
 - `project` equals `Spec.Project`.
-- `image` matches `Spec.Image` by repository and digest. Names are normalised so `prom/node-exporter` and `docker.io/prom/node-exporter` are the same repository, and `library/` is implied for a one-element Docker Hub name. A spec image with no digest (a tag, or nothing) matches no block. A spec image `name:tag@sha256:…` matches on name and digest and ignores the tag, as the Engine does.
+- `image` matches `Spec.Image` by repository and digest. Names are normalised so `prom/node-exporter` and `docker.io/prom/node-exporter` are the same repository, `library/` is implied for a one-element Docker Hub name, `localhost` is a registry host, and `index.docker.io` folds into `docker.io`. A spec image with no digest (a tag, or nothing) matches no block. A spec image `name:tag@sha256:…` matches on name and digest and ignores the tag, as the Engine does.
 - `environment`, when named, equals `Spec.Environment`.
 - `service`, when named, equals `Spec.Service`.
 
@@ -275,10 +275,10 @@ registries   = ["ghcr.io/acme/*"]
 |---|---|
 | `update.channel` | `stable` or `canary`. Absent means `stable`. |
 | `commands.forbid` | List of `delete` and `exec`. Any other class, or a duplicate, is an error. Absent means nothing is forbidden. Which command types are in each class: `docs/specs/local-policy.md` (W5-3). |
-| `sources.repositories`, `sources.registries` | Lists of glob patterns in Go `path.Match` syntax. A pattern with bad syntax, an empty list or an empty or duplicate entry is an error. When a key is present, deploys come only from patterns of that kind; an absent key does not restrict that kind. From W5-3a (`docs/specs/local-policy.md`): patterns must be in the normal form, and a present, empty list allows nothing of its kind instead of being an error. |
+| `sources.repositories`, `sources.registries` | Lists of glob patterns in Go `path.Match` syntax, written in the normal form (`docs/specs/local-policy.md`): a `repositories` pattern is lower case `github.com/<owner>/<repo>`, and a `registries` pattern names a literal host and a path, never `index.docker.io` or `moonglass.local`. A pattern with bad syntax, an empty or duplicate entry, or one not written in the normal form is an error. A present, empty list allows nothing of that kind; an absent key does not restrict it. |
 | `containers.allow` | Array of tables, see "Allow blocks". |
 
-`Parse` and `LoadFile` return the parsed `Config` and the compiled allow blocks. They only load and validate `[commands]` and `[sources]`. What they mean, how a source is matched and where the agent enforces them is `docs/specs/local-policy.md` (W5-3a, W5-3). From W5-3a the image-name normaliser of "Matching" also treats `localhost` as a registry host and folds `index.docker.io` into `docker.io`.
+`Parse` and `LoadFile` return the parsed `Config` and the compiled allow blocks. They only load and validate `[commands]` and `[sources]`. What they mean, how a source is matched and where the agent enforces them is `docs/specs/local-policy.md`. A list in the `Config` is nil when its key is absent and empty when the key is present and lists nothing; the two mean different things (`docs/specs/local-policy.md`, "An empty list").
 
 ### The file
 
@@ -364,7 +364,7 @@ ADR-0004 leaves these open. They are the narrowest reading of it, and each is co
 6. Docker socket, containerd socket and data root each have their own key and are allowed only for the exact path (the data root, or inside it), never an ancestor.
 7. A `name:tag@sha256:…` image is an error in a block, even though it holds a digest.
 8. An absent `agent.toml` is the empty configuration.
-9. Unknown `[sources]` or `[commands]` values, duplicates and empty lists are errors.
+9. Unknown `[commands]` values, duplicates, empty entries and an empty `forbid` list are errors. The `[sources]` rules are in `docs/specs/local-policy.md`: a pattern not in the normal form is an error, and a present, empty list allows nothing.
 10. A project or data-directory name is a path element.
 11. `network_mode: service:<name>` is allowed within the same Compose project.
 
