@@ -1,0 +1,23 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "01abc2e2a90c339d2b5be4cc55bdd919325462b1",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "ui/src/lib/fonts.css",
+      "line": 8,
+      "issue": "font-display: swap with an unadjusted system-ui / ui-monospace stack (no size-adjust/ascent-override face) cannot guarantee the CLS 0 that docs/specs/ui.md §5 claims; the ticket asked for metric-matched system faces.",
+      "scenario": "On a cold load the page paints in system-ui, then swaps to Geist whose advance widths and line metrics differ, so text reflows and list rows shift by a few pixels."
+    },
+    {
+      "file": "docs/specs/ui.md",
+      "line": 131,
+      "issue": "Spec still says the token CSS lands in the UI build 'once W2-Sa lands', but this ticket (W2-Sc) is what lands it; the path is outside allowed_paths so it could not be changed here.",
+      "scenario": "A reader looking for where tokens enter the build follows W2-Sa and does not find them."
+    }
+  ]
+}

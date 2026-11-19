@@ -336,7 +336,14 @@ moonglass.dev/moonglass/tools/pipeline TestStopFileHaltsStateChanges
 moonglass.dev/moonglass/tools/pipeline TestSummarizeChecks
 moonglass.dev/moonglass/tools/pipeline TestTicketLifecycleToMerge
 moonglass.dev/moonglass/tools/pipeline TestWithStatusChangesOnlyTheStatusLine
+moonglass.dev/moonglass/ui TestContrastPairsMeetThresholds
+moonglass.dev/moonglass/ui TestFontUrlsLocalWOFF2
+moonglass.dev/moonglass/ui TestNeutralRampChromaAndFrame
+moonglass.dev/moonglass/ui TestOKLCHContrastConversion
+moonglass.dev/moonglass/ui TestOrbStaticAndNoGlobalID
 moonglass.dev/moonglass/ui TestPackageJSONExactPins
 moonglass.dev/moonglass/ui TestScaffoldFilesPresent
+moonglass.dev/moonglass/ui TestSpinnerReducedMotion
+moonglass.dev/moonglass/ui TestTokensByteIdenticalToSpec
 moonglass.dev/moonglass/ui TestViteConfigAdapterStatic
 moonglass.dev/moonglass/ui TestViteConfigTailwind

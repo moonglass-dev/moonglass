@@ -1,0 +1,165 @@
+/* Design tokens for the Moonglass UI. Values and contrast ratios are specified
+   in docs/specs/ui.md §5. Components use the semantic names only. */
+
+:root {
+  color-scheme: dark;
+
+  /* Neutral ramp, OKLCH, hue 260. Frame is deeper than the canvas. */
+  --gray-1: oklch(0.115 0.004 260); /* --surface-frame */
+  --gray-2: oklch(0.145 0.005 260); /* --surface-canvas */
+  --gray-3: oklch(0.185 0.006 260); /* --surface-hover */
+  --gray-4: oklch(0.220 0.007 260); /* --surface-active */
+  --gray-5: oklch(0.245 0.006 260); /* --border-subtle */
+  --gray-6: oklch(0.315 0.007 260); /* --border-strong */
+  --gray-7: oklch(0.440 0.007 260); /* --text-disabled */
+  --gray-8: oklch(0.535 0.008 260); /* --border-control */
+  --gray-9: oklch(0.635 0.008 260); /* --text-tertiary */
+  --gray-10: oklch(0.750 0.007 260); /* --text-secondary */
+  --gray-11: oklch(0.935 0.004 260); /* --text-primary */
+
+  --surface-frame: var(--gray-1);
+  --surface-canvas: var(--gray-2);
+  --surface-hover: var(--gray-3);
+  --surface-active: var(--gray-4);
+
+  --text-primary: var(--gray-11);
+  --text-secondary: var(--gray-10);
+  --text-tertiary: var(--gray-9);
+  --text-disabled: var(--gray-7);
+
+  --border-subtle: var(--gray-5);
+  --border-strong: var(--gray-6);
+  --border-control: var(--gray-8);
+
+  --accent: oklch(0.75 0.095 195);
+  --accent-solid: oklch(0.50 0.095 195);
+  --accent-fg: oklch(0.985 0.002 260);
+
+  --state-success: oklch(0.72 0.110 152);
+  --state-info: oklch(0.70 0.110 248);
+  --state-warn: oklch(0.77 0.110 80);
+  --state-danger: oklch(0.68 0.140 25);
+  --state-rollback: oklch(0.72 0.120 52);
+  --state-approval: oklch(0.72 0.110 300);
+
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --text-xs: 11px;
+  --text-xs-leading: 16px;
+  --text-xs-tracking: 0.02em;
+  --text-sm: 12px;
+  --text-sm-leading: 16px;
+  --text-sm-mono-leading: 18px;
+  --text-base: 13px;
+  --text-base-leading: 20px;
+  --text-base-tracking: -0.005em;
+  --text-md: 15px;
+  --text-md-leading: 22px;
+  --text-md-tracking: -0.015em;
+  --text-lg: 22px;
+  --text-lg-leading: 28px;
+  --text-lg-tracking: -0.025em;
+
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --shadow-overlay: 0 8px 24px oklch(0 0 0 / 0.45);
+
+  --duration-micro: 90ms;
+  --duration-move: 160ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  --sidebar-width: 220px;
+  --sidebar-rail: 48px;
+  --inspector-width: 280px;
+  --canvas-margin: 8px;
+  --canvas-radius: var(--radius-lg);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --gray-1: oklch(0.968 0.003 260);
+    --gray-2: oklch(0.992 0.002 260);
+    --gray-3: oklch(0.945 0.004 260);
+    --gray-4: oklch(0.915 0.005 260);
+    --gray-5: oklch(0.895 0.005 260);
+    --gray-6: oklch(0.820 0.006 260);
+    --gray-7: oklch(0.680 0.007 260);
+    --gray-8: oklch(0.555 0.008 260);
+    --gray-9: oklch(0.475 0.008 260);
+    --gray-10: oklch(0.390 0.008 260);
+    --gray-11: oklch(0.200 0.006 260);
+
+    --accent: oklch(0.47 0.090 195);
+    --accent-solid: oklch(0.47 0.090 195);
+    --accent-fg: oklch(0.985 0.002 260);
+
+    --state-success: oklch(0.46 0.100 152);
+    --state-info: oklch(0.47 0.120 248);
+    --state-warn: oklch(0.47 0.100 75);
+    --state-danger: oklch(0.48 0.150 25);
+    --state-rollback: oklch(0.48 0.120 52);
+    --state-approval: oklch(0.47 0.110 300);
+
+    --shadow-overlay: 0 8px 24px oklch(0 0 0 / 0.12);
+  }
+}
+
+/* An explicit user choice overrides the operating system. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --gray-1: oklch(0.968 0.003 260);
+  --gray-2: oklch(0.992 0.002 260);
+  --gray-3: oklch(0.945 0.004 260);
+  --gray-4: oklch(0.915 0.005 260);
+  --gray-5: oklch(0.895 0.005 260);
+  --gray-6: oklch(0.820 0.006 260);
+  --gray-7: oklch(0.680 0.007 260);
+  --gray-8: oklch(0.555 0.008 260);
+  --gray-9: oklch(0.475 0.008 260);
+  --gray-10: oklch(0.390 0.008 260);
+  --gray-11: oklch(0.200 0.006 260);
+
+  --accent: oklch(0.47 0.090 195);
+  --accent-solid: oklch(0.47 0.090 195);
+  --accent-fg: oklch(0.985 0.002 260);
+
+  --state-success: oklch(0.46 0.100 152);
+  --state-info: oklch(0.47 0.120 248);
+  --state-warn: oklch(0.47 0.100 75);
+  --state-danger: oklch(0.48 0.150 25);
+  --state-rollback: oklch(0.48 0.120 52);
+  --state-approval: oklch(0.47 0.110 300);
+
+  --shadow-overlay: 0 8px 24px oklch(0 0 0 / 0.12);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-micro: 0ms;
+    --duration-move: 0ms;
+  }
+}

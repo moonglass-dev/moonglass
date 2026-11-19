@@ -1,0 +1,18 @@
+/* Self-hosted Geist and Geist Mono, Latin subset, variable weight
+   (docs/specs/ui.md §5, ADR-0016 decision 5). No request leaves this origin. */
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}

@@ -1,7 +1,7 @@
 ---
 id: W2-Sc
 title: Tokens and static assets
-status: todo
+status: merged
 risk: standard
 depends_on: [W2-Sb]
 allowed_paths:

@@ -1,0 +1,6 @@
+{
+  "round": 2,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All six named tests are in package ui and fail now on missing files. TestOrbStaticAndNoGlobalID requires the Svelte 5 per-instance id form and a 22 px root svg; rim and strand paint are not asserted. TestFontUrlsLocalWOFF2 rejects http(s) substrings under src (an SVG xmlns would fail), requires local /fonts/*.woff2 under static/, and does not check the combined ~65 KB size. TestSpinnerReducedMotion requires prefers-reduced-motion to set animation none and that no other src svelte/css file contains keyframes. TestOKLCHContrastConversion is extra and pins the conversion method to the spec table."
+}
