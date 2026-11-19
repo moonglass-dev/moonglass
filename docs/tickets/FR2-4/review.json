@@ -1,0 +1,17 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "434650cf176e55b275799d3660d0fe780eef84cf",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": ".golangci.yml",
+      "line": 73,
+      "issue": "The acceptance criterion that golangci-lint reports depguard for scratch imports (age in internal/deploy, internal/update and tools/pipeline; moby in internal/agent, internal/keys and internal/scratch; proxy or Caddy in internal/deploy) has no recorded evidence. The worker's result file was rejected in build round 1 as outside the build step's writable paths, and the plan-mode reviewer cannot create scratch files.",
+      "scenario": "If depguard v2.15 ignored the '!' exclusions or '$all' for these rules, make lint would still pass on the current tree and no one would notice. The risk is low because huma-deps, policy-deps and pgx-deps use the same form."
+    }
+  ]
+}

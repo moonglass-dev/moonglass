@@ -71,20 +71,41 @@ linters:
             - pkg: github.com/danielgtaylor/huma/v2
               desc: only internal/api may import Huma
         age-deps:
-          # age is imported only by internal/keys (ADR-0015 decision 2).
-          # depguard file exclusions were not applied for policy-deps, so
-          # every package that exists today is listed.
+          # age is imported only by internal/keys (ADR-0015 decision 2). Every
+          # file outside internal/keys is covered, so new packages are too.
           list-mode: lax
-          files: ["**/cmd/**/*.go", "**/internal/agent/**/*.go", "**/internal/api/**/*.go", "**/internal/cli/**/*.go", "**/internal/installtest/**/*.go", "**/internal/policy/**/*.go", "**/internal/protocol/**/*.go", "**/internal/proxy/**/*.go", "**/internal/registry/**/*.go", "**/internal/release/**/*.go", "**/internal/server/**/*.go", "**/internal/store/**/*.go"]
+          files:
+            - "$all"
+            - "!**/internal/keys/**"
           deny:
             - pkg: filippo.io/age
               desc: only internal/keys may import age (ADR-0015)
         docker-deps:
+          # The Docker client (github.com/moby/moby/client and /api) is imported
+          # only by internal/deploy, internal/build and internal/agent/disk
+          # (ADR-0014 decision 2). Every other file is covered, so new packages
+          # are too.
           list-mode: lax
-          files: ["**/cmd/**/*.go", "**/internal/agent/**/*.go", "**/internal/api/**/*.go", "**/internal/cli/**/*.go", "**/internal/installtest/**/*.go", "**/internal/keys/**/*.go", "**/internal/policy/**/*.go", "**/internal/protocol/**/*.go", "**/internal/proxy/**/*.go", "**/internal/registry/**/*.go", "**/internal/release/**/*.go", "**/internal/server/**/*.go", "**/internal/store/**/*.go", "**/internal/update/**/*.go", "**/tools/**/*.go"]
+          files:
+            - "$all"
+            - "!**/internal/deploy/**"
+            - "!**/internal/build/**"
+            - "!**/internal/agent/disk/**"
           deny:
             - pkg: github.com/moby/moby
-              desc: only internal/deploy may import the Docker client today (ADR-0014)
+              desc: only internal/deploy, internal/build and internal/agent/disk may import the Docker client (ADR-0014)
+        deploy-deps:
+          # internal/deploy never imports internal/proxy, which links Caddy, and
+          # never imports Caddy itself (docs/specs/release.md "Proxy config",
+          # ADR-0011). The agent pushes proxy config over the admin socket.
+          list-mode: lax
+          files:
+            - "**/internal/deploy/**"
+          deny:
+            - pkg: moonglass.dev/moonglass/internal/proxy
+              desc: internal/deploy never imports internal/proxy, which links Caddy (docs/specs/release.md, ADR-0011)
+            - pkg: github.com/caddyserver/caddy/v2
+              desc: only internal/proxy may import Caddy (ADR-0011)
         sqlite-deps:
           # modernc sqlite is imported only by internal/store/sqlite and
           # internal/agent/state (ADR-0010, amended 2026-11-17). Every file
