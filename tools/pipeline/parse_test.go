@@ -144,6 +144,26 @@ func TestPathAllowed(t *testing.T) {
 	}
 }
 
+func TestBannedWordsSkip(t *testing.T) {
+	cases := map[string]bool{
+		"AGENTS.md":                         true,
+		"docs/adr/0016-ui-toolchain.md":     true,
+		"go.mod":                            true,
+		"go.sum":                            true,
+		"ui/svelte.config.js":               true,
+		"internal/agent/agent.go":           false,
+		"ui/src/app.html":                   false,
+		"ui/svelte.config.ts":               false,
+		"scripts/svelte.config.js":          false,
+		"docs/tickets/T-1/svelte.config.js": true,
+	}
+	for f, want := range cases {
+		if got := bannedWordsSkip(f); got != want {
+			t.Errorf("bannedWordsSkip(%q) = %v, want %v", f, got, want)
+		}
+	}
+}
+
 func TestStepAllows(t *testing.T) {
 	tk := ticket{ID: "T-1", AllowedPaths: []string{"internal/deploy/"}}
 	cases := []struct {

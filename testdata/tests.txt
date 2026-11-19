@@ -289,6 +289,7 @@ moonglass.dev/moonglass/internal/update TestVerifyRejectsTamperedSignature
 moonglass.dev/moonglass/internal/update TestVerifyRejectsUnpinnedKey
 moonglass.dev/moonglass/internal/update TestVerifyRejectsWrongEnvelope
 moonglass.dev/moonglass/internal/update TestVerifyRequiresExactFlags
+moonglass.dev/moonglass/tools/pipeline TestBannedWordsSkip
 moonglass.dev/moonglass/tools/pipeline TestBlockedChildStopsOnlyItsTicketAndResumes
 moonglass.dev/moonglass/tools/pipeline TestBranchWaitsForUnmergedDependencies
 moonglass.dev/moonglass/tools/pipeline TestCIPostgresURLMatchesWorkflow

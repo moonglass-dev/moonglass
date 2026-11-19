@@ -744,6 +744,15 @@ func addedLines(dir, base string, paths ...string) (map[string]map[int]string, e
 	return res, nil
 }
 
+// bannedWordsSkip names the files whose added lines the banned-words gate
+// ignores: prose and lockfiles that legitimately contain the words, and
+// ui/svelte.config.js, where adapter-static's client-side routing option is
+// spelled "fallback" and no other spelling exists (ADR-0016, ticket W2-Sb).
+func bannedWordsSkip(f string) bool {
+	return strings.HasSuffix(f, ".md") || strings.HasPrefix(f, "docs/") || f == "go.mod" || f == "go.sum" ||
+		f == "ui/svelte.config.js"
+}
+
 func bannedWords(dir, base string) ([]string, error) {
 	added, err := addedLines(dir, base)
 	if err != nil {
@@ -751,7 +760,7 @@ func bannedWords(dir, base string) ([]string, error) {
 	}
 	var hits []string
 	for f, ls := range added {
-		if strings.HasSuffix(f, ".md") || strings.HasPrefix(f, "docs/") || f == "go.mod" || f == "go.sum" {
+		if bannedWordsSkip(f) {
 			continue
 		}
 		for n, l := range ls {
