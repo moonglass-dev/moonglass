@@ -1,0 +1,90 @@
+name: release
+
+# Builds the release artifacts for a version tag and leaves them, unsigned, in a
+# draft GitHub release. Signing happens offline on the owner's token, and the
+# publish job that uploads to the release origin is W7-6g
+# (docs/specs/update.md §9, docs/adr/0007-releases-and-updates.md d1).
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Build linux-amd64
+        env:
+          GOARCH: amd64
+        run: |
+          CGO_ENABLED=0 GOOS=linux go build \
+            -trimpath \
+            -ldflags "-s -w -X main.version=$VERSION" \
+            -o dist/amd64/moonglass ./cmd/moonglass
+      - name: Build linux-arm64
+        env:
+          GOARCH: arm64
+        run: |
+          CGO_ENABLED=0 GOOS=linux go build \
+            -trimpath \
+            -ldflags "-s -w -X main.version=$VERSION" \
+            -o dist/arm64/moonglass ./cmd/moonglass
+      - name: SBOM linux-amd64
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          file: dist/amd64/moonglass
+          format: spdx-json
+          output-file: dist/amd64/moonglass.sbom.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: SBOM linux-arm64
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          file: dist/arm64/moonglass
+          format: spdx-json
+          output-file: dist/arm64/moonglass.sbom.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Package linux-amd64
+        env:
+          ARCH: amd64
+        run: |
+          cp deploy/systemd/moonglass-* "dist/$ARCH/"
+          cd "dist/$ARCH"
+          sha256sum moonglass moonglass.sbom.json moonglass-* > SHA256SUMS
+          tar -cf "../moonglass-$VERSION-linux-$ARCH.tar" -- *
+      - name: Package linux-arm64
+        env:
+          ARCH: arm64
+        run: |
+          cp deploy/systemd/moonglass-* "dist/$ARCH/"
+          cd "dist/$ARCH"
+          sha256sum moonglass moonglass.sbom.json moonglass-* > SHA256SUMS
+          tar -cf "../moonglass-$VERSION-linux-$ARCH.tar" -- *
+      - name: Attest binaries and SBOM
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/amd64/moonglass
+            dist/amd64/moonglass.sbom.json
+            dist/arm64/moonglass
+            dist/arm64/moonglass.sbom.json
+      - name: Upload to a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$VERSION" --draft --verify-tag --title "$VERSION" "dist/moonglass-$VERSION-linux-amd64.tar" "dist/moonglass-$VERSION-linux-arm64.tar"

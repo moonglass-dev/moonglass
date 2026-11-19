@@ -1,0 +1,23 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "e5370f09bfdbb404e1db4d3cfa05b0b0f1fdcd72",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": ".github/workflows/release.yml",
+      "line": 26,
+      "issue": "actions/setup-go runs with its default cache: true, so the tag build restores the Go module and build caches saved by main-branch ci.yml runs; the binaries that are attested and later signed can depend on cache contents that are not in the tagged source",
+      "scenario": "a main-branch CI run saves a GOCACHE or module cache entry with unexpected contents; the next vX.Y.Z tag run restores it, go build reuses the cached objects, and the attestation records a binary that a clean rebuild of the tag would not reproduce"
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "line": 36,
+      "issue": "the release build sets only -X main.version, while the Makefile also sets main.commit and main.date, so release binaries report commit and build date as unknown",
+      "scenario": "an operator runs `moonglass version` on an installed v1.2.3 binary and gets `commit unknown` and `built unknown`, so the binary cannot be traced to its source commit from its own output"
+    }
+  ]
+}

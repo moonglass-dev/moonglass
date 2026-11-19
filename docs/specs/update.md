@@ -365,9 +365,9 @@ Each is declared in the registry next to its handler (ADR-0006 d3), added by W7-
 
 `.github/workflows/release.yml`, built by W7-6c, triggered by `on: push: tags: ['v[0-9]+.[0-9]+.[0-9]+']`.
 
-1. For `GOARCH` `amd64` and `arm64` it runs `CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w -X <version var>=<tag>"`.
+1. For `GOARCH` `amd64` and `arm64` it runs `CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w -X main.version=<tag>"`.
 2. It writes `moonglass.sbom.json` (SPDX JSON) with `anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3`.
-3. It writes `SHA256SUMS` over the artifacts of that arch's set and copies the units from `deploy/systemd/`.
+3. It copies the units with the glob `deploy/systemd/moonglass-*`, then writes `SHA256SUMS` over the other artifacts of that arch's set.
 4. It attests each binary and the SBOM with `actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2`, with permissions `id-token: write`, `attestations: write` and `contents: write` (ADR-0007 d1, S§3.14).
 5. It uploads `moonglass-<version>-linux-<arch>.tar` (unsigned) to a **draft** GitHub release for the tag.
 
