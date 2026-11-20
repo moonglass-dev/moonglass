@@ -1,0 +1,23 @@
+{
+  "round": 2,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "d4633ed021d9a89da78aa19ef4c1f5a1397b6700",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/api/api.go",
+      "line": 259,
+      "issue": "url.URL.Query() silently drops query pairs that fail to parse (bad percent-escape, semicolon), so they are neither checked against the inputs nor refused; decodeBody has the same gap for POST/PUT.",
+      "scenario": "GET /v1/servers?bogus=%zz is answered 200 instead of 400 unknown query parameter; GET ...?domain=%zz treats domain as absent instead of failing."
+    },
+    {
+      "file": "internal/api/api.go",
+      "line": 108,
+      "issue": "The GET kind check accepts any slice whose element kind is string, but decodeQuery assigns a []string with reflect.Value.Set, which panics when the element is a named string type, so mount accepts an In it cannot serve.",
+      "scenario": "A GET In with `Domains []DomainName` (type DomainName string) mounts without error, and every request sending ?domains=x panics in v.Field(i).Set instead of failing at startup."
+    }
+  ]
+}

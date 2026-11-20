@@ -147,7 +147,7 @@ An operation's `In` is a Go struct. Each field has a `json` tag in snake_case an
 - A store failure while resolving the target is not a refusal: the handler does not run, the call is answered 500, and the event has outcome `error` and reason `the target could not be resolved`.
 - When a row does match, the call is answered 404, `project "<name>" not found` or `environment "<name>" not found in project "<project>"`, and the handler does not run. The event has outcome `error` and reason `not found`.
 - On success the handler gets the ids in `Call.ProjectID` and `Call.EnvironmentID` and never resolves the target's names again. Other names, such as `service` or `server`, are the handler's to resolve in those ids, after authorisation.
-- A request that fails decoding or the input schema (below) is answered 400 by `internal/api` before `Invoke`, so it writes no audit event: no operation was called. Huma checks the shape before the handler authenticates, so a malformed request is 400 even with a bad token. The schema is public in `internal/api/openapi.json`, so this reveals nothing.
+- A request that fails decoding or the input schema (below) is answered 400 by `internal/api` before `Invoke`, so it writes no audit event: no operation was called. `internal/api` checks the shape before it authenticates, so a malformed request is 400 even with a bad token. The schema is public in `internal/api/openapi.json`, so this reveals nothing.
 
 ### Handler refusals
 
@@ -155,13 +155,14 @@ A handler answers a request it cannot carry out with `registry.Refuse(kind, mess
 
 - A handler maps every store sentinel it can meet to a refusal: `store.ErrInvalidName` to `ErrInvalidInput`, `store.ErrNotFound` to `ErrNotFound`, `store.ErrDuplicate` to `ErrConflict`. Cross-field rules, such as exactly one of `image` or `git` on `deploy`, are `ErrInvalidInput`.
 - Any other handler error, including a store sentinel the handler did not map, is a 500.
+- A refusal wrapped by another error is not a refusal, so it is a 500: the wrapper's text could carry another error's text.
 - The audit event of a refusal has outcome `error` and reason `invalid input`, `not found` or `conflict`. Every other handler error keeps the reason `the handler returned an error`.
 
 ### REST inputs
 
 - `GET`: every input is a query parameter named as its `json` tag. A list is the parameter repeated, `?domain=a&domain=b` (Huma's `explode` form); a comma is part of a value. A boolean is `true` or `false`.
 - `POST` and `PUT`: every input is a field of one JSON object in the body, sent with `Content-Type: application/json`, and there are no query parameters. A body over Huma's 1 MiB limit is 413.
-- Unknown query parameters and unknown body fields are refused with 400: `RejectUnknownQueryParameters` is set on every operation, and bodies keep Huma's default of no additional properties.
+- Unknown query parameters and unknown body fields are refused with 400: `internal/api` checks every query parameter name against the inputs, and the body schema has no additional properties.
 - An optional input that is absent takes its zero value.
 
 ### Errors
