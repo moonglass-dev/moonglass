@@ -82,9 +82,12 @@ func TestRollbackUnderLoadIsUnderFiveSeconds(t *testing.T) {
 }
 
 // checkOrder asserts, for every mark, that the switched-to release answered
-// within its window and that no banned older release answered after the first
-// new answer and before the next operation was called. Any 2xx body that is not
-// a release of the run also fails.
+// within its window and that no request sent after the switch returned was
+// answered with a release it replaced. An answer to a request already in flight
+// when the switch returned may carry the older release: a reload lets requests
+// on the old route finish (docs/specs/release.md, "Draining"), so it is excused
+// by the write time of its request. Any 2xx body that is not a release of the
+// run also fails.
 func checkOrder(t *testing.T, responses []response, marks []mark, loadEnd time.Time) {
 	t.Helper()
 	ordered := slices.Clone(responses)
@@ -124,11 +127,15 @@ func checkOrder(t *testing.T, responses []response, marks []mark, loadEnd time.T
 			windowEnd = marks[i+1].called
 		}
 		for _, r := range ordered[first+1:] {
-			if r.arrived.Before(windowEnd) && slices.Contains(m.banned, r.release) {
-				t.Errorf("at %s, %s after the switch to %s, a response carried the older release %s, want none before %s",
-					r.arrived.Format(time.RFC3339Nano), r.arrived.Sub(m.returned), m.release, r.release,
-					windowEnd.Format(time.RFC3339Nano))
+			if !r.arrived.Before(windowEnd) || !slices.Contains(m.banned, r.release) {
+				continue
 			}
+			if !r.sent.IsZero() && r.sent.Before(m.returned) {
+				continue
+			}
+			t.Errorf("at %s, %s after the switch to %s, a response carried the older release %s, want none before %s",
+				r.arrived.Format(time.RFC3339Nano), r.arrived.Sub(m.returned), m.release, r.release,
+				windowEnd.Format(time.RFC3339Nano))
 		}
 	}
 }

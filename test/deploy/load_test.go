@@ -31,9 +31,13 @@ type loadConfig struct {
 	rate int
 }
 
-// response is one 2xx answer: when it arrived and what release id its body
-// carried.
+// response is one 2xx answer: when its request was written on its connection,
+// when it arrived and what release id its body carried. The write time tells an
+// answer to a request already in flight when a switch returned, which a reload
+// lets finish on the old route (docs/specs/release.md, "Draining"), from one to
+// a request sent after it.
 type response struct {
+	sent    time.Time
 	arrived time.Time
 	release string
 }
@@ -159,12 +163,12 @@ func startLoad(cfg loadConfig) *load {
 // attempt was cut before any answer byte, and records its answer or its
 // failure.
 func (l *load) get() {
-	release, err := l.attempt()
+	release, sent, err := l.attempt()
 	if errors.Is(err, errCutBeforeAnswer) {
 		l.mu.Lock()
 		l.retried++
 		l.mu.Unlock()
-		release, err = l.attempt()
+		release, sent, err = l.attempt()
 	}
 	if err != nil {
 		l.fail(err)
@@ -175,37 +179,42 @@ func (l *load) get() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.total++
-	l.responses = append(l.responses, response{arrived: arrived, release: release})
+	l.responses = append(l.responses, response{sent: sent, arrived: arrived, release: release})
 }
 
 // attempt sends the request once on a new connection and returns the release
-// id a 2xx answer carried. An error wraps errCutBeforeAnswer when the
-// connection closed before any answer byte and the request did not time out.
-func (l *load) attempt() (string, error) {
+// id a 2xx answer carried and when the request was written. An error wraps
+// errCutBeforeAnswer when the connection closed before any answer byte and the
+// request did not time out.
+func (l *load) attempt() (string, time.Time, error) {
 	var answered atomic.Bool
-	trace := &httptrace.ClientTrace{GotFirstResponseByte: func() { answered.Store(true) }}
+	var sent time.Time
+	trace := &httptrace.ClientTrace{
+		WroteRequest:         func(httptrace.WroteRequestInfo) { sent = time.Now() },
+		GotFirstResponseByte: func() { answered.Store(true) },
+	}
 	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), trace),
 		http.MethodGet, "https://"+l.cfg.host+"/", nil)
 	if err != nil {
-		return "", fmt.Errorf("build GET %s: %w", l.cfg.host, err)
+		return "", sent, fmt.Errorf("build GET %s: %w", l.cfg.host, err)
 	}
 	res, err := l.client.Do(req)
 	if err != nil {
 		var netErr net.Error
 		if !answered.Load() && closedByPeer(err) && (!errors.As(err, &netErr) || !netErr.Timeout()) {
-			return "", fmt.Errorf("GET %s: %w: %w", l.cfg.host, errCutBeforeAnswer, err)
+			return "", sent, fmt.Errorf("GET %s: %w: %w", l.cfg.host, errCutBeforeAnswer, err)
 		}
-		return "", fmt.Errorf("GET %s: %w", l.cfg.host, err)
+		return "", sent, fmt.Errorf("GET %s: %w", l.cfg.host, err)
 	}
 	body, err := io.ReadAll(io.LimitReader(res.Body, 256))
 	_ = res.Body.Close()
 	if err != nil {
-		return "", fmt.Errorf("GET %s: read its answer: %w", l.cfg.host, err)
+		return "", sent, fmt.Errorf("GET %s: read its answer: %w", l.cfg.host, err)
 	}
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return "", fmt.Errorf("GET %s: status %d", l.cfg.host, res.StatusCode)
+		return "", sent, fmt.Errorf("GET %s: status %d", l.cfg.host, res.StatusCode)
 	}
-	return strings.TrimSpace(string(body)), nil
+	return strings.TrimSpace(string(body)), sent, nil
 }
 
 // fail counts one failed request and keeps the first failure and its time.
