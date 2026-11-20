@@ -86,7 +86,7 @@ func (e *Engine) clearName(ctx context.Context, name, appID, releaseID string) e
 	if res.Container.Name != "/"+name {
 		return nil
 	}
-	if res.Container.Config.Labels[labelManaged] == "true" && res.Container.Config.Labels[labelApp] == appID && res.Container.Config.Labels[labelRelease] == releaseID {
+	if res.Container.Config != nil && ownedBy(res.Container.Config.Labels, appID, releaseID) {
 		if _, err := e.cli.ContainerRemove(ctx, res.Container.ID, client.ContainerRemoveOptions{Force: true}); err != nil {
 			return fmt.Errorf("remove leftover container %s: %w", name, err)
 		}

@@ -1,0 +1,23 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "8e865b3b98a4cd2ea3fedddd4b121913d263e65d",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/deploy/stop.go",
+      "line": 230,
+      "issue": "isConflict treats any Engine error whose text contains \"conflict\" as an image in use and swallows it, instead of the typed Conflict() check or the \"conflict:\" prefix the plan named.",
+      "scenario": "ImageRemove fails with a 500 whose message happens to contain \"conflict\" (for example a containerd content or lease error). retain returns nil, onError never hears of it, and the image stays until the disk guard runs."
+    },
+    {
+      "file": "internal/deploy/stop.go",
+      "line": 124,
+      "issue": "Retention removes the image of a deleted retired row without the app lock, while Deploy resolves an image and creates its container without the lock too. An image that a Deploy in flight has resolved but not yet used is unprotected.",
+      "scenario": "An app redeploys the same single-tagged reference (web:latest) with content identical to a retired release that just fell outside the five. Run's retention removes that image ID between the deploy's image resolve and its ContainerCreate, so the deploy fails with image not found and must be sent again. No data is lost."
+    }
+  ]
+}

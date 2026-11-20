@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -28,9 +29,22 @@ type Executor struct {
 	policy *policy.Policy
 	db     *state.DB
 	// proxy is the agent's one pusher: Run and SwitchRelease share it.
-	proxy          *Proxy
+	proxy *Proxy
+	// locks is one mutex per app, guarded by locksMu, so a stop and a switch or
+	// rollback of one app never run at the same time.
+	locks map[string]*sync.Mutex
+	// now is the executor's one clock, so every recorded time comes from it and
+	// a test can move it.
+	now func() time.Time
+	// scope narrows the container list Reconcile reads. It is nil in production,
+	// where every managed container on the server is ours.
+	scope []string
+
 	preDeployLimit time.Duration
 	healthLimit    time.Duration
+	// retainEvery is how often Run applies retention.
+	retainEvery time.Duration
+	locksMu     sync.Mutex
 }
 
 // New returns the executor over the agent's one Proxy, so Run and
@@ -40,6 +54,7 @@ func New(engine *Engine, p *policy.Policy, db *state.DB, proxy *Proxy) *Executor
 	return &Executor{
 		engine: engine, policy: p, db: db, proxy: proxy,
 		preDeployLimit: preDeployTimeout, healthLimit: healthTimeout,
+		now: time.Now, retainEvery: retainInterval, locks: map[string]*sync.Mutex{},
 	}
 }
 
@@ -73,7 +88,7 @@ func (x *Executor) Deploy(ctx context.Context, d *agentv1.Deploy) *agentv1.Comma
 	if err != nil {
 		return x.fail(ctx, rec, st, err)
 	}
-	if err := x.db.RecordCandidate(ctx, binding, rec, next, time.Now()); err != nil {
+	if err := x.db.RecordCandidate(ctx, binding, rec, next, x.now()); err != nil {
 		if rmErr := x.engine.remove(ctx, rec.ContainerID); rmErr != nil {
 			err = fmt.Errorf("%w; removing the container also failed: %w", err, rmErr)
 		}
@@ -152,7 +167,7 @@ func (x *Executor) prepare(ctx context.Context, d *agentv1.Deploy, rec *state.Re
 func (x *Executor) fail(ctx context.Context, rec state.Record, st release.State, cause error) *agentv1.CommandResult {
 	rec.ContainerID = ""
 	detail := truncate(cause.Error())
-	if err := x.db.RecordFailed(ctx, rec, detail, time.Now()); err != nil {
+	if err := x.db.RecordFailed(ctx, rec, detail, x.now()); err != nil {
 		detail += "; recording the failure also failed: " + err.Error()
 	}
 	o := agentv1.CommandOutcome_FAILED

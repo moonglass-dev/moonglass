@@ -3,7 +3,6 @@ package deploy
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"moonglass.dev/moonglass/internal/agent/state"
 	agentv1 "moonglass.dev/moonglass/internal/protocol/agentv1"
@@ -20,6 +19,7 @@ const previousGone = "the previous release's container is gone; deploy again"
 // (docs/specs/release.md, "Rollback").
 func (x *Executor) Rollback(ctx context.Context, r *agentv1.Rollback) *agentv1.CommandResult {
 	appID := r.GetAppId()
+	defer x.lockApp(appID)()
 
 	b, st, known, err := x.db.App(ctx, appID)
 	if err != nil {
@@ -65,7 +65,7 @@ func (x *Executor) Rollback(ctx context.Context, r *agentv1.Rollback) *agentv1.C
 
 	routed := state.CurrentRelease{Binding: b, Record: rec}
 	if err := x.proxy.PushRouted(ctx, routed, func(ctx context.Context) error {
-		return x.db.RecordRollback(ctx, appID, next, time.Now())
+		return x.db.RecordRollback(ctx, appID, next, x.now())
 	}); err != nil {
 		return result(agentv1.CommandOutcome_FAILED, err.Error(), st)
 	}

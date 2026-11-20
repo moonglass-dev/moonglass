@@ -44,6 +44,7 @@ var healthClient = &http.Client{
 func (x *Executor) SwitchRelease(ctx context.Context, s *agentv1.SwitchRelease) *agentv1.CommandResult {
 	appID := s.GetAppId()
 	releaseID := s.GetReleaseId()
+	defer x.lockApp(appID)()
 
 	b, st, known, err := x.db.App(ctx, appID)
 	if err != nil {
@@ -73,7 +74,7 @@ func (x *Executor) SwitchRelease(ctx context.Context, s *agentv1.SwitchRelease) 
 
 	routed := state.CurrentRelease{Binding: b, Record: rec}
 	if err := x.proxy.PushRouted(ctx, routed, func(ctx context.Context) error {
-		return x.db.RecordSwitch(ctx, appID, releaseID, next, time.Now())
+		return x.db.RecordSwitch(ctx, appID, releaseID, next, x.now())
 	}); err != nil {
 		return result(agentv1.CommandOutcome_FAILED, err.Error(), st)
 	}

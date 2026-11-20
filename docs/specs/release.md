@@ -120,7 +120,7 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 2. Run the health gate on the candidate. On failure: apply `Abort`, remove the candidate container, write its row as `aborted` with the gate's detail as `error` and an empty `container_id`, and answer `FAILED` with the aborted state. The old release keeps serving.
 3. Push the complete proxy config (below) with the candidate routed in place of the app's stored current release, through `Proxy.PushRouted`. On failure, answer `FAILED`; the candidate stays `ready`, and the switch can be sent again.
 4. Commit the switch inside that push's lock, in one transaction: the new current row `current` with `switched_at` = now, the old current `previous` with `stop_after` = now + 10 minutes, and the old previous (if any) `retired` with `stop_after` = now + 30 seconds. Answer `SUCCEEDED` with the new state. A commit that fails is `FAILED` with the stored state unchanged, and the last pushed document is cleared, so `Run` restores the stored routes.
-5. Afterwards, without blocking the result: at `stop_after` a `retired` container is stopped (SIGTERM, 30 seconds before SIGKILL) and removed; a `previous` container is stopped and kept.
+5. Afterwards, without blocking the result: a stop, `SwitchRelease` and `Rollback` of one app hold that app's lock, so a stop never runs between a rollback reading the previous container as running and its commit. At `stop_after` a `retired` container is stopped (SIGTERM, 30 seconds before SIGKILL) and removed, and the release's pre-deploy step container `mg-<app_id>-<release_id>-pre` goes with it; a `previous` container is stopped and kept, so a rollback inside its window only starts it. A stop re-reads its row under the lock and skips a row a switch or rollback changed, so a restored release is never stopped. Every stop or removal is preceded by the check that the container carries `dev.moonglass.managed=true` with the same app and release; a container without those labels is left running, and the stop fails with an error naming the container, the app and the release. A container the Engine no longer has counts as stopped and removed, and a release with an empty `container_id` is recorded the same way. The carried-out stop is written in one transaction that clears `stop_after`, and for a `retired` row also `container_id` (`docs/specs/agent-state.md`, "Rules").
 
 **Draining.** Caddy reloads gracefully: requests in flight on the old route finish on it. The proxy's `http` app sets `grace_period` to 30 seconds, so WebSockets on the old route get the 30-second drain window of stack §5.3 and ADR-0001 decision 7, then close.
 
@@ -168,7 +168,11 @@ Owner decision of 2026-11-19 (week 6). `Deploy` carries a service's settings (`d
 
 ### Keep five
 
-Per app, the current, the previous and the three newest retired releases keep their images: five in all (stack §3.5). Retired containers beyond the previous one are removed after their drain. When a release falls out of the five, its image is removed (without force; an image still in use is left for the disk guard). The rows follow `docs/specs/agent-state.md`, "Retention".
+Per app, the current, the previous and the three newest retired releases keep their images: five in all (stack §3.5). Newest means `created_at`, then the order the rows were written, so a tie keeps the later row. A retired row outside those three is deleted only once its stop has run, so no container is orphaned. Retired containers beyond the previous one are removed after their drain. When a release falls out of the five, its image is removed by ID, never by a reference from a message, and without force; an image the Engine still uses, or no longer has, is left for the disk guard. The rows follow `docs/specs/agent-state.md`, "Retention".
+
+### Run
+
+`Executor.Run(ctx, onError)` reconciles and applies retention at start, then carries out the stops due every second and applies retention every hour, until `ctx` ends. A step that fails goes to `onError`, when the caller passed one, and is retried at its next turn; it never stops `Run`. Stops and removals keep the 60-second Engine call limit, and a stop's own wait is 30 seconds. `moonglass agent connect` runs `Executor.Run` for its whole life from W2-10.
 
 ### One deploy per app
 

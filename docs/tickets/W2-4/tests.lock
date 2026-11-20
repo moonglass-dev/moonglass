@@ -1,0 +1,5 @@
+# base 0094d8f77e4fc0d66076c7eda40c17c32bdca00b
+370034c673f71e04fbf5169ab008e2c51a64a609bf33f6ffe2d0cfc320bc3920  internal/agent/state/stops_test.go
+0349fbf869f0777d2560e98ebbdfaaf21c2a2f7c8abf2177d7b2846c46fc1af9  internal/deploy/retain_test.go
+7a0c9cf3c06c2bf7bb64f21be574ec5a744d333660ca6a2b0da93cecfb8a514f  internal/deploy/run_test.go
+5f885837cecf147eed66076c2abf5ee8898816c6de1c056be6614beb82b9726c  internal/deploy/stop_test.go

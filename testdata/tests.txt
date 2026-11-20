@@ -29,6 +29,7 @@ moonglass.dev/moonglass/internal/agent TestReconnectBackoffWithJitter
 moonglass.dev/moonglass/internal/agent TestRejectsControlPlanePinMismatch
 moonglass.dev/moonglass/internal/agent TestServerOfflineThenRecovers
 moonglass.dev/moonglass/internal/agent/state TestCurrentReleasesListsEveryAppsCurrentRelease
+moonglass.dev/moonglass/internal/agent/state TestDueStopsListsPreviousAndRetiredPastStopAfter
 moonglass.dev/moonglass/internal/agent/state TestOpenCreatesFileMode0600
 moonglass.dev/moonglass/internal/agent/state TestOpenErrorNamesPath
 moonglass.dev/moonglass/internal/agent/state TestOpenMigratesSpecSchema
@@ -42,8 +43,10 @@ moonglass.dev/moonglass/internal/agent/state TestRecordCandidateRejectsOtherBind
 moonglass.dev/moonglass/internal/agent/state TestRecordFailedLeavesStateUnchanged
 moonglass.dev/moonglass/internal/agent/state TestRecordPreDeployOutcome
 moonglass.dev/moonglass/internal/agent/state TestRecordRollbackRestoresPrevious
+moonglass.dev/moonglass/internal/agent/state TestRecordStoppedClearsStopAfter
 moonglass.dev/moonglass/internal/agent/state TestRecordStoresTextVerbatim
 moonglass.dev/moonglass/internal/agent/state TestRecordSwitchWritesStatusesAndStopAfter
+moonglass.dev/moonglass/internal/agent/state TestRetainKeepsFiveAndPrunesOldRows
 moonglass.dev/moonglass/internal/api TestBodyInputsDecoded
 moonglass.dev/moonglass/internal/api TestBodyOverLimitIs413
 moonglass.dev/moonglass/internal/api TestEveryMountedRouteIsOperationOrAllowlisted
@@ -84,6 +87,7 @@ moonglass.dev/moonglass/internal/deploy TestDeployResolvesRegistryImages
 moonglass.dev/moonglass/internal/deploy TestDeployWithPreDeployLeavesContainerCreated
 moonglass.dev/moonglass/internal/deploy TestEngineAPIVersionFloor
 moonglass.dev/moonglass/internal/deploy TestEngineCallDeadlines
+moonglass.dev/moonglass/internal/deploy TestExecutorRunStopsAndRetainsUntilCancelled
 moonglass.dev/moonglass/internal/deploy TestHealthGateFailsWhenContainerExitsOrRestarts
 moonglass.dev/moonglass/internal/deploy TestHealthGateHTTPPath
 moonglass.dev/moonglass/internal/deploy TestHealthGateTCPConnect
@@ -95,9 +99,11 @@ moonglass.dev/moonglass/internal/deploy TestProxyPushFailuresPushNothing
 moonglass.dev/moonglass/internal/deploy TestProxyPushIssuers
 moonglass.dev/moonglass/internal/deploy TestProxyPushesOneAtATime
 moonglass.dev/moonglass/internal/deploy TestProxyRunPushesAgainWhenRunningConfigDiffers
+moonglass.dev/moonglass/internal/deploy TestReconcileCarriesOutDueStops
 moonglass.dev/moonglass/internal/deploy TestReconcileKeepsReferencedReleases
 moonglass.dev/moonglass/internal/deploy TestReconcileRemovesUnreferencedContainers
 moonglass.dev/moonglass/internal/deploy TestResolveRefParsing
+moonglass.dev/moonglass/internal/deploy TestRetainRemovesImagesOutsideFive
 moonglass.dev/moonglass/internal/deploy TestRollbackLeavesCandidateUntouched
 moonglass.dev/moonglass/internal/deploy TestRollbackPreviousContainerGone
 moonglass.dev/moonglass/internal/deploy TestRollbackRefusalsAndPushFailure
@@ -111,6 +117,10 @@ moonglass.dev/moonglass/internal/deploy TestRunPreDeployReplacesLeftoverStepCont
 moonglass.dev/moonglass/internal/deploy TestRunPreDeploySuccessStartsCandidate
 moonglass.dev/moonglass/internal/deploy TestRunPreDeployTimeoutKillsStep
 moonglass.dev/moonglass/internal/deploy TestRunningAfterStart
+moonglass.dev/moonglass/internal/deploy TestStopNeverStopsRestoredRelease
+moonglass.dev/moonglass/internal/deploy TestStopPreviousStopsAndKeepsContainer
+moonglass.dev/moonglass/internal/deploy TestStopRefusesUnmanagedContainer
+moonglass.dev/moonglass/internal/deploy TestStopRetiredRemovesContainerAndPreDeployStep
 moonglass.dev/moonglass/internal/deploy TestSwitchReleaseHealthFailureAborts
 moonglass.dev/moonglass/internal/deploy TestSwitchReleaseRefusalsAndPushFailure
 moonglass.dev/moonglass/internal/deploy TestSwitchReleaseRoutesCandidateAndCommits

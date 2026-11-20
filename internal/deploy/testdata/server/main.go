@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -18,6 +20,9 @@ import (
 const healthBody = "health-body-must-not-leak"
 
 func main() {
+	// As PID 1 the server would otherwise ignore SIGTERM, so a stop of it would
+	// wait the Engine's full timeout instead of ending at once.
+	go exitOnTerm()
 	if len(os.Args) == 1 {
 		serve()
 		return
@@ -65,6 +70,14 @@ func number(args []string) int {
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: app [exit <n> | print <marker> <n> | sleep <seconds> | health <path> <code> | die <seconds> <code>]")
 	os.Exit(2)
+}
+
+// exitOnTerm ends the process on SIGTERM, as a stop sends it before SIGKILL.
+func exitOnTerm() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM)
+	<-signals
+	os.Exit(0)
 }
 
 func serve() {

@@ -1,0 +1,6 @@
+{
+  "round": 2,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "Round 1's four blockers are fixed. DueStops requires stop_after order, an app_id then release_id tie-break against insertion order, and a row whose stop_after equals now. Retain deletes the retired row that created_at leaves outside the three newest while switched_at and rowid keep it inside. Reconcile checks the previous container is stopped, and the lock test stops a release that is no longer due so it returns at once unless it takes the app lock. The ten named tests sit in package state and package deploy, the diff only adds those four files, and Docker resources are per-run labels and temp directories. testdata/tests.txt is still unchanged. Nothing pins the 30-second stop wait or the 60-second Engine limit, and Run's stop check is only an upper bound."
+}

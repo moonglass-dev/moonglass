@@ -10,7 +10,13 @@ import (
 	"moonglass.dev/moonglass/internal/release"
 )
 
-func (x *Executor) Reconcile(ctx context.Context) error { return x.reconcile(ctx) }
+// Reconcile removes the managed containers no release references and then
+// carries out the stops due at the time it runs (docs/specs/release.md,
+// "Failure").
+func (x *Executor) Reconcile(ctx context.Context) error {
+	return errors.Join(x.reconcile(ctx, x.scope...), x.stopDue(ctx, x.now()))
+}
+
 func (x *Executor) reconcile(ctx context.Context, scope ...string) error {
 	listCtx, cancel := call(ctx)
 	defer cancel()
