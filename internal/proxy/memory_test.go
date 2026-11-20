@@ -119,14 +119,20 @@ func TestProxyAndAgentIdleUnderBudget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create control plane: %v", err)
 	}
-	enrolSrv := httptest.NewServer(s.Handler())
+	enrolSrv := httptest.NewUnstartedServer(s.Handler())
+	enrolCfg, err := s.TLSConfig()
+	if err != nil {
+		t.Fatalf("enrol tls config: %v", err)
+	}
+	enrolSrv.TLS = enrolCfg
+	enrolSrv.StartTLS()
 	t.Cleanup(enrolSrv.Close)
 	token, err := s.IssueEnrolToken(ctx, org)
 	if err != nil {
 		t.Fatalf("issue enrolment token: %v", err)
 	}
 	agentDir := filepath.Join(tmp, "agent")
-	if _, err := agent.Enroll(ctx, http.DefaultClient, agentDir, enrolSrv.URL, token); err != nil {
+	if _, err := agent.Enroll(ctx, agentDir, enrolSrv.URL, s.Fingerprint(), token); err != nil {
 		t.Fatalf("enrol the agent against the local control plane: %v", err)
 	}
 

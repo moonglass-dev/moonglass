@@ -128,10 +128,10 @@ func TestAgentConnectRunsProxyPush(t *testing.T) {
 	}
 
 	// Enrol a fresh data directory against a real control plane.
-	serverURL, token := newTestServer(t)
+	serverURL, serverFP, token := newTestServer(t)
 	dir := t.TempDir()
 	var enrollOut, enrollErr bytes.Buffer
-	if code := run([]string{"agent", "enroll", "--data-dir", dir, "--url", serverURL, token}, &enrollOut, &enrollErr); code != 0 {
+	if code := run([]string{"agent", "enroll", "--data-dir", dir, "--url", serverURL, "--server-fingerprint", serverFP, token}, &enrollOut, &enrollErr); code != 0 {
 		t.Fatalf("agent enroll exit status = %d, want 0 (stderr %q)", code, enrollErr.String())
 	}
 

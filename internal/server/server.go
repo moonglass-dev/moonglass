@@ -1,10 +1,12 @@
-// Package server is the control-plane server: enrolment today.
+// Package server is the control-plane server: enrolment and the registry REST
+// API, served over TLS 1.3 on one listener.
 package server
 
 import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base32"
 	"errors"
 	"fmt"
@@ -18,6 +20,7 @@ import (
 	"time"
 
 	"moonglass.dev/moonglass/internal/api"
+	"moonglass.dev/moonglass/internal/keys"
 	"moonglass.dev/moonglass/internal/registry"
 	"moonglass.dev/moonglass/internal/store"
 	"moonglass.dev/moonglass/internal/store/sqlite"
@@ -37,10 +40,11 @@ var tokenEncoding = base32.StdEncoding.WithPadding(base32.NoPadding)
 
 // Server is the control plane: a store and the control-plane Ed25519 identity.
 type Server struct {
-	st  store.Store
-	reg *registry.Registry
-	now func() time.Time
-	key ed25519.PrivateKey
+	st          store.Store
+	reg         *registry.Registry
+	fingerprint string
+	now         func() time.Time
+	key         ed25519.PrivateKey
 }
 
 // New loads the control-plane key from dataDir/control-plane.key, creating it
@@ -50,8 +54,21 @@ func New(st store.Store, dataDir string, now func() time.Time) (*Server, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Server{st: st, reg: registry.New(st, now), key: key, now: now}, nil
+	fingerprint, err := keys.Fingerprint(key.Public().(ed25519.PublicKey))
+	if err != nil {
+		return nil, fmt.Errorf("fingerprint the control-plane key: %w", err)
+	}
+	return &Server{st: st, reg: registry.New(st, now), key: key, now: now, fingerprint: fingerprint}, nil
 }
+
+// Fingerprint is the lowercase hex SHA-256 of the control-plane public key. Run
+// prints it as its first stdout line so the operator can pass it to
+// `moonglass agent enroll --server-fingerprint`.
+func (s *Server) Fingerprint() string { return s.fingerprint }
+
+// TLSConfig is the TLS 1.3 config the API listener presents: the control-plane
+// key in a self-signed certificate, with no client certificate requested.
+func (s *Server) TLSConfig() (*tls.Config, error) { return keys.ListenerTLSConfig(s.key) }
 
 func loadOrCreateKey(dataDir string) (ed25519.PrivateKey, error) {
 	path := filepath.Join(dataDir, controlPlaneKeyFile)
@@ -166,12 +183,31 @@ func (s *Server) IssueEnrolToken(ctx context.Context, orgID string) (string, err
 	return token, nil
 }
 
-// Run opens dataDir/server.db, creates an org if there is none, and serves
-// until ctx ends: enrolment over HTTP on listen and agents over TLS 1.3 WSS on
-// agentListen. With printEnrolToken it issues one token and prints it to stdout;
-// with a non-empty ownerTokenName it also issues one owner token and prints it
-// there. An empty ownerTokenName means no owner token is requested.
+// Run listens on listen and agentListen and then calls serve. The API listener
+// speaks TLS 1.3 only. A bind failure is an error naming the address, and no
+// token is minted before both listeners are open.
 func Run(ctx context.Context, dataDir, listen, agentListen string, printEnrolToken bool, ownerTokenName string, stdout io.Writer) error {
+	ln, err := net.Listen("tcp", listen)
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", listen, err)
+	}
+	agentLn, err := net.Listen("tcp", agentListen)
+	if err != nil {
+		_ = ln.Close()
+		return fmt.Errorf("listen for agents on %s: %w", agentListen, err)
+	}
+	return serve(ctx, dataDir, ln, agentLn, printEnrolToken, ownerTokenName, stdout)
+}
+
+// serve opens dataDir/server.db, creates an org if there is none, prints the
+// control-plane fingerprint as the first stdout line, then serves until ctx
+// ends: the API over TLS 1.3 on ln and agents over TLS 1.3 WSS on agentLn. With
+// printEnrolToken it issues one token and prints it after the fingerprint; with
+// a non-empty ownerTokenName it also issues one owner token and prints it
+// there. An empty ownerTokenName means no owner token is requested.
+func serve(ctx context.Context, dataDir string, ln, agentLn net.Listener, printEnrolToken bool, ownerTokenName string, stdout io.Writer) error {
+	defer func() { _ = ln.Close() }()
+	defer func() { _ = agentLn.Close() }()
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fmt.Errorf("create data dir %s: %w", dataDir, err)
 	}
@@ -183,6 +219,9 @@ func Run(ctx context.Context, dataDir, listen, agentListen string, printEnrolTok
 	s, err := New(st, dataDir, time.Now)
 	if err != nil {
 		return err
+	}
+	if _, err = fmt.Fprintln(stdout, s.Fingerprint()); err != nil {
+		return fmt.Errorf("print control-plane fingerprint: %w", err)
 	}
 	if printEnrolToken || ownerTokenName != "" {
 		var orgID, token string
@@ -206,27 +245,48 @@ func Run(ctx context.Context, dataDir, listen, agentListen string, printEnrolTok
 			}
 		}
 	}
-	ln, err := net.Listen("tcp", listen)
+	cfg, err := s.TLSConfig()
 	if err != nil {
-		return fmt.Errorf("listen on %s: %w", listen, err)
-	}
-	agentLn, err := net.Listen("tcp", agentListen)
-	if err != nil {
-		_ = ln.Close()
-		return fmt.Errorf("listen for agents on %s: %w", agentListen, err)
+		return fmt.Errorf("configure TLS on %s: %w", ln.Addr(), err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errs := make(chan error, 2)
 	go func() { errs <- s.ServeAgents(ctx, agentLn) }()
-	go func() { errs <- serveEnrol(ctx, s.Handler(), ln, listen) }()
+	go func() { errs <- serveAPI(ctx, s.Handler(), tlsListener{Listener: ln, cfg: cfg}) }()
 	first := <-errs
 	cancel()
 	return errors.Join(first, <-errs)
 }
 
-// serveEnrol serves the plain HTTP enrolment API on ln until ctx ends.
-func serveEnrol(ctx context.Context, handler http.Handler, ln net.Listener, listen string) error {
+// tlsListener wraps every accepted connection in TLS without exposing the
+// *tls.Conn type to net/http. net/http answers a plain-HTTP request on a
+// *tls.Conn with an unencrypted "400 Client sent an HTTP request to an HTTPS
+// server" (net/http/server.go, conn.serve). Hiding the type means net/http
+// treats the connection as plain HTTP, its write fails on the TLS handshake,
+// and a plain-HTTP client gets no HTTP response at all.
+type tlsListener struct {
+	net.Listener
+	cfg *tls.Config
+}
+
+// Accept returns the connection wrapped in TLS. The handshake runs on the first
+// Read, under the http.Server's ReadHeaderTimeout.
+func (l tlsListener) Accept() (net.Conn, error) {
+	c, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return tlsConn{tls.Server(c, l.cfg)}, nil
+}
+
+// tlsConn reports only net.Conn, so net/http cannot see a *tls.Conn.
+type tlsConn struct {
+	net.Conn
+}
+
+// serveAPI serves the API over TLS 1.3 on ln until ctx ends.
+func serveAPI(ctx context.Context, handler http.Handler, ln net.Listener) error {
 	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	done := make(chan struct{})
 	go func() {
@@ -243,7 +303,7 @@ func serveEnrol(ctx context.Context, handler http.Handler, ln net.Listener, list
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
-	return fmt.Errorf("serve %s: %w", listen, err)
+	return fmt.Errorf("serve %s: %w", ln.Addr(), err)
 }
 
 // firstOrg returns the org id stored in dataDir/org, creating the org the first time.

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -25,11 +26,18 @@ var (
 	ErrTokenUsed    = errors.New("agent: enrolment token was already used")
 )
 
-// Enroll registers this machine with the control plane at url using a one-time
-// token and returns the agent fingerprint. It reuses the identity in dataDir
-// or generates one, and writes nothing until the server answers ACCEPTED with
-// a 32-byte control-plane key, which it then pins.
-func Enroll(ctx context.Context, client *http.Client, dataDir, url, token string) (string, error) {
+// Enroll registers this machine with the control plane at rawURL using a
+// one-time token and returns the agent fingerprint. rawURL must be https:// and
+// serverFingerprint is the control-plane fingerprint `moonglass server` printed
+// at start: the token is sent only after the TLS 1.3 handshake proved possession
+// of that key. It reuses the identity in dataDir or generates one, follows no
+// redirects, and writes nothing until the server answers ACCEPTED with the same
+// 32-byte control-plane key, which it then pins.
+func Enroll(ctx context.Context, dataDir, rawURL, serverFingerprint, token string) (string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" || u.Host == "" {
+		return "", errors.New("enrol: --url must start with https://: the token is never sent without TLS")
+	}
 	id, saved, err := keys.LoadAgentIdentity(dataDir)
 	if err != nil {
 		return "", fmt.Errorf("enrol: %w: remove %s to start over", err, dataDir)
@@ -55,7 +63,14 @@ func Enroll(ctx context.Context, client *http.Client, dataDir, url, token string
 	if err = os.Remove(probe.Name()); err != nil {
 		return "", fmt.Errorf("enrol: data dir %s is not writable: %w", dataDir, err)
 	}
-	pin, err := post(ctx, client, url, token, id)
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig:   keys.EnrolClientTLSConfig(serverFingerprint),
+			DisableKeepAlives: true,
+		},
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	pin, err := post(ctx, client, rawURL, token, id)
 	if err != nil {
 		return "", err
 	}
@@ -73,8 +88,9 @@ func Enroll(ctx context.Context, client *http.Client, dataDir, url, token string
 	return fingerprint, nil
 }
 
-// post sends the EnrollRequest and returns the control-plane public key.
-func post(ctx context.Context, client *http.Client, url, token string, id keys.AgentIdentity) ([]byte, error) {
+// post sends the EnrollRequest to base and returns the control-plane public key
+// after checking it equals the TLS leaf key the fingerprint check verified.
+func post(ctx context.Context, client *http.Client, base, token string, id keys.AgentIdentity) ([]byte, error) {
 	sum := sha256.Sum256([]byte(token))
 	wrapped, err := protocol.Wrap(agentv1.MessageType_ENROLL_REQUEST, "enroll", &agentv1.EnrollRequest{
 		TokenId:               hex.EncodeToString(sum[:]),
@@ -88,15 +104,15 @@ func post(ctx context.Context, client *http.Client, url, token string, id keys.A
 	if err != nil {
 		return nil, fmt.Errorf("enrol: encode request: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(url, "/")+"/v1/enroll", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(base, "/")+"/v1/enroll", bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("enrol: bad --url %q: %w", url, err)
+		return nil, fmt.Errorf("enrol: bad --url %q: %w", base, err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/octet-stream")
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("enrol: reach the control plane at %s (check --url and the network): %w", url, redact(err, token))
+		return nil, fmt.Errorf("enrol: reach the control plane at %s (check --url and the network): %w", base, redact(err, token))
 	}
 	defer func() { _ = res.Body.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(res.Body, protocol.MaxEnvelopeSize+1))
@@ -118,6 +134,16 @@ func post(ctx context.Context, client *http.Client, url, token string, id keys.A
 	case agentv1.EnrollResult_ACCEPTED:
 		if len(resp.GetControlPlanePublicKey()) != ed25519.PublicKeySize {
 			return nil, fmt.Errorf("enrol: control plane sent a %d-byte public key, expected %d: nothing was pinned", len(resp.GetControlPlanePublicKey()), ed25519.PublicKeySize)
+		}
+		if res.TLS == nil || len(res.TLS.PeerCertificates) == 0 {
+			return nil, errors.New("enrol: the response did not arrive over a TLS connection with a verified leaf key: nothing was pinned")
+		}
+		leaf, err := keys.PeerPublicKey([][]byte{res.TLS.PeerCertificates[0].Raw})
+		if err != nil {
+			return nil, fmt.Errorf("enrol: read the TLS leaf key: %w", err)
+		}
+		if !leaf.Equal(ed25519.PublicKey(resp.GetControlPlanePublicKey())) {
+			return nil, errors.New("enrol: control plane answered with a key other than the one its TLS certificate proved: nothing was pinned")
 		}
 		return resp.GetControlPlanePublicKey(), nil
 	case agentv1.EnrollResult_TOKEN_USED:

@@ -89,6 +89,53 @@ func ClientTLSConfig(priv ed25519.PrivateKey, pin ed25519.PublicKey) (*tls.Confi
 	}, nil
 }
 
+// ListenerTLSConfig returns a TLS 1.3 server config that presents priv and
+// asks for no client certificate. It serves the enrolment and REST API
+// listeners, whose caller is authenticated by the bearer token instead.
+func ListenerTLSConfig(priv ed25519.PrivateKey) (*tls.Config, error) {
+	cert, err := SelfSignedCert(priv)
+	if err != nil {
+		return nil, err
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS13,
+		// A client session cache is never set, so a resumed session cannot skip
+		// the caller's bearer-token check, and none are issued either.
+		SessionTicketsDisabled: true,
+	}, nil
+}
+
+// EnrolClientTLSConfig returns a TLS 1.3 client config that skips chain
+// verification and accepts only a server whose Ed25519 leaf key has the given
+// fingerprint. The fingerprint is the whole check: an empty or uppercase copy
+// fails, as does any other key.
+func EnrolClientTLSConfig(fingerprint string) *tls.Config {
+	return &tls.Config{
+		MinVersion: tls.VersionTLS13,
+		// The server certificate is a key carrier, not a CA-issued identity:
+		// the chain, name and expiry are ignored and VerifyPeerCertificate
+		// compares the leaf key's fingerprint instead.
+		InsecureSkipVerify: true, //nolint:gosec // G402: replaced by the fingerprint comparison in VerifyPeerCertificate
+		// No ClientSessionCache is set, so this client never resumes a session
+		// and VerifyPeerCertificate runs on every handshake.
+		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error { //nolint:gosec // G123: no session cache, so there is no resumption to bypass the fingerprint
+			got, err := PeerPublicKey(rawCerts)
+			if err != nil {
+				return err
+			}
+			gotFP, err := Fingerprint(got)
+			if err != nil {
+				return err
+			}
+			if gotFP != fingerprint {
+				return errors.New("control plane key does not match the server fingerprint: copy the fingerprint moonglass server printed at start")
+			}
+			return nil
+		},
+	}
+}
+
 // ServerTLSConfig returns a TLS 1.3 server config that presents priv and
 // requires a client certificate. authorize decides whether the client's
 // Ed25519 key is allowed; a non-nil error fails the handshake.

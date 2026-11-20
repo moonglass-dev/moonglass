@@ -128,7 +128,7 @@ W5-1b adds `agent_id` to the event and the hash, and W5-5 adds `project_id`, `en
 
 `make generate` rewrites `internal/api/openapi.json` (Huma) and `internal/cli/generated.go` from `registry.Operations()`. The tests `TestGeneratedOpenAPIIsCurrent` and `TestGeneratedCLIIsCurrent` run in `make test`, so `make ci` fails when either file is stale.
 
-The generated runner sends `Authorization: Bearer $MOONGLASS_TOKEN` to `$MOONGLASS_URL` and prints a success response to stdout; errors are printed as "Generated CLI" says, with exit code 1. `cli.Run` exits 2 for an unknown subcommand, or when the local handlers passed to it differ from `registry.LocalCommands`.
+The generated runner sends `Authorization: Bearer $MOONGLASS_TOKEN` to `$MOONGLASS_URL` and prints a success response to stdout; errors are printed as "Generated CLI" says, with exit code 1. It accepts an `https://` `MOONGLASS_URL` with Go's standard certificate verification, and `http://` only for the host `localhost` or a loopback IP literal; anything else exits 2 with a message naming `MOONGLASS_URL` and sends nothing. `cli.Run` exits 2 for an unknown subcommand, or when the local handlers passed to it differ from `registry.LocalCommands`.
 
 ## Inputs and errors
 

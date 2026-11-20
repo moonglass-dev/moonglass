@@ -48,7 +48,13 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatalf("New: unexpected error %v", err)
 	}
-	ts := httptest.NewServer(s.Handler())
+	ts := httptest.NewUnstartedServer(s.Handler())
+	cfg, err := s.TLSConfig()
+	if err != nil {
+		t.Fatalf("TLSConfig: unexpected error %v", err)
+	}
+	ts.TLS = cfg
+	ts.StartTLS()
 	t.Cleanup(ts.Close)
 	return &fixture{srv: s, st: st, ts: ts, org: org, dir: dir}
 }
@@ -89,9 +95,10 @@ func newRequest(t *testing.T, token string) *agentv1.EnrollRequest {
 	}
 }
 
-// post sends req with the given Authorization header value (empty means none)
-// and returns the HTTP status and, when the status is 200, the typed response.
-func post(t *testing.T, url, authorization string, req *agentv1.EnrollRequest) (int, *agentv1.EnrollResponse) {
+// post sends req over TLS, pinned to fp, with the given Authorization header
+// value (empty means none) and returns the HTTP status and, when the status is
+// 200, the typed response.
+func post(t *testing.T, url, fp, authorization string, req *agentv1.EnrollRequest) (int, *agentv1.EnrollResponse) {
 	t.Helper()
 	env, err := protocol.Wrap(agentv1.MessageType_ENROLL_REQUEST, "enroll-test", req)
 	if err != nil {
@@ -108,7 +115,8 @@ func post(t *testing.T, url, authorization string, req *agentv1.EnrollRequest) (
 	if authorization != "" {
 		hreq.Header.Set("Authorization", authorization)
 	}
-	res, err := http.DefaultClient.Do(hreq)
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: keys.EnrolClientTLSConfig(fp)}}
+	res, err := client.Do(hreq)
 	if err != nil {
 		t.Fatalf("POST /v1/enroll: unexpected error %v", err)
 	}
@@ -176,7 +184,7 @@ func TestEnrollRejectsInvalidToken(t *testing.T) {
 			f := newFixture(t)
 			auth, req := tt.setup(t, f)
 
-			status, resp := post(t, f.ts.URL, auth, req)
+			status, resp := post(t, f.ts.URL, f.srv.Fingerprint(), auth, req)
 
 			if status != http.StatusOK {
 				t.Fatalf("status: expected %d, got %d", http.StatusOK, status)
@@ -203,7 +211,7 @@ func TestEnrollStoresAgeRecipient(t *testing.T) {
 	tok := f.issue(t)
 	req := newRequest(t, tok)
 
-	status, resp := post(t, f.ts.URL, "Bearer "+tok, req)
+	status, resp := post(t, f.ts.URL, f.srv.Fingerprint(), "Bearer "+tok, req)
 	if status != http.StatusOK {
 		t.Fatalf("status: expected %d, got %d", http.StatusOK, status)
 	}
@@ -247,10 +255,10 @@ func TestEnrollDuplicateKeyStoresNoRecipient(t *testing.T) {
 		t.Fatalf("test setup: the two requests must carry different age recipients")
 	}
 
-	if status, resp := post(t, f.ts.URL, "Bearer "+tokA, reqA); status != http.StatusOK || resp.GetResult() != agentv1.EnrollResult_ACCEPTED {
+	if status, resp := post(t, f.ts.URL, f.srv.Fingerprint(), "Bearer "+tokA, reqA); status != http.StatusOK || resp.GetResult() != agentv1.EnrollResult_ACCEPTED {
 		t.Fatalf("first enroll: expected 200 ACCEPTED, got %d %v", status, resp.GetResult())
 	}
-	if status, resp := post(t, f.ts.URL, "Bearer "+tokB, reqB); status != http.StatusOK || resp.GetResult() != agentv1.EnrollResult_TOKEN_INVALID {
+	if status, resp := post(t, f.ts.URL, f.srv.Fingerprint(), "Bearer "+tokB, reqB); status != http.StatusOK || resp.GetResult() != agentv1.EnrollResult_TOKEN_INVALID {
 		t.Fatalf("second enroll: expected 200 %v, got %d %v", agentv1.EnrollResult_TOKEN_INVALID, status, resp.GetResult())
 	}
 
@@ -281,7 +289,7 @@ func TestEnrollRejectsReplay(t *testing.T) {
 		tok := f.issue(t)
 		req := newRequest(t, tok)
 
-		status, first := post(t, f.ts.URL, "Bearer "+tok, req)
+		status, first := post(t, f.ts.URL, f.srv.Fingerprint(), "Bearer "+tok, req)
 		if status != http.StatusOK || first.GetResult() != agentv1.EnrollResult_ACCEPTED {
 			t.Fatalf("first enroll: expected 200 ACCEPTED, got %d %v", status, first.GetResult())
 		}
@@ -289,7 +297,7 @@ func TestEnrollRejectsReplay(t *testing.T) {
 			t.Errorf("control_plane_public_key length: expected 32, got %d", n)
 		}
 
-		status, second := post(t, f.ts.URL, "Bearer "+tok, req)
+		status, second := post(t, f.ts.URL, f.srv.Fingerprint(), "Bearer "+tok, req)
 		if status != http.StatusOK {
 			t.Fatalf("second enroll status: expected %d, got %d", http.StatusOK, status)
 		}
@@ -311,10 +319,10 @@ func TestEnrollRejectsReplay(t *testing.T) {
 		reqB := newRequest(t, tokB)
 		reqB.AgentSigningPublicKey = reqA.AgentSigningPublicKey
 
-		if _, resp := post(t, f.ts.URL, "Bearer "+tokA, reqA); resp.GetResult() != agentv1.EnrollResult_ACCEPTED {
+		if _, resp := post(t, f.ts.URL, f.srv.Fingerprint(), "Bearer "+tokA, reqA); resp.GetResult() != agentv1.EnrollResult_ACCEPTED {
 			t.Fatalf("first enroll: expected ACCEPTED, got %v", resp.GetResult())
 		}
-		_, resp := post(t, f.ts.URL, "Bearer "+tokB, reqB)
+		_, resp := post(t, f.ts.URL, f.srv.Fingerprint(), "Bearer "+tokB, reqB)
 		if resp.GetResult() != agentv1.EnrollResult_TOKEN_INVALID {
 			t.Errorf("duplicate key result: expected %v, got %v", agentv1.EnrollResult_TOKEN_INVALID, resp.GetResult())
 		}
@@ -339,19 +347,25 @@ func TestEnrollRejectsReplay(t *testing.T) {
 	t.Run("control-plane identity survives reopening", func(t *testing.T) {
 		f := newFixture(t)
 		tok1 := f.issue(t)
-		_, r1 := post(t, f.ts.URL, "Bearer "+tok1, newRequest(t, tok1))
+		_, r1 := post(t, f.ts.URL, f.srv.Fingerprint(), "Bearer "+tok1, newRequest(t, tok1))
 
 		s2, err := New(f.st, f.dir, func() time.Time { return testNow })
 		if err != nil {
 			t.Fatalf("New (reopen): unexpected error %v", err)
 		}
-		ts2 := httptest.NewServer(s2.Handler())
+		ts2 := httptest.NewUnstartedServer(s2.Handler())
+		cfg2, err := s2.TLSConfig()
+		if err != nil {
+			t.Fatalf("TLSConfig: unexpected error %v", err)
+		}
+		ts2.TLS = cfg2
+		ts2.StartTLS()
 		defer ts2.Close()
 		tok2, err := s2.IssueEnrolToken(context.Background(), f.org)
 		if err != nil {
 			t.Fatalf("IssueEnrolToken: unexpected error %v", err)
 		}
-		_, r2 := post(t, ts2.URL, "Bearer "+tok2, newRequest(t, tok2))
+		_, r2 := post(t, ts2.URL, s2.Fingerprint(), "Bearer "+tok2, newRequest(t, tok2))
 
 		if r1.GetResult() != agentv1.EnrollResult_ACCEPTED || r2.GetResult() != agentv1.EnrollResult_ACCEPTED {
 			t.Fatalf("results: expected ACCEPTED twice, got %v and %v", r1.GetResult(), r2.GetResult())

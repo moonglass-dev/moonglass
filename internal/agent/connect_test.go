@@ -488,14 +488,20 @@ func TestServerOfflineThenRecovers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("server.New: unexpected error %v", err)
 	}
-	enrolSrv := httptest.NewServer(s.Handler())
+	enrolSrv := httptest.NewUnstartedServer(s.Handler())
+	enrolCfg, err := s.TLSConfig()
+	if err != nil {
+		t.Fatalf("TLSConfig: unexpected error %v", err)
+	}
+	enrolSrv.TLS = enrolCfg
+	enrolSrv.StartTLS()
 	t.Cleanup(enrolSrv.Close)
 	token, err := s.IssueEnrolToken(ctx, org)
 	if err != nil {
 		t.Fatalf("IssueEnrolToken: unexpected error %v", err)
 	}
 	agentDir := t.TempDir()
-	if _, err := Enroll(ctx, http.DefaultClient, agentDir, enrolSrv.URL, token); err != nil {
+	if _, err := Enroll(ctx, agentDir, enrolSrv.URL, s.Fingerprint(), token); err != nil {
 		t.Fatalf("Enroll: unexpected error %v", err)
 	}
 	before := snapshot(t, agentDir)

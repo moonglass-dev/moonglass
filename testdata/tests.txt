@@ -3,6 +3,7 @@ moonglass.dev/moonglass/cmd/moonglass TestAgentConnectProxyFlagDefaults
 moonglass.dev/moonglass/cmd/moonglass TestAgentConnectRejectsBadProxyFlags
 moonglass.dev/moonglass/cmd/moonglass TestAgentConnectRunsProxyPush
 moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollFailures
+moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollNeedsServerFingerprint
 moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollPrintsFingerprint
 moonglass.dev/moonglass/cmd/moonglass TestKeysInitFailures
 moonglass.dev/moonglass/cmd/moonglass TestKeysInitWritesRecoveryKeyFile
@@ -22,6 +23,10 @@ moonglass.dev/moonglass/internal/agent TestConnectDialsOutboundWSS
 moonglass.dev/moonglass/internal/agent TestDialTimesOutOnSilentServer
 moonglass.dev/moonglass/internal/agent TestEnrollAcceptsAndPins
 moonglass.dev/moonglass/internal/agent TestEnrollDoesNotConsumeTokenOnMalformedKeys
+moonglass.dev/moonglass/internal/agent TestEnrollFingerprintMismatchSendsNoToken
+moonglass.dev/moonglass/internal/agent TestEnrollPinsFingerprintVerifiedKey
+moonglass.dev/moonglass/internal/agent TestEnrollRefusesPlainHTTP
+moonglass.dev/moonglass/internal/agent TestEnrollRejectsResponseKeyOtherThanTLSKey
 moonglass.dev/moonglass/internal/agent TestEnrollReplayFails
 moonglass.dev/moonglass/internal/agent TestEnrollUnwritableDataDirDoesNotConsumeToken
 moonglass.dev/moonglass/internal/agent TestHeartbeatSentOnInterval
@@ -70,6 +75,7 @@ moonglass.dev/moonglass/internal/cli TestGeneratedMissingRequiredFlagExits2
 moonglass.dev/moonglass/internal/cli TestGeneratedPrintsErrorDetail
 moonglass.dev/moonglass/internal/cli TestGeneratedRefusesPositionalAndUnknownFlags
 moonglass.dev/moonglass/internal/cli TestGeneratedRepeatedBooleanAndIntegerFlags
+moonglass.dev/moonglass/internal/cli TestGeneratedRunnerRefusesPlainHTTPExceptLocalhost
 moonglass.dev/moonglass/internal/cli TestGeneratedRunnerSendsBearerToken
 moonglass.dev/moonglass/internal/cli TestGeneratedUsageListsRequiredFlagsFirst
 moonglass.dev/moonglass/internal/deploy TestCheckIssuerAcceptsTheThreeIssuers
@@ -142,6 +148,7 @@ moonglass.dev/moonglass/internal/keys TestAgentAgreeKeyAsAgeRecipient
 moonglass.dev/moonglass/internal/keys TestAgentIdentityFilesRoundTrip
 moonglass.dev/moonglass/internal/keys TestAgentTLSCertCarriesKey
 moonglass.dev/moonglass/internal/keys TestControlPlanePinFile
+moonglass.dev/moonglass/internal/keys TestEnrolClientTLSConfigChecksFingerprint
 moonglass.dev/moonglass/internal/keys TestFingerprintFile
 moonglass.dev/moonglass/internal/keys TestFingerprintIsSHA256OfSigningKey
 moonglass.dev/moonglass/internal/keys TestGenerateAgentIdentity
@@ -149,6 +156,7 @@ moonglass.dev/moonglass/internal/keys TestGenerateEnvironmentKey
 moonglass.dev/moonglass/internal/keys TestKeyRecordRejectsMalformed
 moonglass.dev/moonglass/internal/keys TestKeyRecordRoundTrip
 moonglass.dev/moonglass/internal/keys TestKeyVectorsDecryptWithStockAge
+moonglass.dev/moonglass/internal/keys TestListenerTLSConfigNeedsNoClientCert
 moonglass.dev/moonglass/internal/keys TestLoadAgentIdentityAbsentDir
 moonglass.dev/moonglass/internal/keys TestLoadAgentIdentityRejectsMalformed
 moonglass.dev/moonglass/internal/keys TestOnlyX25519RecipientsAndIdentitiesParse
@@ -314,8 +322,10 @@ moonglass.dev/moonglass/internal/server TestIssueOwnerTokenRejectsEmptyNameWitho
 moonglass.dev/moonglass/internal/server TestIssueOwnerTokenUsesExistingOwner
 moonglass.dev/moonglass/internal/server TestRejectsTLSBelow13
 moonglass.dev/moonglass/internal/server TestRejectsUnknownAgent
+moonglass.dev/moonglass/internal/server TestRunPrintsControlPlaneFingerprintFirst
 moonglass.dev/moonglass/internal/server TestRunPrintsEnrolTokenBeforeOwnerToken
 moonglass.dev/moonglass/internal/server TestRunPrintsOwnerTokenOnce
+moonglass.dev/moonglass/internal/server TestRunServesListenOnlyOverTLS
 moonglass.dev/moonglass/internal/server TestServerClosesOnBadAgentFrame
 moonglass.dev/moonglass/internal/store TestAppRoleCannotBypassRLS
 moonglass.dev/moonglass/internal/store TestAuditSessionColumnsConformancePostgres

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -178,6 +180,10 @@ func runGenerated(c command, args []string, env func(string) string, stdout, std
 		_, _ = fmt.Fprintf(stderr, "moonglass: %s needs MOONGLASS_URL (the control-plane URL) and MOONGLASS_TOKEN (an owner token)\n", c.Name)
 		return 2
 	}
+	if err := checkURL(base); err != nil {
+		_, _ = fmt.Fprintf(stderr, "moonglass: %s: %v\n", c.Name, err)
+		return 2
+	}
 	query, body, err := encode(c, values)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "moonglass: %s: %v\n", c.Name, err)
@@ -209,6 +215,29 @@ func runGenerated(c command, args []string, env func(string) string, stdout, std
 	}
 	printProblem(stderr, c.Name, resp)
 	return 1
+}
+
+// checkURL allows an https:// MOONGLASS_URL with a host, and http:// only for
+// the host localhost or a loopback IP literal, so a token is never sent in clear
+// off the machine. The URL is never echoed.
+func checkURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return errors.New("MOONGLASS_URL must start with https://; http:// is allowed only for localhost or a loopback IP address")
+	}
+	if u.Scheme == "https" && u.Host != "" {
+		return nil
+	}
+	if u.Scheme == "http" {
+		host := u.Hostname()
+		if host == "localhost" {
+			return nil
+		}
+		if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+			return nil
+		}
+	}
+	return errors.New("MOONGLASS_URL must start with https://; http:// is allowed only for localhost or a loopback IP address")
 }
 
 // commandUsage is the usage of one generated subcommand: its flags, the required

@@ -273,11 +273,12 @@ func TestIssueOwnerTokenRejectsEmptyNameWithoutWrites(t *testing.T) {
 	wantNoAuditEvents(t, f.st, f.org)
 }
 
-// runServer starts Run on dir with loopback listeners, reads wantLines lines of
-// stdout, then cancels and asserts Run returned nil and printed nothing more.
-func runServer(t *testing.T, dir string, printEnrol bool, ownerName string) []string {
+// runServerOutput starts Run on dir with loopback listeners, reads the
+// control-plane fingerprint line and the token lines, then cancels and asserts
+// Run returned nil and printed nothing more.
+func runServerOutput(t *testing.T, dir string, printEnrol bool, ownerName string) []string {
 	t.Helper()
-	wantLines := 0
+	wantLines := 1 // the control-plane fingerprint line
 	if printEnrol {
 		wantLines++
 	}
@@ -335,6 +336,12 @@ func runServer(t *testing.T, dir string, printEnrol bool, ownerName string) []st
 		t.Fatalf("Run: expected it to return after ctx cancel, still running after 10s")
 	}
 	return lines
+}
+
+// runServer returns the token lines of runServerOutput, after the fingerprint.
+func runServer(t *testing.T, dir string, printEnrol bool, ownerName string) []string {
+	t.Helper()
+	return runServerOutput(t, dir, printEnrol, ownerName)[1:]
 }
 
 func TestRunPrintsOwnerTokenOnce(t *testing.T) {

@@ -6,7 +6,7 @@ W1-4 implements the agent's outbound connection to the control plane and its hea
 
 The agent dials `wss://HOST/v1/agent`. It never listens. `moonglass server` serves this endpoint on `--agent-listen ADDR` (default `127.0.0.1:8443`; port 443 in production is an install choice, W1-6).
 
-FR1-1 moves `--listen` onto TLS 1.3 with the server's Ed25519 self-signed certificate (`keys.SelfSignedCert`). `POST /v1/enroll` and the registry REST routes share that listener; there is no plain-HTTP listener in production. The first connection is trust-on-first-use: `moonglass agent enroll --server-fingerprint FP` verifies the leaf key's SHA-256 against the fingerprint `moonglass server` prints at start, then `control-plane.pub` is the pin for every later connection (`docs/specs/enrolment.md`).
+FR1-1 moves `--listen` onto TLS 1.3 with the server's Ed25519 self-signed certificate (`keys.SelfSignedCert`). `POST /v1/enroll` and the registry REST routes share that listener, and a plain-HTTP request to it is closed without an HTTP response. The first connection is trust-on-first-use: `moonglass agent enroll --server-fingerprint FP` verifies the leaf key's SHA-256 against the fingerprint `moonglass server` prints at start; the pinned key is that verified leaf key, and it must equal the `ACCEPTED` response's `control_plane_public_key`. Then `control-plane.pub` is the pin for every later connection (`docs/specs/enrolment.md`).
 
 TLS is 1.3 only on both sides. Both sides authenticate with their Ed25519 identity from enrolment (mutual TLS). Go has no raw-public-key TLS, so each side presents a short-lived self-signed Ed25519 x509 certificate (`keys.SelfSignedCert`) as a carrier. Subject, SANs and expiry are not trusted:
 

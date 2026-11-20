@@ -15,7 +15,7 @@ import (
 	"moonglass.dev/moonglass/internal/store/sqlite"
 )
 
-func newTestServer(t *testing.T) (url, token string) {
+func newTestServer(t *testing.T) (url, fingerprint, token string) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -32,21 +32,27 @@ func newTestServer(t *testing.T) (url, token string) {
 	if err != nil {
 		t.Fatalf("server.New: unexpected error %v", err)
 	}
-	ts := httptest.NewServer(s.Handler())
+	ts := httptest.NewUnstartedServer(s.Handler())
+	cfg, err := s.TLSConfig()
+	if err != nil {
+		t.Fatalf("TLSConfig: unexpected error %v", err)
+	}
+	ts.TLS = cfg
+	ts.StartTLS()
 	t.Cleanup(ts.Close)
 	token, err = s.IssueEnrolToken(ctx, org)
 	if err != nil {
 		t.Fatalf("IssueEnrolToken: unexpected error %v", err)
 	}
-	return ts.URL, token
+	return ts.URL, s.Fingerprint(), token
 }
 
 func TestAgentEnrollPrintsFingerprint(t *testing.T) {
-	url, token := newTestServer(t)
+	url, fingerprint, token := newTestServer(t)
 	dir := t.TempDir()
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"agent", "enroll", "--data-dir", dir, "--url", url, token}, &stdout, &stderr)
+	code := run([]string{"agent", "enroll", "--data-dir", dir, "--url", url, "--server-fingerprint", fingerprint, token}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit status: expected 0, got %d (stderr %q)", code, stderr.String())
@@ -74,10 +80,10 @@ func TestAgentEnrollPrintsFingerprint(t *testing.T) {
 }
 
 func TestAgentEnrollFailures(t *testing.T) {
-	url, token := newTestServer(t)
+	url, fingerprint, token := newTestServer(t)
 	first := t.TempDir()
 	var out, errb bytes.Buffer
-	if code := run([]string{"agent", "enroll", "--data-dir", first, "--url", url, token}, &out, &errb); code != 0 {
+	if code := run([]string{"agent", "enroll", "--data-dir", first, "--url", url, "--server-fingerprint", fingerprint, token}, &out, &errb); code != 0 {
 		t.Fatalf("first enroll exit status: expected 0, got %d (stderr %q)", code, errb.String())
 	}
 
@@ -87,8 +93,8 @@ func TestAgentEnrollFailures(t *testing.T) {
 		wantCode int
 		wantUse  bool
 	}{
-		{"missing token", []string{"agent", "enroll", "--data-dir", t.TempDir(), "--url", url}, 2, true},
-		{"replayed token", []string{"agent", "enroll", "--data-dir", t.TempDir(), "--url", url, token}, 1, false},
+		{"missing token", []string{"agent", "enroll", "--data-dir", t.TempDir(), "--url", url, "--server-fingerprint", fingerprint}, 2, true},
+		{"replayed token", []string{"agent", "enroll", "--data-dir", t.TempDir(), "--url", url, "--server-fingerprint", fingerprint, token}, 1, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

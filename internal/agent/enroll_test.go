@@ -37,9 +37,16 @@ type env struct {
 	st  store.Store
 	ts  *httptest.Server
 	org string
+	fp  string
 }
 
 func newEnv(t *testing.T) *env {
+	t.Helper()
+	return newEnvWith(t, nil)
+}
+
+// newEnvWith is newEnv with wrap around the handler when wrap is not nil.
+func newEnvWith(t *testing.T, wrap func(http.Handler) http.Handler) *env {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -56,9 +63,19 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatalf("server.New: unexpected error %v", err)
 	}
-	ts := httptest.NewServer(s.Handler())
+	handler := s.Handler()
+	if wrap != nil {
+		handler = wrap(handler)
+	}
+	ts := httptest.NewUnstartedServer(handler)
+	cfg, err := s.TLSConfig()
+	if err != nil {
+		t.Fatalf("TLSConfig: unexpected error %v", err)
+	}
+	ts.TLS = cfg
+	ts.StartTLS()
 	t.Cleanup(ts.Close)
-	return &env{srv: s, st: st, ts: ts, org: org}
+	return &env{srv: s, st: st, ts: ts, org: org, fp: s.Fingerprint()}
 }
 
 func (e *env) issue(t *testing.T) string {
@@ -102,8 +119,9 @@ func snapshot(t *testing.T, dir string) map[string]string {
 	return out
 }
 
-// rawEnroll posts an arbitrary request and returns the status and, for 200s, the response.
-func rawEnroll(t *testing.T, url, bearer string, req *agentv1.EnrollRequest) (int, *agentv1.EnrollResponse) {
+// rawEnroll posts an arbitrary request over TLS and returns the status and, for
+// 200s, the response.
+func rawEnroll(t *testing.T, url, fp, bearer string, req *agentv1.EnrollRequest) (int, *agentv1.EnrollResponse) {
 	t.Helper()
 	wrapped, err := protocol.Wrap(agentv1.MessageType_ENROLL_REQUEST, "raw", req)
 	if err != nil {
@@ -118,7 +136,8 @@ func rawEnroll(t *testing.T, url, bearer string, req *agentv1.EnrollRequest) (in
 		t.Fatalf("http.NewRequest: unexpected error %v", err)
 	}
 	hreq.Header.Set("Authorization", "Bearer "+bearer)
-	res, err := http.DefaultClient.Do(hreq)
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: keys.EnrolClientTLSConfig(fp)}}
+	res, err := client.Do(hreq)
 	if err != nil {
 		t.Fatalf("POST: unexpected error %v", err)
 	}
@@ -146,7 +165,7 @@ func TestEnrollAcceptsAndPins(t *testing.T) {
 	tok := e.issue(t)
 	dir := t.TempDir()
 
-	fp, err := Enroll(context.Background(), e.ts.Client(), dir, e.ts.URL, tok)
+	fp, err := Enroll(context.Background(), dir, e.ts.URL, e.fp, tok)
 	if err != nil {
 		t.Fatalf("Enroll: unexpected error %v", err)
 	}
@@ -185,7 +204,7 @@ func TestEnrollAcceptsAndPins(t *testing.T) {
 		t.Fatalf("GenerateAgentIdentity: unexpected error %v", err)
 	}
 	sum := sha256.Sum256([]byte(tok2))
-	status, resp := rawEnroll(t, e.ts.URL, tok2, &agentv1.EnrollRequest{
+	status, resp := rawEnroll(t, e.ts.URL, e.fp, tok2, &agentv1.EnrollRequest{
 		TokenId:               hex.EncodeToString(sum[:]),
 		AgentSigningPublicKey: id.SigningPublic,
 		AgentAgeRecipient:     id.AgreePublic,
@@ -214,7 +233,7 @@ func TestEnrollReplayFails(t *testing.T) {
 	ctx := context.Background()
 	first := t.TempDir()
 
-	if _, err := Enroll(ctx, e.ts.Client(), first, e.ts.URL, tok); err != nil {
+	if _, err := Enroll(ctx, first, e.ts.URL, e.fp, tok); err != nil {
 		t.Fatalf("first Enroll: unexpected error %v", err)
 	}
 	before := snapshot(t, first)
@@ -228,7 +247,7 @@ func TestEnrollReplayFails(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fp, err := Enroll(ctx, e.ts.Client(), tt.dir, e.ts.URL, tok)
+			fp, err := Enroll(ctx, tt.dir, e.ts.URL, e.fp, tok)
 
 			if !errors.Is(err, ErrTokenUsed) {
 				t.Errorf("error: expected errors.Is ErrTokenUsed, got %v", err)
@@ -266,7 +285,7 @@ func TestEnrollUnwritableDataDirDoesNotConsumeToken(t *testing.T) {
 		t.Fatalf("WriteFile: unexpected error %v", err)
 	}
 
-	fp, err := Enroll(ctx, e.ts.Client(), filepath.Join(parent, "agent"), e.ts.URL, tok)
+	fp, err := Enroll(ctx, filepath.Join(parent, "agent"), e.ts.URL, e.fp, tok)
 
 	if err == nil {
 		t.Errorf("Enroll into an unwritable data dir: expected an error, got fingerprint %q", fp)
@@ -275,7 +294,7 @@ func TestEnrollUnwritableDataDirDoesNotConsumeToken(t *testing.T) {
 		t.Errorf("registered servers: expected 0, got %d", len(got))
 	}
 	dir := t.TempDir()
-	if _, err := Enroll(ctx, e.ts.Client(), dir, e.ts.URL, tok); err != nil {
+	if _, err := Enroll(ctx, dir, e.ts.URL, e.fp, tok); err != nil {
 		t.Errorf("Enroll with the same token into a writable dir: unexpected error %v", err)
 	}
 }
@@ -304,7 +323,7 @@ func TestEnrollDoesNotConsumeTokenOnMalformedKeys(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, _ := rawEnroll(t, e.ts.URL, tok, &agentv1.EnrollRequest{
+			status, _ := rawEnroll(t, e.ts.URL, e.fp, tok, &agentv1.EnrollRequest{
 				TokenId:               tokenID,
 				AgentSigningPublicKey: tt.signing,
 				AgentAgeRecipient:     tt.agree,
@@ -328,7 +347,7 @@ func TestEnrollDoesNotConsumeTokenOnMalformedKeys(t *testing.T) {
 		})
 	}
 
-	if _, err := Enroll(context.Background(), e.ts.Client(), t.TempDir(), e.ts.URL, tok); err != nil {
+	if _, err := Enroll(context.Background(), t.TempDir(), e.ts.URL, e.fp, tok); err != nil {
 		t.Errorf("Enroll after malformed attempts: expected success, got %v", err)
 	}
 }
