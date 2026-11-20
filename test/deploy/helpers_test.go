@@ -405,7 +405,7 @@ func newSuite(t *testing.T) *suite {
 func (s *suite) deploy(release string) {
 	s.t.Helper()
 	image := importRelease(s.t, s.cli, s.project, release)
-	res := s.x.Deploy(context.Background(), &agentv1.Deploy{
+	res := s.x.Deploy(context.Background(), "deploy-"+release, &agentv1.Deploy{
 		AppId:       s.app,
 		ReleaseId:   release,
 		Image:       image,
@@ -426,7 +426,7 @@ func (s *suite) deploy(release string) {
 func (s *suite) switchTo(release string) (called, returned time.Time) {
 	s.t.Helper()
 	called = time.Now()
-	res := s.x.SwitchRelease(context.Background(), &agentv1.SwitchRelease{AppId: s.app, ReleaseId: release})
+	res := s.x.SwitchRelease(context.Background(), "switch-"+release, &agentv1.SwitchRelease{AppId: s.app, ReleaseId: release})
 	returned = time.Now()
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		s.t.Fatalf("SwitchRelease(%s) outcome = %v with detail %q, want %v", release, got, res.GetDetail(), want)

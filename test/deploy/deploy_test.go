@@ -54,7 +54,7 @@ func TestRollbackUnderLoadIsUnderFiveSeconds(t *testing.T) {
 	marks := s.tenDeploys()
 
 	called := time.Now()
-	res := s.x.Rollback(context.Background(), &agentv1.Rollback{AppId: s.app})
+	res := s.x.Rollback(context.Background(), "rollback-"+s.app, &agentv1.Rollback{AppId: s.app})
 	elapsed := time.Since(called)
 	returned := time.Now()
 

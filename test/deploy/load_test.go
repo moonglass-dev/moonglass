@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -39,24 +41,29 @@ type response struct {
 type loadResult struct {
 	total      int
 	failed     int
+	retried    int
 	firstErr   error
 	firstErrAt time.Time
 	started    time.Time
 	responses  []response
 }
 
-// String gives the count, the total, the first error and when it happened.
+// String gives the count, the total, the retries, the first error and when it
+// happened.
 func (r loadResult) String() string {
 	if r.firstErr == nil {
-		return fmt.Sprintf("%d of %d requests failed, no error", r.failed, r.total)
+		return fmt.Sprintf("%d of %d requests failed (%d retried), no error", r.failed, r.total, r.retried)
 	}
-	return fmt.Sprintf("%d of %d requests failed, first error %v at %s (%.3f s after start)",
-		r.failed, r.total, r.firstErr, r.firstErrAt.Format(time.RFC3339Nano),
+	return fmt.Sprintf("%d of %d requests failed (%d retried), first error %v at %s (%.3f s after start)",
+		r.failed, r.total, r.retried, r.firstErr, r.firstErrAt.Format(time.RFC3339Nano),
 		r.firstErrAt.Sub(r.started).Seconds())
 }
 
 // load is one run of the load generator. It opens a new connection for every
-// request, so each request is routed by the config live when it was sent.
+// request, so each request is routed by the config live when it was sent. A
+// request whose connection closed before any answer byte, without timing out,
+// is sent once more on a new connection: a Caddy reload closes a connection the
+// old server has not read a request from (docs/specs/deploy-suite.md).
 type load struct {
 	cfg    loadConfig
 	client *http.Client
@@ -70,10 +77,15 @@ type load struct {
 	mu         sync.Mutex
 	total      int
 	failed     int
+	retried    int
 	firstErr   error
 	firstErrAt time.Time
 	responses  []response
 }
+
+// errCutBeforeAnswer marks an attempt whose connection closed before any byte
+// of an answer arrived, without a timeout.
+var errCutBeforeAnswer = errors.New("connection closed before any answer byte")
 
 // newLoadClient builds the one client the load generator uses: a new connection
 // per request, a 5-second limit per request, and only the proxy's local CA root,
@@ -97,20 +109,26 @@ func newLoadClient(cfg loadConfig) *http.Client {
 	}
 }
 
+// newLoad builds a load generator for cfg that sends nothing until get or
+// startLoad.
+func newLoad(cfg loadConfig) *load {
+	return &load{
+		cfg:      cfg,
+		client:   newLoadClient(cfg),
+		started:  time.Now(),
+		stopped:  make(chan struct{}),
+		finished: make(chan struct{}),
+	}
+}
+
 // startLoad starts sending requests to cfg at its rate until stop is called.
 func startLoad(cfg loadConfig) *load {
 	rate := cfg.rate
 	if rate == 0 {
 		rate = 50
 	}
-	l := &load{
-		cfg:      cfg,
-		client:   newLoadClient(cfg),
-		started:  time.Now(),
-		ticker:   time.NewTicker(time.Second / time.Duration(rate)),
-		stopped:  make(chan struct{}),
-		finished: make(chan struct{}),
-	}
+	l := newLoad(cfg)
+	l.ticker = time.NewTicker(time.Second / time.Duration(rate))
 	go func() {
 		defer close(l.finished)
 		for {
@@ -129,26 +147,19 @@ func startLoad(cfg loadConfig) *load {
 	return l
 }
 
-// get sends one request and records its answer or its failure.
+// get sends one request, retrying it once on a new connection when the first
+// attempt was cut before any answer byte, and records its answer or its
+// failure.
 func (l *load) get() {
-	req, err := http.NewRequest(http.MethodGet, "https://"+l.cfg.host+"/", nil)
-	if err != nil {
-		l.fail(fmt.Errorf("build GET %s: %w", l.cfg.host, err))
-		return
+	release, err := l.attempt()
+	if errors.Is(err, errCutBeforeAnswer) {
+		l.mu.Lock()
+		l.retried++
+		l.mu.Unlock()
+		release, err = l.attempt()
 	}
-	res, err := l.client.Do(req)
 	if err != nil {
-		l.fail(fmt.Errorf("GET %s: %w", l.cfg.host, err))
-		return
-	}
-	body, err := io.ReadAll(io.LimitReader(res.Body, 256))
-	_ = res.Body.Close()
-	if err != nil {
-		l.fail(fmt.Errorf("GET %s: read its answer: %w", l.cfg.host, err))
-		return
-	}
-	if res.StatusCode < 200 || res.StatusCode > 299 {
-		l.fail(fmt.Errorf("GET %s: status %d", l.cfg.host, res.StatusCode))
+		l.fail(err)
 		return
 	}
 
@@ -156,9 +167,37 @@ func (l *load) get() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.total++
-	l.responses = append(l.responses, response{
-		arrived: arrived, release: strings.TrimSpace(string(body)),
-	})
+	l.responses = append(l.responses, response{arrived: arrived, release: release})
+}
+
+// attempt sends the request once on a new connection and returns the release
+// id a 2xx answer carried. An error wraps errCutBeforeAnswer when the
+// connection closed before any answer byte and the request did not time out.
+func (l *load) attempt() (string, error) {
+	var answered atomic.Bool
+	trace := &httptrace.ClientTrace{GotFirstResponseByte: func() { answered.Store(true) }}
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), trace),
+		http.MethodGet, "https://"+l.cfg.host+"/", nil)
+	if err != nil {
+		return "", fmt.Errorf("build GET %s: %w", l.cfg.host, err)
+	}
+	res, err := l.client.Do(req)
+	if err != nil {
+		var netErr net.Error
+		if !answered.Load() && (!errors.As(err, &netErr) || !netErr.Timeout()) {
+			return "", fmt.Errorf("GET %s: %w: %w", l.cfg.host, errCutBeforeAnswer, err)
+		}
+		return "", fmt.Errorf("GET %s: %w", l.cfg.host, err)
+	}
+	body, err := io.ReadAll(io.LimitReader(res.Body, 256))
+	_ = res.Body.Close()
+	if err != nil {
+		return "", fmt.Errorf("GET %s: read its answer: %w", l.cfg.host, err)
+	}
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return "", fmt.Errorf("GET %s: status %d", l.cfg.host, res.StatusCode)
+	}
+	return strings.TrimSpace(string(body)), nil
 }
 
 // fail counts one failed request and keeps the first failure and its time.
@@ -180,11 +219,15 @@ func (l *load) stop() loadResult {
 	<-l.finished
 	l.ticker.Stop()
 	l.wg.Wait()
+	return l.result()
+}
 
+// result is what the generator has counted so far.
+func (l *load) result() loadResult {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return loadResult{
-		total: l.total, failed: l.failed,
+		total: l.total, failed: l.failed, retried: l.retried,
 		firstErr: l.firstErr, firstErrAt: l.firstErrAt, started: l.started,
 		responses: append([]response(nil), l.responses...),
 	}
@@ -215,11 +258,15 @@ func TestLoadGeneratorCountsEveryNon2xx(t *testing.T) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			conn, _, err := hijacker.Hijack()
+			conn, buf, err := hijacker.Hijack()
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+			// The answer starts, then the connection is cut: a connection
+			// error after the first answer byte, never retried.
+			_, _ = buf.WriteString("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nr")
+			_ = buf.Flush()
 			_ = conn.Close()
 		default:
 			w.WriteHeader(http.StatusOK)
@@ -251,6 +298,9 @@ func TestLoadGeneratorCountsEveryNon2xx(t *testing.T) {
 	if want := 4; res.failed != want {
 		t.Fatalf("load generator %s, want %d failed requests", res, want)
 	}
+	if res.retried != 0 {
+		t.Errorf("load generator retried %d requests, want 0: every failure came after an answer byte", res.retried)
+	}
 	if got, want := res.total, int(served.Load()); got != want {
 		t.Errorf("load generator total = %d, want the %d requests the server answered", got, want)
 	}
@@ -275,6 +325,72 @@ func TestLoadGeneratorCountsEveryNon2xx(t *testing.T) {
 
 	if got, want := len(res.responses), res.total-res.failed; got != want {
 		t.Errorf("recorded %d 2xx responses, want %d", got, want)
+	}
+	for _, r := range res.responses {
+		if r.release != "r1" {
+			t.Errorf("a 2xx response carried release %q, want r1", r.release)
+		}
+	}
+}
+
+// TestLoadGeneratorRetriesOnceACutBeforeAnswer proves a request whose
+// connection closes before any answer byte is sent once more on a new
+// connection and counted as retried, and that a retry cut again is one failed
+// request.
+func TestLoadGeneratorRetriesOnceACutBeforeAnswer(t *testing.T) {
+	var served, connections atomic.Int64
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		switch served.Add(1) {
+		case 1, 3, 4:
+			hijacker, ok := w.(http.Hijacker)
+			if !ok {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			conn, _, err := hijacker.Hijack()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			_ = conn.Close()
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, "r1")
+		}
+	}))
+	srv.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			connections.Add(1)
+		}
+	}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(srv.Certificate())
+	l := newLoad(loadConfig{addr: srv.Listener.Addr().String(), host: "example.com", roots: roots})
+
+	// Request one: cut (1), retried and answered (2). Request two: cut (3),
+	// retried and cut again (4), so it fails. Request three: answered (5).
+	l.get()
+	l.get()
+	l.get()
+	res := l.result()
+
+	if res.total != 3 || res.failed != 1 || res.retried != 2 {
+		t.Fatalf("load generator %s, want 1 of 3 requests failed with 2 retried", res)
+	}
+	if !errors.Is(res.firstErr, errCutBeforeAnswer) {
+		t.Errorf("first error = %v, want the retry of request two cut before any answer byte", res.firstErr)
+	}
+	if got, want := served.Load(), int64(5); got != want {
+		t.Errorf("the server answered %d attempts, want %d", got, want)
+	}
+	if got, want := connections.Load(), int64(5); got != want {
+		t.Errorf("new connections = %d, want %d, one per attempt", got, want)
+	}
+	if got := len(res.responses); got != 2 {
+		t.Fatalf("recorded %d 2xx responses, want 2", got)
 	}
 	for _, r := range res.responses {
 		if r.release != "r1" {
