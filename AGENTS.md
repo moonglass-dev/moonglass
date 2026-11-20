@@ -2,7 +2,7 @@
 
 Moonglass is an open-source deploy platform for your own servers: zero-downtime deploys, one-click restores, nothing to SSH into, in under 100 MB. A control plane coordinates; a small agent and proxy on each server do the work and keep running without it.
 
-One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and the CLI. Config lives at `/etc/moonglass/agent.toml`, data at `/var/lib/moonglass`. Environment variables are `MOONGLASS_*`. The Go module is `moonglass.dev/moonglass`; the code is in the private repository `github.com/moonglass-dev/moonglass`. The product was renamed: never reintroduce the old working name.
+One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and the CLI. Config lives at `/etc/moonglass/agent.toml`, data at `/var/lib/moonglass`. Environment variables are `MOONGLASS_*`. The Go module is `moonglass.dev/moonglass`; the code is at `github.com/moonglass-dev/moonglass`. The product was renamed: never reintroduce the old working name.
 
 ## Repo map
 

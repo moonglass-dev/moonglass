@@ -432,7 +432,7 @@ aws s3 cp <file> s3://moonglass-releases/<key> \
 
 A `latest` directory read during a promotion can mix two versions for up to 60 seconds. The install then fails its checksum or signature check and is rerun; it never installs a mixed set.
 
-**Attestations.** The repository `github.com/moonglass-dev/moonglass` stays private until the first release tag is cut. It is made public before that tag is pushed, because `actions/attest-build-provenance` on a private repository needs GitHub Enterprise Cloud. W7-6c and W7-6g are built and merged while the repository is private; their workflows run only on a tag or a dispatch. Making it public is the owner's step, done by hand, not by any ticket.
+**Attestations.** The repository `github.com/moonglass-dev/moonglass` is public, so `actions/attest-build-provenance` can run without GitHub Enterprise Cloud. It was made public before the first release tag. W7-6c and W7-6g workflows still run only on a tag or a dispatch.
 
 ### Promotion to stable
 

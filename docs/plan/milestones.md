@@ -49,7 +49,7 @@ If the week 1 or week 2 gates slip by more than a week, move the launch to week 
 
 | Do | Why now |
 |---|---|
-| **Name: done.** Moonglass, moonglass.dev owned. The code is in the private repository `github.com/moonglass-dev/moonglass` until it moves to a GitHub organization. `moonglass` is taken by a user account. Package names and social handles are still open | The repository no longer blocks development. The organization name can wait until launch |
+| **Name: done.** Moonglass, moonglass.dev owned. The code is public at `github.com/moonglass-dev/moonglass` under the `moonglass-dev` organization. Package names and social handles are still open | The repository no longer blocks development |
 | **Buy a separate user-content domain** for managed subdomains (V§8, open decision 2) | Needed for the Public Suffix List application; cannot be a subdomain of moonglass.dev |
 | **Apply to the Public Suffix List** on cookie-isolation grounds, and **ask Let's Encrypt for a rate-limit adjustment** | No SLA; often one to two weeks, sometimes months, and requests aimed at Let's Encrypt limits are rejected (S§3.4). Managed subdomains are v1, so this no longer blocks launch |
 | Repository, CI on real Docker, test fleet; **two release signing keys on hardware tokens (ADR-0007); canary and stable channels** | Everything after depends on it; the first agent binary must already be signed |
@@ -361,8 +361,10 @@ The two limit measures tell you how large the paying population is before you bu
 2. Invite-gated hosted signups at launch, opening around week 11 on the criteria in week 8.
 3. Alpha users come out of the week 0 interviews.
 
+**Resolved 2026-11-20**
+1. **GitHub organization:** `moonglass-dev`. The repository `github.com/moonglass-dev/moonglass` is public. The module path stays `moonglass.dev/moonglass`.
+
 **Open**
 1. **Is week 8 a date or a quality bar?** I recommend a quality bar with week 10 as the fallback.
 2. **The user-content domain** (V§8, open decision 2). Needed in week 0.
-3. **GitHub organization name.** Development stays in the private repository `github.com/moonglass-dev/moonglass` until the move. `moonglass` is taken by a user account. Pick the organization name before the public launch. The module path stays `moonglass.dev/moonglass`.
-4. **Experiment thresholds** in 2.2. They are my numbers; adjust them before the experiments start, not after the results arrive.
+3. **Experiment thresholds** in 2.2. They are my numbers; adjust them before the experiments start, not after the results arrive.

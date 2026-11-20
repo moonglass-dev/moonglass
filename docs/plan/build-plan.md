@@ -261,7 +261,7 @@ A fresh Opus child reviews the whole repository for architecture drift and appen
 
 Things only you can do.
 
-- [x] Repository for now: private `github.com/moonglass-dev/moonglass`. `main` requires a pull request and a passing `ci` check, and squash merge is the only merge. It moves to a GitHub organization later. `moonglass` is taken by a user account, so the organization name stays open (M§8).
+- [x] Repository: public `github.com/moonglass-dev/moonglass` under the `moonglass-dev` organization. `main` requires a pull request and a passing `ci` check.
 - [ ] Serve the Go vanity import for `moonglass.dev/moonglass` from moonglass.dev (one `<meta name="go-import">` tag).
 - [ ] Two release signing keys (`ed25519-sk`, `-O verify-required`) on two FIDO2 tokens, primary and backup, kept apart; both public keys committed to the repository before W1-6 (ADR-0007).
 - [ ] Accounts and an API token for the three test-fleet VPSs.

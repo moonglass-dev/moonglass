@@ -6,7 +6,7 @@ Moonglass is an open-source deploy platform for your own servers. It is being bu
 
 **Status: pre-alpha, not usable yet.** This repository holds the plan and the first plumbing. Nothing above works today.
 
-The code is private at [moonglass-dev/moonglass](https://github.com/moonglass-dev/moonglass) until it moves to a GitHub organization. The module path stays `moonglass.dev/moonglass`.
+The source is at [moonglass-dev/moonglass](https://github.com/moonglass-dev/moonglass). The module path is `moonglass.dev/moonglass`.
 
 ## Build and test
 
