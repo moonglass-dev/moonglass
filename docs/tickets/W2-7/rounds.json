@@ -1,6 +1,7 @@
 {
   "counts": {
     "approve": 1,
+    "build": 1,
     "done:approve": 1,
     "done:plan": 1,
     "done:tests": 1,
@@ -9,5 +10,8 @@
     "tests": 1,
     "worker": 1
   },
-  "claim": null
+  "claim": {
+    "step": "build",
+    "round": 1
+  }
 }
