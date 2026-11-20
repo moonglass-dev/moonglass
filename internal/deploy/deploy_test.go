@@ -408,3 +408,14 @@ func TestDeployReplacesLeftoverContainer(t *testing.T) {
 	}
 	requireEqual(t, "row container_id", row.ContainerID, replacement)
 }
+
+// TestNewTakesTheAgentsProxy covers the constructor handing the executor the
+// agent's one Proxy, so a switch pushes through the pusher Run uses.
+func TestNewTakesTheAgentsProxy(t *testing.T) {
+	t.Parallel()
+	db := newProxyDB(t)
+	pusher := NewProxy(nil, db, ProxyConfig{Socket: "unused", Issuer: "internal"})
+	if got := New(nil, emptyPolicy(t, policy.Env{}), db, pusher); got.proxy != pusher {
+		t.Errorf("New(...).proxy = %p, want the given Proxy %p", got.proxy, pusher)
+	}
+}

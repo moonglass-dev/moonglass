@@ -114,6 +114,21 @@ func (s State) Switch(id string) (State, error) {
 	return State{Current: s.Candidate, Previous: s.Current}, nil
 }
 
+// Abort clears the candidate id in either phase. Current and Previous are
+// untouched, so the old release keeps serving and a new Deploy is legal.
+func (s State) Abort(id string) (State, error) {
+	if s.Candidate == nil {
+		return s, illegal("abort %q with no candidate; deploy first", id)
+	}
+	if s.Candidate.ID != id {
+		return s, illegal("abort %q, candidate is %q", id, s.Candidate.ID)
+	}
+	next := s
+	next.Candidate = nil
+	next.Phase = PhaseNone
+	return next, nil
+}
+
 // Rollback promotes previous to current and clears previous. A candidate is left untouched.
 func (s State) Rollback() (State, error) {
 	if s.Previous == nil {

@@ -167,8 +167,10 @@ func emptyPolicy(t *testing.T, env policy.Env) *policy.Policy {
 	return pol
 }
 
-// newExecutor returns an executor over a fresh agent database and an empty
-// agent.toml, and that database's data directory.
+// newExecutor returns an executor over a fresh agent database, an empty
+// agent.toml and one Proxy over a fake admin socket, and that database's data
+// directory. A test that inspects the pushed document builds its own fake admin
+// and passes a Proxy over it to New.
 func newExecutor(t *testing.T, e *Engine) (*Executor, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -177,7 +179,9 @@ func newExecutor(t *testing.T, e *Engine) (*Executor, string) {
 		t.Fatalf("state.Open(%q) error = %v, want nil", dir, err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return New(e, emptyPolicy(t, policy.Env{}), db), dir
+	fake := newFakeAdmin(t)
+	proxy := NewProxy(e, db, ProxyConfig{Socket: fake.path, Issuer: "internal"})
+	return New(e, emptyPolicy(t, policy.Env{}), db, proxy), dir
 }
 
 // importImage builds ./testdata/server for the Engine's platform and imports it

@@ -123,3 +123,32 @@ func (e *Engine) remove(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+// runState is the part of a container's state the health gate reads.
+type runState struct {
+	Status       string
+	Running      bool
+	ExitCode     int
+	RestartCount int
+}
+
+// runState inspects the container, so the gate fails as soon as it exits or
+// restarts instead of waiting for the limit.
+func (e *Engine) runState(ctx context.Context, id string) (runState, error) {
+	ctx, cancel := call(ctx)
+	defer cancel()
+	res, err := e.cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+	if err != nil {
+		return runState{}, fmt.Errorf("inspect it: %w", err)
+	}
+	s := res.Container.State
+	if s == nil {
+		return runState{}, fmt.Errorf("inspect it: the Engine reported no state; deploy the app again")
+	}
+	return runState{
+		Running:      s.Running && !s.Restarting,
+		Status:       string(s.Status),
+		ExitCode:     s.ExitCode,
+		RestartCount: res.Container.RestartCount,
+	}, nil
+}

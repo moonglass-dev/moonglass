@@ -1,0 +1,17 @@
+{
+  "round": 2,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "b6851455d5166a84e4d5b60e965a8502c15c7a34",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/deploy/switch.go",
+      "line": 94,
+      "issue": "Carried from round 1: abortSwitch gives RecordAbort truncate(detail) to store, but answers with the untruncated detail, which can include an appended container-removal or record-failure error.",
+      "scenario": "A gate failure whose cause is close to 4096 bytes, followed by a failed container removal, gives a result detail longer than 4096 bytes. The stored error is cut at 4096 bytes, so the row's error no longer equals the answer's detail."
+    }
+  ]
+}

@@ -55,6 +55,7 @@ type fakeAdmin struct {
 	loadStatus   int
 	loadBody     []byte
 	loadDelay    time.Duration
+	onLoad       func()
 	inflight     int
 	maxInflight  int
 	configAnswer []byte
@@ -160,7 +161,11 @@ func (f *fakeAdmin) handle(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.loads = append(f.loads, body)
 		f.inflight--
+		onLoad := f.onLoad
 		f.mu.Unlock()
+		if onLoad != nil {
+			onLoad()
+		}
 		writeFake(w, status, response)
 	default:
 		http.NotFound(w, r)

@@ -24,14 +24,23 @@ const (
 )
 
 type Executor struct {
-	engine         *Engine
-	policy         *policy.Policy
-	db             *state.DB
+	engine *Engine
+	policy *policy.Policy
+	db     *state.DB
+	// proxy is the agent's one pusher: Run and SwitchRelease share it.
+	proxy          *Proxy
 	preDeployLimit time.Duration
+	healthLimit    time.Duration
 }
 
-func New(engine *Engine, p *policy.Policy, db *state.DB) *Executor {
-	return &Executor{engine: engine, policy: p, db: db, preDeployLimit: preDeployTimeout}
+// New returns the executor over the agent's one Proxy, so Run and
+// SwitchRelease push through the same pusher (docs/specs/release.md, "Proxy
+// config").
+func New(engine *Engine, p *policy.Policy, db *state.DB, proxy *Proxy) *Executor {
+	return &Executor{
+		engine: engine, policy: p, db: db, proxy: proxy,
+		preDeployLimit: preDeployTimeout, healthLimit: healthTimeout,
+	}
 }
 
 type rejectedError struct{ error }

@@ -34,6 +34,7 @@ moonglass.dev/moonglass/internal/agent/state TestOpenErrorNamesPath
 moonglass.dev/moonglass/internal/agent/state TestOpenMigratesSpecSchema
 moonglass.dev/moonglass/internal/agent/state TestOpenSetsPragmas
 moonglass.dev/moonglass/internal/agent/state TestPackageImportsReleaseAndStoreOnly
+moonglass.dev/moonglass/internal/agent/state TestRecordAbortMarksCandidateAborted
 moonglass.dev/moonglass/internal/agent/state TestRecordCandidateFirstDeployWritesBinding
 moonglass.dev/moonglass/internal/agent/state TestRecordCandidateIsAtomic
 moonglass.dev/moonglass/internal/agent/state TestRecordCandidateKeepsBinding
@@ -41,6 +42,7 @@ moonglass.dev/moonglass/internal/agent/state TestRecordCandidateRejectsOtherBind
 moonglass.dev/moonglass/internal/agent/state TestRecordFailedLeavesStateUnchanged
 moonglass.dev/moonglass/internal/agent/state TestRecordPreDeployOutcome
 moonglass.dev/moonglass/internal/agent/state TestRecordStoresTextVerbatim
+moonglass.dev/moonglass/internal/agent/state TestRecordSwitchWritesStatusesAndStopAfter
 moonglass.dev/moonglass/internal/api TestBodyInputsDecoded
 moonglass.dev/moonglass/internal/api TestBodyOverLimitIs413
 moonglass.dev/moonglass/internal/api TestEveryMountedRouteIsOperationOrAllowlisted
@@ -72,6 +74,11 @@ moonglass.dev/moonglass/internal/deploy TestDeployResolvesRegistryImages
 moonglass.dev/moonglass/internal/deploy TestDeployWithPreDeployLeavesContainerCreated
 moonglass.dev/moonglass/internal/deploy TestEngineAPIVersionFloor
 moonglass.dev/moonglass/internal/deploy TestEngineCallDeadlines
+moonglass.dev/moonglass/internal/deploy TestHealthGateFailsWhenContainerExitsOrRestarts
+moonglass.dev/moonglass/internal/deploy TestHealthGateHTTPPath
+moonglass.dev/moonglass/internal/deploy TestHealthGateTCPConnect
+moonglass.dev/moonglass/internal/deploy TestHealthGateWithoutPort
+moonglass.dev/moonglass/internal/deploy TestNewTakesTheAgentsProxy
 moonglass.dev/moonglass/internal/deploy TestPreDeploySpecDerivesFromCandidate
 moonglass.dev/moonglass/internal/deploy TestProxyPushBuildsCompleteConfig
 moonglass.dev/moonglass/internal/deploy TestProxyPushFailuresPushNothing
@@ -89,6 +96,9 @@ moonglass.dev/moonglass/internal/deploy TestRunPreDeployReplacesLeftoverStepCont
 moonglass.dev/moonglass/internal/deploy TestRunPreDeploySuccessStartsCandidate
 moonglass.dev/moonglass/internal/deploy TestRunPreDeployTimeoutKillsStep
 moonglass.dev/moonglass/internal/deploy TestRunningAfterStart
+moonglass.dev/moonglass/internal/deploy TestSwitchReleaseHealthFailureAborts
+moonglass.dev/moonglass/internal/deploy TestSwitchReleaseRefusalsAndPushFailure
+moonglass.dev/moonglass/internal/deploy TestSwitchReleaseRoutesCandidateAndCommits
 moonglass.dev/moonglass/internal/installtest TestAgentUnitMemoryMaxFitsBuilds
 moonglass.dev/moonglass/internal/installtest TestInstallAcceptsEitherPinnedKey
 moonglass.dev/moonglass/internal/installtest TestInstallCreatesProxyAdminGroup
@@ -252,6 +262,7 @@ moonglass.dev/moonglass/internal/registry TestRefusalKindsAndAuditReasons
 moonglass.dev/moonglass/internal/registry TestRoleAndScopeAreEnforced
 moonglass.dev/moonglass/internal/registry TestTokenStoredHashedOnly
 moonglass.dev/moonglass/internal/registry TestUnmappedStoreErrorIsNotARefusal
+moonglass.dev/moonglass/internal/release TestAbortClearsCandidate
 moonglass.dev/moonglass/internal/release TestDeployThenSwitchMakesNewCurrent
 moonglass.dev/moonglass/internal/release TestIllegalTransitionDoesNotChangeState
 moonglass.dev/moonglass/internal/release TestPreDeployFailureLeavesOldServing

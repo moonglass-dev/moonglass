@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"reflect"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -78,7 +80,31 @@ func NewProxy(engine *Engine, db *state.DB, cfg ProxyConfig) *Proxy {
 func (p *Proxy) Push(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	return p.push(ctx, nil)
+}
 
+// PushRouted builds the complete document with routed replacing its app's
+// stored current release, pushes it, and then commits inside the same lock, so a
+// Run push cannot read the old current release between the two. A failed commit
+// clears the last pushed document, so Run pushes the stored routes again, and
+// the commit's error is returned.
+func (p *Proxy) PushRouted(ctx context.Context, routed state.CurrentRelease, commit func(context.Context) error) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if err := p.push(ctx, &routed); err != nil {
+		return err
+	}
+	if err := commit(ctx); err != nil {
+		p.last.Store(nil)
+		return err
+	}
+	return nil
+}
+
+// push is the one builder and poster of the complete config. routed, when set,
+// replaces its app's stored current release.
+func (p *Proxy) push(ctx context.Context, routed *state.CurrentRelease) error {
 	tlsApps, err := issuerApps(p.cfg.Issuer)
 	if err != nil {
 		return err
@@ -94,6 +120,9 @@ func (p *Proxy) Push(ctx context.Context) error {
 	current, err := p.db.CurrentReleases(ctx)
 	if err != nil {
 		return fmt.Errorf("read the apps to route: %w", err)
+	}
+	if routed != nil {
+		current = withRouted(current, *routed)
 	}
 
 	routes := make([]any, 0, len(current))
@@ -133,6 +162,29 @@ func (p *Proxy) Push(ctx context.Context) error {
 	}
 	p.last.Store(&doc)
 	return nil
+}
+
+// withRouted returns current with routed in place of its app's entry, or with
+// routed appended and the app_id order restored when the app has no entry yet.
+func withRouted(current []state.CurrentRelease, routed state.CurrentRelease) []state.CurrentRelease {
+	out := make([]state.CurrentRelease, 0, len(current)+1)
+	replaced := false
+	for _, cr := range current {
+		if cr.Record.AppID == routed.Record.AppID {
+			out = append(out, routed)
+			replaced = true
+			continue
+		}
+		out = append(out, cr)
+	}
+	if replaced {
+		return out
+	}
+	out = append(out, routed)
+	slices.SortFunc(out, func(a, b state.CurrentRelease) int {
+		return cmp.Compare(a.Record.AppID, b.Record.AppID)
+	})
+	return out
 }
 
 // route builds one route: the release's domains, the counter, and the reverse

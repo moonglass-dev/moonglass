@@ -27,7 +27,7 @@ Each event is a method that takes the state by value and returns the new state a
 | `PreDeployDone(id, ok)` | outcome of `RunPreDeploy` | Reported later by the executor (W2-6). |
 | `Switch(id)` | `SwitchRelease` | |
 | `Rollback()` | `Rollback` | Names the app only. |
-| `Abort(id)` | none | The executor gives up on a candidate: its health gate failed (W2-4). |
+| `Abort(id)` | none | The executor gives up on a candidate: its health gate failed (W2-4b). |
 
 ## Transitions
 
@@ -35,7 +35,7 @@ Each event is a method that takes the state by value and returns the new state a
 - `PreDeployDone(id, true)`: legal for the `pending` candidate `id`. The candidate becomes `ready`.
 - `PreDeployDone(id, false)`: legal for the `pending` candidate `id`. The deploy aborts: the candidate is cleared and `Current` and `Previous` are untouched, so the old release keeps serving. A new `Deploy` is then legal. `reversible` does not change this (it matters to auto-rollback, W4-3).
 - `Switch(id)`: legal for the `ready` candidate `id`. The candidate becomes `Current`, the old `Current` becomes `Previous` (nil if there was none), and the candidate is cleared.
-- `Abort(id)`: legal for the candidate `id` in either phase. The candidate is cleared; `Current` and `Previous` are untouched, so the old release keeps serving. A new `Deploy` is then legal. W2-4 adds it to `internal/release`.
+- `Abort(id)`: legal for the candidate `id` in either phase. The candidate is cleared; `Current` and `Previous` are untouched, so the old release keeps serving. A new `Deploy` is then legal. W2-4b adds it to `internal/release`.
 - `Rollback()`: legal when `Previous` is set. `Previous` becomes `Current` and `Previous` is cleared; there is no roll-forward, so a new `Deploy` is required. A candidate, if any, and its phase are left untouched.
 
 ## Illegal transitions
@@ -117,9 +117,9 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 ### SwitchRelease
 
 1. Apply `State.Switch` in memory. Illegal is `REJECTED`.
-2. Run the health gate on the candidate. On failure: apply `Abort`, stop and remove the candidate container, write its row as `aborted`, and answer `FAILED`. The old release keeps serving.
-3. Push the complete proxy config (below) with the candidate routed. On failure, answer `FAILED`; the candidate stays `ready`, and the switch can be sent again.
-4. In one transaction: commit the switch, set the new current row `current` and the old current `previous` with `stop_after` = now + 10 minutes, and set the old previous (if any) `retired` with `stop_after` = now + 30 seconds. Answer `SUCCEEDED`.
+2. Run the health gate on the candidate. On failure: apply `Abort`, remove the candidate container, write its row as `aborted` with the gate's detail as `error` and an empty `container_id`, and answer `FAILED` with the aborted state. The old release keeps serving.
+3. Push the complete proxy config (below) with the candidate routed in place of the app's stored current release, through `Proxy.PushRouted`. On failure, answer `FAILED`; the candidate stays `ready`, and the switch can be sent again.
+4. Commit the switch inside that push's lock, in one transaction: the new current row `current` with `switched_at` = now, the old current `previous` with `stop_after` = now + 10 minutes, and the old previous (if any) `retired` with `stop_after` = now + 30 seconds. Answer `SUCCEEDED` with the new state. A commit that fails is `FAILED` with the stored state unchanged, and the last pushed document is cleared, so `Run` restores the stored routes.
 5. Afterwards, without blocking the result: at `stop_after` a `retired` container is stopped (SIGTERM, 30 seconds before SIGKILL) and removed; a `previous` container is stopped and kept.
 
 **Draining.** Caddy reloads gracefully: requests in flight on the old route finish on it. The proxy's `http` app sets `grace_period` to 30 seconds, so WebSockets on the old route get the 30-second drain window of stack §5.3 and ADR-0001 decision 7, then close.
@@ -140,10 +140,10 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 - The agent builds the complete Caddy JSON from every app's current release that has domains, and pushes it with `POST /load` over the admin socket (`--proxy-socket`, ADR-0001 decision 3). A route is the release's domains, with the handlers `moonglass_counter` (`release` = the release id) and `reverse_proxy` to `<container IP>:<port>`.
 - Certificates: `--tls-issuer acme` (the default, Let's Encrypt production), `acme-staging` (the fleet), or `internal` (tests and CI, as in `docs/specs/proxy.md`).
 - A domain that another app's current release routes is `REJECTED` at `Deploy` (step 3 of "Order").
-- **One pusher** (W2-4a). `deploy.NewProxy(engine, db, deploy.ProxyConfig{Socket, Issuer, OnError})` returns the agent's one `*deploy.Proxy`. `OnError`, optional, receives a push that failed during `Run`.
+- **One pusher** (W2-4a). `deploy.NewProxy(engine, db, deploy.ProxyConfig{Socket, Issuer, OnError})` returns the agent's one `*deploy.Proxy`. `OnError`, optional, receives a push that failed during `Run`. The executor's pusher is that same `*deploy.Proxy`, never a second one, so the switch pushes through the same pusher as `Run` (W2-4b).
 - **The document.** `Proxy.Push(ctx)` reads `admin` and `storage` over the admin socket and repeats them exactly, sets `logging` to `{"logs": {"default": {"level": "WARN"}}}` (the level the proxy starts with), and builds `apps` from every app's current release that has domains, in `app_id` order. `apps.http` always carries `grace_period` `"30s"`. When at least one route exists it also carries the server `moonglass` with `listen` `[":443"]` and one route per routed app in `app_id` order, each with the release's domains, in stored order, as its `host` match, the `moonglass_counter` handler with the release id, the `reverse_proxy` handler dialling `<container IP>:<port>` on `mg-<project>`, and `terminal` `true`. With no routed app there is no server, so nothing listens on :443; Caddy's automatic HTTPS adds the :80 redirect (the proxy unit binds :80 and :443, `docs/specs/install.md`). A routed current release whose container is gone or has no address on `mg-<project>` is an error naming the app, the release and the container, and nothing is posted.
 - **Certificates.** `apps.tls` is `{"automation": {"policies": [{"issuers": [<issuer>]}]}}`, where the issuer is `{"module": "acme"}` for `acme`, `{"module": "acme", "ca": "https://acme-staging-v02.api.letsencrypt.org/directory"}` for `acme-staging`, and `{"module": "internal"}` for `internal`. Only `internal` also sets `apps.pki` to `{"certificate_authorities": {"local": {"install_trust": false}}}`. Any other issuer is an error naming the value and the three accepted ones, before anything is read or posted.
-- **Pushing.** Pushes run one at a time; each records the document it posted as the last pushed, and only when `/load` answers 2xx, so a failed push is never the last pushed. A non-2xx answer is an error carrying the method, path, status and the bounded body.
+- **Pushing.** Pushes run one at a time; each records the document it posted as the last pushed, and only when `/load` answers 2xx, so a failed push is never the last pushed. A non-2xx answer is an error carrying the method, path, status and the bounded body. `Proxy.PushRouted(ctx, routed, commit)` (W2-4b) builds the same complete document with one app's route taken from the given release record instead of its stored current release, then runs `commit` while it still holds the push lock, so a `Run` push cannot read the old current release in between. A failed `commit` clears the last pushed document and returns the commit's error.
 - **Run.** `Proxy.Run(ctx)` pushes once at start, then every second `GET`s `/config/` over the admin socket; when that answers and the running config, decoded as JSON, is not equal to the last pushed one decoded the same way, it pushes again. A probe that fails is not an error: the proxy is restarting, and the next probe tries again. `Run` returns only when `ctx` ends. A push that fails during `Run` is reported through `OnError` and retried at the next probe; it never stops `Run`.
 - `moonglass agent connect` runs `Proxy.Run` for its whole life (W2-4c, `docs/specs/connection.md`). The switch and rollback push through the same `Proxy` (W2-4b, W2-4d).
 

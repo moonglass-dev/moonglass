@@ -24,8 +24,20 @@ const dbName = "agent.db"
 
 const (
 	statusCandidate = "candidate"
+	statusCurrent   = "current"
+	statusPrevious  = "previous"
+	statusRetired   = "retired"
 	statusFailed    = "failed"
 	statusAborted   = "aborted"
+)
+
+const (
+	// previousStopAfter is how long the release a switch replaced keeps running,
+	// unrouted, so a rollback is only a route push (docs/specs/release.md).
+	previousStopAfter = 10 * time.Minute
+	// retiredStopAfter is how long the release a switch retired keeps running
+	// after the switch, so its last requests drain.
+	retiredStopAfter = 30 * time.Second
 )
 
 //go:embed migrations/*.sql
@@ -375,36 +387,153 @@ func (d *DB) RecordPreDeploy(ctx context.Context, appID, releaseID string, next 
 	if reversible {
 		reversibleValue = 1
 	}
-	var res sql.Result
 	if next.Candidate != nil {
-		res, err = tx.ExecContext(ctx,
+		err = updateOne(ctx, tx,
 			`UPDATE releases SET pre_deploy_reversible = ? WHERE app_id = ? AND release_id = ? AND status = ?`,
 			reversibleValue, appID, releaseID, statusCandidate)
 	} else {
-		res, err = tx.ExecContext(ctx,
+		err = updateOne(ctx, tx,
 			`UPDATE releases SET pre_deploy_reversible = ?, status = ?, error = ?, container_id = ''
 			WHERE app_id = ? AND release_id = ? AND status = ?`,
 			reversibleValue, statusAborted, detail, appID, releaseID, statusCandidate)
 	}
 	if err != nil {
-		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: write releases row: %w", releaseID, appID, err)
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: count updated rows: %w", releaseID, appID, err)
-	}
-	if affected != 1 {
-		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: the release row is not the pending candidate; nothing was written", releaseID, appID)
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
 	}
 
-	if _, err = tx.ExecContext(ctx,
-		`UPDATE apps SET current_release_id = ?, previous_release_id = ?, candidate_release_id = ?, phase = ?
-		WHERE app_id = ?`,
-		nullID(next.Current), nullID(next.Previous), nullID(next.Candidate), next.Phase.String(), appID); err != nil {
-		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: write apps row: %w", releaseID, appID, err)
+	if err = setAppState(ctx, tx, appID, next); err != nil {
+		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
 	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
+	}
+	return nil
+}
+
+// RecordSwitch records a successful switch in one transaction: the candidate
+// row becomes current with switched_at = now, the old current becomes previous
+// due to stop at now + 10 minutes, the old previous becomes retired due to stop
+// at now + 30 seconds, and the apps row becomes next. It writes nothing and
+// returns an error when next does not follow from the stored state of that
+// release.
+func (d *DB) RecordSwitch(ctx context.Context, appID, releaseID string, next release.State, now time.Time) error {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, stored, known, err := readState(ctx, tx, appID)
+	if err != nil {
+		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if !known {
+		return fmt.Errorf("record switch of release %s: app %s is not in agent state; deploy it first", releaseID, appID)
+	}
+	want, err := stored.Switch(releaseID)
+	if err != nil {
+		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if !sameState(want, next) {
+		return fmt.Errorf("record switch of release %s of app %s: the given state does not follow from the stored one; record the state Switch returned", releaseID, appID)
+	}
+
+	if err = updateOne(ctx, tx,
+		`UPDATE releases SET status = ?, switched_at = ? WHERE app_id = ? AND release_id = ? AND status = ?`,
+		statusCurrent, formatTime(now), appID, releaseID, statusCandidate); err != nil {
+		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if stored.Current != nil {
+		if err = updateOne(ctx, tx,
+			`UPDATE releases SET status = ?, stop_after = ? WHERE app_id = ? AND release_id = ? AND status = ?`,
+			statusPrevious, formatTime(now.Add(previousStopAfter)), appID, stored.Current.ID, statusCurrent); err != nil {
+			return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
+		}
+	}
+	if stored.Previous != nil {
+		if err = updateOne(ctx, tx,
+			`UPDATE releases SET status = ?, stop_after = ? WHERE app_id = ? AND release_id = ? AND status = ?`,
+			statusRetired, formatTime(now.Add(retiredStopAfter)), appID, stored.Previous.ID, statusPrevious); err != nil {
+			return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
+		}
+	}
+	if err = setAppState(ctx, tx, appID, next); err != nil {
+		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
+	}
+	return nil
+}
+
+// RecordAbort records a candidate its health gate gave up on in one transaction:
+// the row becomes aborted with detail as error and an empty container_id, and
+// the apps row becomes next. Current and Previous are untouched. It writes
+// nothing and returns an error when next does not follow from the stored state
+// of that release. detail is stored as given and never logged.
+func (d *DB) RecordAbort(ctx context.Context, appID, releaseID string, next release.State, detail string) error {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, stored, known, err := readState(ctx, tx, appID)
+	if err != nil {
+		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if !known {
+		return fmt.Errorf("record abort of release %s: app %s is not in agent state; deploy it first", releaseID, appID)
+	}
+	want, err := stored.Abort(releaseID)
+	if err != nil {
+		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if !sameState(want, next) {
+		return fmt.Errorf("record abort of release %s of app %s: the given state does not follow from the stored one; record the state Abort returned", releaseID, appID)
+	}
+
+	if err = updateOne(ctx, tx,
+		`UPDATE releases SET status = ?, error = ?, container_id = ''
+		WHERE app_id = ? AND release_id = ? AND status = ?`,
+		statusAborted, detail, appID, releaseID, statusCandidate); err != nil {
+		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if err = setAppState(ctx, tx, appID, next); err != nil {
+		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
+	}
+	return nil
+}
+
+// setAppState writes one app's release state. It is the one apps-row update of
+// every write that changes the state.
+func setAppState(ctx context.Context, tx *sql.Tx, appID string, st release.State) error {
+	_, err := tx.ExecContext(ctx,
+		`UPDATE apps SET current_release_id = ?, previous_release_id = ?, candidate_release_id = ?, phase = ?
+		WHERE app_id = ?`,
+		nullID(st.Current), nullID(st.Previous), nullID(st.Candidate), st.Phase.String(), appID)
+	if err != nil {
+		return fmt.Errorf("write apps row: %w", err)
+	}
+	return nil
+}
+
+// updateOne runs a releases-row update that must change exactly one row, so a
+// state write never silently changes none or several.
+func updateOne(ctx context.Context, tx *sql.Tx, query string, args ...any) error {
+	res, err := tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("write releases row: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count updated releases rows: %w", err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("the update changed %d releases rows, want 1; nothing was written", affected)
 	}
 	return nil
 }

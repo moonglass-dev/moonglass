@@ -46,7 +46,7 @@ One row per `app_id` that has ever been deployed here.
 | `status` | `candidate`, `current`, `previous`, `retired`, `failed` or `aborted`. |
 | `container_id` | The release's container, or empty once removed. |
 | `error` | The `detail` of a failed or rejected step. |
-| `created_at`, `switched_at`, `stop_after` | `stop_after` is when a previous or retired container is due to be stopped (`docs/specs/release.md`, "Switch"). |
+| `created_at`, `switched_at`, `stop_after` | `switched_at` is when the release became current. `stop_after` is when a previous or retired container is due to be stopped (`docs/specs/release.md`, "Switch"). |
 
 ### `commands` (W2-10)
 
@@ -62,4 +62,6 @@ One row per `app_id` that has ever been deployed here.
 - A command's state change and its `commands` row are written in one transaction (`docs/specs/connection.md`, "Each request id runs once").
 - **Retention.** Per app, the rows for the current and previous release and the three newest `retired` releases are kept: five in all, with their images (`docs/specs/release.md`, "Keep five"). Older `retired` rows are deleted with their images. `failed` and `aborted` rows, and `commands` rows, are deleted after 7 days. Retention runs at start and every hour.
 - A `failed` release row never creates or changes an `apps` row: the binding and the release state stay as they were (`docs/specs/release.md`, "Failure").
+- **A switch** (W2-4b) is one transaction: the candidate row becomes `current` with `switched_at` = now, the old current becomes `previous` with `stop_after` = now + 10 minutes, the old previous becomes `retired` with `stop_after` = now + 30 seconds, and the `apps` row takes the new state. Times are RFC 3339 UTC. A state that does not follow from the stored one writes nothing.
+- **A failed health gate** (W2-4b) writes one transaction too: the candidate row becomes `aborted` with the gate's detail as `error` and an empty `container_id`, and the `apps` row takes the state `Abort` returned. The `Current` and `Previous` rows are untouched.
 - A database that does not open or migrate stops the agent with the error and the file's path.
