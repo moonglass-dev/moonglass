@@ -729,3 +729,129 @@ func TestProxyRunPushesAgainWhenRunningConfigDiffers(t *testing.T) {
 		t.Fatalf("Run() did not return within 2 s of cancel")
 	}
 }
+
+// docObject decodes a pushed document as a JSON object.
+func docObject(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	doc, ok := decodeAny(t, body).(map[string]any)
+	if !ok {
+		t.Fatalf("pushed config is not a JSON object: %s", body)
+	}
+	return doc
+}
+
+// serverObject returns doc's apps.http.servers.moonglass object.
+func serverObject(t *testing.T, doc map[string]any) map[string]any {
+	t.Helper()
+	apps, ok := doc["apps"].(map[string]any)
+	if !ok {
+		t.Fatalf("pushed config apps = %#v, want an object", doc["apps"])
+	}
+	httpApp, ok := apps["http"].(map[string]any)
+	if !ok {
+		t.Fatalf("pushed config apps.http = %#v, want an object", apps["http"])
+	}
+	servers, ok := httpApp["servers"].(map[string]any)
+	if !ok {
+		t.Fatalf("pushed config apps.http.servers = %#v, want an object", httpApp["servers"])
+	}
+	server, ok := servers[proxyServer].(map[string]any)
+	if !ok {
+		t.Fatalf("pushed config apps.http.servers.%s = %#v, want an object", proxyServer, servers[proxyServer])
+	}
+	return server
+}
+
+func TestProxyPushListenSetsAddressAndDisablesRedirects(t *testing.T) {
+	ctx := context.Background()
+	e := testEngine(t)
+	p := testProject(t, e)
+	x, dir := newExecutor(t, e)
+	app := testAppID(p, "listen")
+
+	requireDeployOutcome(t,
+		deployDomains(t, e, x, p, app, "r1", []string{"listen.example.com"}),
+		agentv1.CommandOutcome_SUCCEEDED, "")
+	makeCurrent(t, dir, app)
+
+	const listen = "127.0.0.1:8443"
+	plainFake := newFakeAdmin(t)
+	if err := NewProxy(e, x.db, ProxyConfig{Socket: plainFake.path, Issuer: "internal"}).Push(ctx); err != nil {
+		t.Fatalf("Push() with Listen empty error = %v, want nil", err)
+	}
+	listenFake := newFakeAdmin(t)
+	if err := NewProxy(e, x.db, ProxyConfig{Socket: listenFake.path, Issuer: "internal", Listen: listen}).Push(ctx); err != nil {
+		t.Fatalf("Push() with Listen %q error = %v, want nil", listen, err)
+	}
+	requireEqual(t, "POST /load count with Listen empty", plainFake.loadCount(), 1)
+	requireEqual(t, "POST /load count with Listen set", listenFake.loadCount(), 1)
+
+	plainDoc := docObject(t, plainFake.loadAt(0))
+	listenDoc := docObject(t, listenFake.loadAt(0))
+	plainServer := serverObject(t, plainDoc)
+	listenServer := serverObject(t, listenDoc)
+
+	requireJSONEqual(t, "server listen with Listen set", listenServer["listen"], []any{listen})
+	requireJSONEqual(t, "server automatic_https with Listen set", listenServer["automatic_https"],
+		map[string]any{"disable_redirects": true})
+	requireJSONEqual(t, "server listen with Listen empty", plainServer["listen"], []any{":443"})
+	if got, present := plainServer["automatic_https"]; present {
+		t.Errorf("server automatic_https with Listen empty = %s, want no automatic_https key", mustJSON(t, got))
+	}
+
+	delete(plainServer, "listen")
+	delete(listenServer, "listen")
+	delete(listenServer, "automatic_https")
+	requireJSONEqual(t, "the rest of the document with Listen set", listenDoc, plainDoc)
+}
+
+func TestProxyPushRefusesMalformedListen(t *testing.T) {
+	ctx := context.Background()
+	cases := []string{
+		"127.0.0.1",
+		":https",
+		"127.0.0.1:port",
+		"127.0.0.1:",
+		"[::1",
+		"127.0.0.1:65536",
+	}
+
+	for _, listen := range cases {
+		t.Run(listen, func(t *testing.T) {
+			fake := newFakeAdmin(t)
+			pusher := NewProxy(nil, newProxyDB(t), ProxyConfig{Socket: fake.path, Issuer: "internal", Listen: listen})
+			if last := pusher.last.Load(); last != nil {
+				t.Fatalf("last pushed document before any push = %q, want nil", *last)
+			}
+
+			err := pusher.Push(ctx)
+			if err == nil {
+				t.Fatalf("Push() with Listen %q error = nil, want an error naming the value", listen)
+			}
+			if !strings.Contains(err.Error(), listen) {
+				t.Errorf("Push() error = %q, want it to contain %q", err, listen)
+			}
+
+			committed := false
+			err = pusher.PushRouted(ctx, state.CurrentRelease{}, func(context.Context) error {
+				committed = true
+				return nil
+			})
+			if err == nil {
+				t.Fatalf("PushRouted() with Listen %q error = nil, want an error naming the value", listen)
+			}
+			if !strings.Contains(err.Error(), listen) {
+				t.Errorf("PushRouted() error = %q, want it to contain %q", err, listen)
+			}
+			if committed {
+				t.Errorf("PushRouted() with Listen %q ran commit, want it not to", listen)
+			}
+
+			requireEqual(t, "requests on the admin socket", fake.requestCount(), 0)
+			requireEqual(t, "POST /load count", fake.loadCount(), 0)
+			if last := pusher.last.Load(); last != nil {
+				t.Errorf("last pushed document after a refused Listen %q = %q, want nil", listen, *last)
+			}
+		})
+	}
+}

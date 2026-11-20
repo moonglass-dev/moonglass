@@ -28,6 +28,7 @@ const (
 	maxProxyConfigBytes = 16 << 20
 	// proxyServer is the one HTTP server the pushed config names. It listens on
 	// the ports the proxy unit is allowed to bind; Caddy adds the :80 redirect.
+	// A Listen in ProxyConfig replaces its address and disables that redirect.
 	proxyServer = "moonglass"
 	// acmeStagingDirectory is the Let's Encrypt staging endpoint for acme-staging.
 	acmeStagingDirectory = "https://acme-staging-v02.api.letsencrypt.org/directory"
@@ -42,6 +43,10 @@ type ProxyConfig struct {
 	Socket string
 	// Issuer is acme, acme-staging or internal.
 	Issuer string
+	// Listen, when set, is the one address the HTTP server binds and Caddy adds
+	// no :80 redirect (docs/specs/release.md, "Listen"). Only the
+	// deploy-correctness suite sets it; it is empty in production.
+	Listen string
 }
 
 // Proxy builds the complete proxy config from agent state and pushes it to the
@@ -110,6 +115,9 @@ func (p *Proxy) push(ctx context.Context, routed *state.CurrentRelease) error {
 	if err != nil {
 		return err
 	}
+	if err = checkListen(p.cfg.Listen); err != nil {
+		return err
+	}
 	admin, err := p.do(ctx, http.MethodGet, "/config/admin", nil)
 	if err != nil {
 		return err
@@ -143,9 +151,12 @@ func (p *Proxy) push(ctx context.Context, routed *state.CurrentRelease) error {
 
 	httpApp := map[string]any{"grace_period": "30s"}
 	if len(routes) > 0 {
-		httpApp["servers"] = map[string]any{
-			proxyServer: map[string]any{"listen": []string{":443"}, "routes": routes},
+		server := map[string]any{"listen": []string{":443"}, "routes": routes}
+		if p.cfg.Listen != "" {
+			server["listen"] = []string{p.cfg.Listen}
+			server["automatic_https"] = map[string]any{"disable_redirects": true}
 		}
+		httpApp["servers"] = map[string]any{proxyServer: server}
 	}
 	apps := map[string]any{"http": httpApp}
 	for name, value := range tlsApps {
@@ -351,4 +362,21 @@ func issuerApps(issuer string) (map[string]any, error) {
 		map[string]any{"issuers": []any{value}},
 	}}}
 	return apps, nil
+}
+
+// checkListen refuses a Listen that is not host:port with a numeric port before
+// anything is read from or posted to the proxy. An empty Listen is the
+// production document and is accepted.
+func checkListen(listen string) error {
+	if listen == "" {
+		return nil
+	}
+	_, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return fmt.Errorf("proxy listen address %q is not host:port with a numeric port: %w", listen, err)
+	}
+	if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+		return fmt.Errorf("proxy listen address %q is not host:port with a numeric port: %w", listen, err)
+	}
+	return nil
 }

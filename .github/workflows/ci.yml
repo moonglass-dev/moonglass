@@ -48,3 +48,73 @@ jobs:
           install-only: true
       - run: sudo apt-get update && sudo apt-get install -y age
       - run: make ci
+
+  deploy-suite:
+    name: deploy suite (Docker Engine ${{ matrix.engine.major }})
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        engine:
+          - major: "25"
+            docker: "5:25.0.5-1~ubuntu.22.04~jammy"
+            containerd: "1.7.29-1~ubuntu.22.04~jammy"
+          - major: "26"
+            docker: "5:26.1.4-1~ubuntu.22.04~jammy"
+            containerd: "1.7.29-1~ubuntu.22.04~jammy"
+          - major: "27"
+            docker: "5:27.5.1-1~ubuntu.22.04~jammy"
+            containerd: "1.7.29-1~ubuntu.22.04~jammy"
+          - major: "28"
+            docker: "5:28.5.2-1~ubuntu.22.04~jammy"
+            containerd: "1.7.29-1~ubuntu.22.04~jammy"
+          - major: "29"
+            docker: "5:29.10.0-1~ubuntu.22.04~jammy"
+            containerd: "2.4.2-4~ubuntu.22.04~jammy"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Docker Engine
+        env:
+          DOCKER_VERSION: ${{ matrix.engine.docker }}
+          CONTAINERD_VERSION: ${{ matrix.engine.containerd }}
+          BUILDX_VERSION: "0.39.0-1~ubuntu.22.04~jammy"
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/docker.asc https://download.docker.com/linux/ubuntu/gpg
+          gpg --show-keys --with-colons /tmp/docker.asc \
+            | grep -F 'fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:' >/dev/null
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo cp /tmp/docker.asc /etc/apt/keyrings/docker.asc
+          sudo chmod 0644 /etc/apt/keyrings/docker.asc
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable" \
+            | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+          sudo apt-get update
+          installed=$(dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' \
+            | awk '$1 == "ii" { print $2 }' \
+            | grep -E '^(moby-|docker-|containerd|runc)' || true)
+          if [ -n "$installed" ]; then
+            echo "$installed" | xargs sudo apt-get purge -y
+          fi
+          sudo apt-get install -y --no-install-recommends --allow-downgrades \
+            "docker-ce=${DOCKER_VERSION}" \
+            "docker-ce-cli=${DOCKER_VERSION}" \
+            "containerd.io=${CONTAINERD_VERSION}" \
+            "docker-buildx-plugin=${BUILDX_VERSION}"
+          sudo systemctl restart docker
+      - name: Check Engine major
+        env:
+          MAJOR: ${{ matrix.engine.major }}
+        run: |
+          set -euo pipefail
+          v=$(docker version --format '{{.Server.Version}}')
+          if [ "${v%%.*}" != "$MAJOR" ]; then
+            echo "Docker Engine $v, want major $MAJOR" >&2
+            exit 1
+          fi
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: make test-deploy
