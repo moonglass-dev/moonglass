@@ -324,7 +324,7 @@ registries   = ["ghcr.io/acme/*"]
 
 | Key | Rule |
 |---|---|
-| `update.channel` | `stable` or `canary`. Absent means `stable`. |
+| `update.channel` | `stable` or `canary`. Absent means `stable`. The agent reports it in `Heartbeat.update_channel`: `update.channel = "stable"` reports `STABLE`, `update.channel = "canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE` (`docs/specs/update.md` §1). |
 | `commands.forbid` | List of `delete` and `exec`. Any other class, or a duplicate, is an error. Absent means nothing is forbidden. Which command types are in each class: `docs/specs/local-policy.md` (W5-3). |
 | `sources.repositories`, `sources.registries` | Lists of glob patterns in Go `path.Match` syntax, written in the normal form (`docs/specs/local-policy.md`): a `repositories` pattern is lower case `github.com/<owner>/<repo>`, and a `registries` pattern names a literal host and a path, never `index.docker.io` or `moonglass.local`. A pattern with bad syntax, an empty or duplicate entry, or one not written in the normal form is an error. A present, empty list allows nothing of that kind; an absent key does not restrict it. |
 | `containers.allow` | Array of tables, see "Allow blocks". |
