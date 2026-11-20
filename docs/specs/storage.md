@@ -145,6 +145,21 @@ Specified by the week 5 preflight. `services` gains `deleted_at` and `purge_deta
 
 It lives on `servers`, not `agent_keys`, because a lookup row holds only its key and IDs. Servers enrolled before migration `0007` hold `''` until a re-enrolment or rotation ticket runs. Wrapping a key to this recipient is W4-8 and W3-3, and only after the owner's CLI fingerprint check in `docs/specs/secrets.md`.
 
+### Auto-rollback (W4-3e)
+
+Owner decision of 2026-11-20. The behaviour is `docs/specs/auto-rollback.md`.
+
+`services` gains the seven settings, each `NOT NULL` with its default, so existing rows read back the defaults: `auto_rollback_off` and `auto_rollback_error_rate_enforce` (boolean on Postgres, integer 0 or 1 on SQLite, default false), `auto_rollback_restart_limit` (default 2), `auto_rollback_health_fail_seconds` (30), `auto_rollback_error_rate_percent` (5), `auto_rollback_error_rate_multiple` (3) and `auto_rollback_error_rate_min_requests` (50), integers with a `CHECK` for each range.
+
+`auto_rollback_reports` is a row-level table: `org_id`, `id`, `service_id`, `server_id`, `request_id` (the report's, `a` plus 32 hex), `release_id`, `previous_release_id`, `trigger` (`restarts`, `health`, `error_rate`), `action` (`rolled_back`, `shadow`, `held`, `skipped`, `failed`), `detail`, `restart_count`, `health_failing_seconds`, `window_requests`, `window_5xx`, `previous_requests`, `previous_5xx`, `previous_measured`, `detected_at`, `received_at`, `verdict` (`''`, `right` or `wrong`), `verdict_by` (a user id, or empty), `verdict_at` (empty until marked). Unique `(org_id, request_id)`. On Postgres it has `ENABLE ROW LEVEL SECURITY` and the `org_isolation` policy. It is not a lookup table.
+
+- `SetServiceAutoRollback` writes the seven settings of one service in one `UPDATE` bound to the org; a value outside its range is refused before any SQL runs; another org's service is `ErrNotFound`. `ServiceByName` and `Services` return the settings.
+- `AddAutoRollbackReport` inserts a report for a service of the org whose `server_id` is the given server, in one org-bound transaction; a service of another server or org is `ErrNotFound`. For `rolled_back` it also copies the report's app state in that transaction, as `SetServiceReleases` does. A `request_id` already stored returns the stored row and `ErrAlreadyStored`, and changes nothing.
+- `AutoRollbackReports` returns one service's reports, newest `detected_at` first, at most 50.
+- `MarkAutoRollbackReport` sets `verdict`, `verdict_by` and `verdict_at` = now on one report of the org; another verdict than `right` or `wrong` is refused before any SQL runs; marking again replaces the mark; another org's report is `ErrNotFound`.
+
+W4-3e adds `runAutoRollbackConformance`, run as `TestAutoRollbackConformanceSQLite` and `TestAutoRollbackConformancePostgres`, and `TestAutoRollbackReportsRLSPostgres`.
+
 ### Sessions, links and step-ups (W4-1a, W4-1d)
 
 `session_hashes` (lookup table) and the `session_id` and `step_up_id` columns of `audit_events` are added by W4-1a. `link_token_hashes` (lookup table) and `step_ups` (row-level) are added by W4-1d. All four are specified in `docs/specs/auth.md`.

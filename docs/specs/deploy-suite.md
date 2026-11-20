@@ -12,9 +12,30 @@ How tests reach a real Docker Engine, and what W2-7 builds. Specified by the wee
 ## The deploy-correctness suite (W2-7)
 
 - Package `test/deploy`. It drives `internal/deploy` and a real `moonglass proxy` against a real Engine.
-- **The load generator** is our own Go code (standard library), sending steady requests (default 50 per second) through the proxy and counting every request that does not get a 2xx response. One failed request fails the test.
-- The suite runs ten consecutive deploys of the zero-downtime shape (stack §5.3) under load, then a rollback, and asserts zero failed requests and a rollback under 5 seconds.
-- `make test-deploy` runs only this suite. `make test` runs it too.
+
+### The proxy under test
+
+Owner decision of 2026-11-20 (the W2-7 blocker): the proxy runs on the host, as the test user, on a loopback port, and the pushed document listens there.
+
+- `TestMain` builds `./cmd/moonglass` once into a temp directory (`CGO_ENABLED=0`). Each test run starts that binary as `moonglass proxy --data-dir <temp> --admin-socket <temp>/admin.sock`, waits until the admin socket answers `GET /config/`, and stops it with SIGTERM when the run ends, pass or fail. The temp directory comes from `os.MkdirTemp("", "mgd")`, so the socket path stays under the 104-byte Unix socket limit of macOS.
+- The run reserves a port by listening on `127.0.0.1:0` and closing that listener, and builds its `deploy.Proxy` with `deploy.ProxyConfig{Socket: <admin socket>, Issuer: "internal", Listen: "127.0.0.1:<port>"}` (`docs/specs/release.md`, "Listen"). Nothing binds :443 or :80, no root is needed, and two worktrees can run the suite at once.
+- The proxy reaches each release at its container IP on `mg-<project>`, as in production. That works on a Linux host, where bridge networks are routed from the host; the suite runs on Linux CI. On a host where a container IP does not answer (Docker Desktop), the suite skips with that reason, except under `CI`, where it fails.
+- The load generator trusts only the proxy's local CA root (`GET /pki/ca/local` over the admin socket, `docs/specs/proxy.md`) and sends every request to `127.0.0.1:<port>` with the test domain as TLS server name and `Host`. The test domain is `<test project>.moonglass.test`.
+
+### The test image
+
+- One small static Go HTTP server (standard library), built and imported as "Test images are imported, not pulled" says, once per release, under `moonglass.local/<test project>/web:<release_id>`. Each release's image differs only in the release id it answers with.
+- It listens on port 8080, answers `GET /healthz` with 200, and answers every other path with 200 and a body of exactly its release id. It exits on SIGTERM after finishing the requests in flight.
+- Each `Deploy` has `port` 8080, `health_path` `/healthz`, the test domain, and no pre-deploy step.
+
+### What the suite asserts
+
+- **The load generator** is our own Go code (standard library), sending steady requests (default 50 per second) through the proxy and counting every request that does not get a 2xx response. It opens a new connection for every request (keep-alives off), so each request is routed by the config live when it was sent. A request has a 5-second limit; a timeout or a connection error is a failed request. One failed request fails the test, and the failure message shows the count, the first error and when it happened.
+- The suite runs `Executor.Run` for the whole test, so stops and retention happen as in production.
+- **Ten deploys.** A first release is deployed and switched before the load starts. Then ten more releases follow under load, each a `Deploy` then a `SwitchRelease` through the executor, each `SUCCEEDED`. After each switch, a response with the new release id arrives within 2 seconds, and from then on no response carries an older release id.
+- **Rollback under 5 seconds.** After the last switch, `Executor.Rollback` is called under load. It must return `SUCCEEDED` less than 5 seconds after it was called, measured in the test with the monotonic clock: that is what "a rollback under 5 seconds" means here, in W2-5 and in gate G2. Within 1 second after it returns, a response carries the release before the last one, and from then on no response carries the last one.
+- Zero failed requests across all ten deploys and the rollback. Named tests: `TestTenDeploysUnderLoadDropNothing` and `TestRollbackUnderLoadIsUnderFiveSeconds` (both in `test/deploy`), and `TestLoadGeneratorCountsEveryNon2xx` for the load generator itself against an `httptest` server that fails a known number of requests.
+- `make test-deploy` runs only this suite (`go test -race -count=1 ./test/deploy`). `make test` runs it too.
 
 ## The Docker matrix (W2-7)
 

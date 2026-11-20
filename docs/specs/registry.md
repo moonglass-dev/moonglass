@@ -78,6 +78,22 @@ W4-2 stores `environments.protected` and does not gate deploys. W5-2 adds that g
 - **`environments.create`** sets `protected` true for the org's first environment and false for later ones. The column is `NOT NULL` (`docs/specs/storage.md`).
 - **`deploy`** is not gated on `protected` until W5-2. Until then a deploy to a protected environment runs and is audited like every other call.
 
+### Auto-rollback (W4-3)
+
+Owner decision of 2026-11-20. The behaviour is `docs/specs/auto-rollback.md`, the storage `docs/specs/storage.md` ("Auto-rollback").
+
+| Ticket | Name | Method, path | `MinRole` | Destructive | Target |
+|---|---|---|---|---|---|
+| W4-3 | `services.auto-rollback.set` | `POST /v1/services/auto-rollback` | member | no | project, environment |
+| W4-3 | `auto-rollbacks.list` | `GET /v1/auto-rollbacks` | viewer | no | project, environment |
+| W4-3 | `auto-rollbacks.mark` | `POST /v1/auto-rollbacks/mark` | member | no | project, environment |
+
+- **`services.auto-rollback.set`** takes `project`, `environment`, `service` and any of the seven settings (`off`, `error_rate_enforce`, `restart_limit`, `health_fail_seconds`, `error_rate_percent`, `error_rate_multiple`, `error_rate_min_requests`). An input left out keeps its stored value; a value outside its range is `ErrInvalidInput`. It returns all seven. The change reaches the agent with the next `deploy`, and the answer says so.
+- **`deploy`** sends the service's stored settings as `Deploy.auto_rollback`, always with all seven values. From W4-3, `services.list` returns each service's settings.
+- **`auto-rollbacks.list`** takes `project`, `environment`, `service` and returns its reports, newest first, at most 50, with every column of the table except `org_id`.
+- **`auto-rollbacks.mark`** takes `project`, `environment`, `service`, `id` and `verdict` (`right` or `wrong`). A report that is not that service's is not found. The caller's user id is recorded as `verdict_by`.
+- Each is audited like every call.
+
 ### Sign-in and step-up (W4-1)
 
 `sessions.list`, `sessions.revoke`, `identities.list` and `identities.link`, the `StepUp` flag, session authentication and the sign-in routes are specified in `docs/specs/auth.md`.

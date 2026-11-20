@@ -196,7 +196,7 @@ Both are `delete` class for `agent.toml` (`docs/specs/local-policy.md`). In thei
 
 Owner decision of 2026-11-19 (week 6): the owner approved these fields, their rules and their numbers. They carry a service's container settings for the databases of W6-1 and the Compose services of W6-4 (`docs/specs/managed-services.md`, `docs/specs/compose.md`). How the agent applies them is `docs/specs/release.md` ("Service settings, volumes and names"). No field is a host path, and none is run by a host shell: `command` and `healthcheck.test` run inside the container.
 
-`Deploy` field numbers: W4-8 takes `env_key` = 11 and `secrets` = 12 (`docs/specs/secrets.md`); W6-1a adds `command` = 13, `volumes` = 14, `labels` = 15, `restart` = 16, `healthcheck` = 17. Either ticket may land first; the numbers do not move.
+`Deploy` field numbers: W4-8 takes `env_key` = 11 and `secrets` = 12 (`docs/specs/secrets.md`); W6-1a adds `command` = 13, `volumes` = 14, `labels` = 15, `restart` = 16, `healthcheck` = 17; W4-3a adds `auto_rollback` = 18 ("Auto-rollback (W4-3a)" below). The tickets may land in any order; the numbers do not move.
 
 | Field | Type | Rule |
 |---|---|---|
@@ -232,7 +232,7 @@ Opening a `Deploy` rejects unknown fields inside `VolumeMount` and `Healthcheck`
 
 Specified by `docs/specs/update.md` §1 and §6 (owner decision 5 of its §10). W7-6d adds them to the `.proto`. The owner approved these numbers and names on 2026-11-19. They are wire format: once released they never change.
 
-- `MessageType`: `UPDATE_OFFER` = 17, `UPDATE_REPORT` = 18. Numbers 12 to 16 stay reserved for the live, delete and secrets messages (`docs/specs/live.md`, `docs/specs/delete.md`); the tickets that add those take numbers after 18.
+- `MessageType`: `UPDATE_OFFER` = 17, `UPDATE_REPORT` = 18. Numbers 12 to 16 stay reserved for the live, delete and secrets messages (`docs/specs/live.md`, `docs/specs/delete.md`); the auto-rollback messages take 19 and 20 ("Auto-rollback (W4-3a)" below), and the secrets messages take numbers after 20.
 - `UpdateOffer`: `version` = 1. An offer names no URL, path, channel, hash or older version.
 - `UpdateReport`: `version` = 1, `sha256` = 2, `outcome` = 3 (`UpdateOutcome`), `reason` = 4 (`UpdateReason`), `proxy_restarted` = 5. The report has no free-text field.
 - `Heartbeat`: `update_channel` = 4 (see "Heartbeat" above).
@@ -249,6 +249,30 @@ The validation rules, checked when a payload is opened:
 - `reason`: unknown numbers are rejected, and each reason belongs to one outcome. `NOT_NEWER`, `NOT_ON_CHANNEL`, `REVERTED_BEFORE`, `TRIAL_IN_PROGRESS` and `POINTER` belong to `REJECTED`; `DISK`, `DOWNLOAD`, `TOO_LARGE`, `SIGNATURE`, `CHECKSUM`, `POINTER_MISMATCH` and `WRITE` to `VERIFY_FAILED`; `RESTARTED`, `NOT_CONNECTED`, `EXE_MISMATCH`, `PROXY` and `DEADLINE` to `REVERTED` and `CHECK_FAILED`; `SWITCHING` and `PASSED` allow `UNSPECIFIED` only.
 - `proxy_restarted`: `false` with `REJECTED` and `VERIFY_FAILED`; either value otherwise.
 - Unknown fields are rejected at every nesting level, as for every other payload.
+
+## Auto-rollback (W4-3a)
+
+Specified by `docs/specs/auto-rollback.md`, owner decision of 2026-11-20: the owner approved these names, numbers and rules. W4-3a adds them to the `.proto`. They are wire format: once released they never change.
+
+- `MessageType`: `AUTO_ROLLBACK_REPORT` = 19 (agent to server), `AUTO_ROLLBACK_ACK` = 20 (server to agent, empty payload, the report's `request_id`).
+- `Deploy`: `auto_rollback` = 18, an `AutoRollback` message. Optional: absent means the defaults of `docs/specs/auto-rollback.md`, "Settings".
+- `AutoRollback`: `off` = 1, `error_rate_enforce` = 2, `restart_limit` = 3, `health_fail_seconds` = 4, `error_rate_percent` = 5, `error_rate_multiple` = 6, `error_rate_min_requests` = 7. The two `bool`s are free. Each `uint32` must lie in its range in "Settings": a present message sets all five, and 0 is rejected.
+- `AutoRollbackReport`: `app_id` = 1, `release_id` = 2, `previous_release_id` = 3, `trigger` = 4 (`AutoRollbackTrigger`), `action` = 5 (`AutoRollbackAction`), `detail` = 6, `restart_count` = 7, `health_failing_seconds` = 8, `window_requests` = 9, `window_5xx` = 10, `previous_requests` = 11, `previous_5xx` = 12, `previous_measured` = 13, `app` = 14 (`AppState`, as in `CommandResult`), `detected_at` = 15.
+- `AutoRollbackTrigger`: `AUTO_ROLLBACK_TRIGGER_UNSPECIFIED` = 0, `RESTARTS` = 1, `HEALTH` = 2, `ERROR_RATE` = 3, each with the prefix `AUTO_ROLLBACK_TRIGGER_`.
+- `AutoRollbackAction`: `AUTO_ROLLBACK_ACTION_UNSPECIFIED` = 0, `ROLLED_BACK` = 1, `SHADOW` = 2, `HELD` = 3, `SKIPPED` = 4, `FAILED` = 5, each with the prefix `AUTO_ROLLBACK_ACTION_`.
+
+The validation rules, checked when a payload is opened:
+
+- `request_id` of a report and its ack: `a` followed by exactly 32 lowercase hex characters.
+- `app_id`, `release_id`, `previous_release_id`: identifiers, as for `Deploy`; all three required, and `release_id` differs from `previous_release_id`.
+- `trigger` and `action`: one of their values; `UNSPECIFIED` and unknown numbers are rejected. `SHADOW` belongs to `ERROR_RATE` only.
+- `detail`: at most 4096 bytes; empty unless `action` is `FAILED`, and required then. The same rule as `CommandResult.detail`: never an environment value, a secret or a credential.
+- The numbers (`uint32` `restart_count` and `health_failing_seconds`; `uint64` for the four counts): `window_5xx` at most `window_requests` and `previous_5xx` at most `previous_requests`; with `previous_measured` false both previous counts are 0. `restart_count` is set only for `RESTARTS`, `health_failing_seconds` only for `HEALTH`, the four counts only for `ERROR_RATE`; the others are 0.
+- `app`: required, under the rules of `CommandResult.app`.
+- `detected_at`: RFC 3339 UTC with a `Z`, at most 64 bytes.
+- Unknown fields are rejected at every nesting level, as for every other payload.
+
+**Direction.** `AUTO_ROLLBACK_REPORT` travels from the agent only and `AUTO_ROLLBACK_ACK` from the control plane only; the wrong way closes the connection (`docs/specs/connection.md`).
 
 ## Secret delivery (W4-8) and reveal (W4-9)
 
