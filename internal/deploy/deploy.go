@@ -112,6 +112,14 @@ func (x *Executor) checkDomains(ctx context.Context, appID string, domains []str
 	if err != nil {
 		return err
 	}
+	return domainConflict(current, appID, domains)
+}
+
+// domainConflict is the one rule for who owns a domain: another app's current
+// release in current holds its domains, and appID's own releases never conflict.
+// The first of domains, in the given order, that another app routes is a
+// refusal naming that app.
+func domainConflict(current []state.CurrentRelease, appID string, domains []string) error {
 	owner := make(map[string]string)
 	for _, cr := range current {
 		if cr.Record.AppID == appID {
@@ -129,6 +137,16 @@ func (x *Executor) checkDomains(ctx context.Context, appID string, domains []str
 		}
 	}
 	return nil
+}
+
+// outcome is the one mapping from a refused step to its CommandOutcome: a
+// refusal is REJECTED and anything else is FAILED.
+func outcome(err error) agentv1.CommandOutcome {
+	var refusal rejectedError
+	if errors.As(err, &refusal) {
+		return agentv1.CommandOutcome_REJECTED
+	}
+	return agentv1.CommandOutcome_FAILED
 }
 
 func (x *Executor) prepare(ctx context.Context, d *agentv1.Deploy, rec *state.Record) (resolved, error) {
@@ -170,11 +188,7 @@ func (x *Executor) fail(ctx context.Context, rec state.Record, st release.State,
 	if err := x.db.RecordFailed(ctx, rec, detail, x.now()); err != nil {
 		detail += "; recording the failure also failed: " + err.Error()
 	}
-	o := agentv1.CommandOutcome_FAILED
-	var refusal rejectedError
-	if errors.As(cause, &refusal) {
-		o = agentv1.CommandOutcome_REJECTED
-	}
+	o := outcome(cause)
 	return result(o, detail, st)
 }
 

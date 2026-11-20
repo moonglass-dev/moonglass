@@ -103,6 +103,7 @@ moonglass.dev/moonglass/internal/deploy TestPreDeploySpecDerivesFromCandidate
 moonglass.dev/moonglass/internal/deploy TestProxyPushBuildsCompleteConfig
 moonglass.dev/moonglass/internal/deploy TestProxyPushFailuresPushNothing
 moonglass.dev/moonglass/internal/deploy TestProxyPushIssuers
+moonglass.dev/moonglass/internal/deploy TestProxyPushRoutedRejectsDomainBeforePosting
 moonglass.dev/moonglass/internal/deploy TestProxyPushesOneAtATime
 moonglass.dev/moonglass/internal/deploy TestProxyRunPushesAgainWhenRunningConfigDiffers
 moonglass.dev/moonglass/internal/deploy TestReconcileCarriesOutDueStops
@@ -113,7 +114,9 @@ moonglass.dev/moonglass/internal/deploy TestRetainRemovesImagesOutsideFive
 moonglass.dev/moonglass/internal/deploy TestRollbackLeavesCandidateUntouched
 moonglass.dev/moonglass/internal/deploy TestRollbackPreviousContainerGone
 moonglass.dev/moonglass/internal/deploy TestRollbackRefusalsAndPushFailure
+moonglass.dev/moonglass/internal/deploy TestRollbackRejectsDomainRoutedByAnotherApp
 moonglass.dev/moonglass/internal/deploy TestRollbackRunningPreviousRoutesAndCommits
+moonglass.dev/moonglass/internal/deploy TestRollbackStoppedPreviousRejectedForDomain
 moonglass.dev/moonglass/internal/deploy TestRollbackStoppedPreviousStartsAndGates
 moonglass.dev/moonglass/internal/deploy TestRunPreDeployEngineErrorAborts
 moonglass.dev/moonglass/internal/deploy TestRunPreDeployFailureAbortsDeploy
@@ -128,7 +131,9 @@ moonglass.dev/moonglass/internal/deploy TestStopPreviousStopsAndKeepsContainer
 moonglass.dev/moonglass/internal/deploy TestStopRefusesUnmanagedContainer
 moonglass.dev/moonglass/internal/deploy TestStopRetiredRemovesContainerAndPreDeployStep
 moonglass.dev/moonglass/internal/deploy TestSwitchReleaseHealthFailureAborts
+moonglass.dev/moonglass/internal/deploy TestSwitchReleaseKeepsOwnDomains
 moonglass.dev/moonglass/internal/deploy TestSwitchReleaseRefusalsAndPushFailure
+moonglass.dev/moonglass/internal/deploy TestSwitchReleaseRejectsDomainRoutedByAnotherApp
 moonglass.dev/moonglass/internal/deploy TestSwitchReleaseRoutesCandidateAndCommits
 moonglass.dev/moonglass/internal/installtest TestAgentUnitMemoryMaxFitsBuilds
 moonglass.dev/moonglass/internal/installtest TestInstallAcceptsEitherPinnedKey

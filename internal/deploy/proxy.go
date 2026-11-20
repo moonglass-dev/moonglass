@@ -85,9 +85,10 @@ func (p *Proxy) Push(ctx context.Context) error {
 
 // PushRouted builds the complete document with routed replacing its app's
 // stored current release, pushes it, and then commits inside the same lock, so a
-// Run push cannot read the old current release between the two. A failed commit
-// clears the last pushed document, so Run pushes the stored routes again, and
-// the commit's error is returned.
+// Run push cannot read the old current release between the two. A routed domain
+// that another app's current release routes is refused before anything is
+// posted, so commit is not run. A failed commit clears the last pushed document,
+// so Run pushes the stored routes again, and the commit's error is returned.
 func (p *Proxy) PushRouted(ctx context.Context, routed state.CurrentRelease, commit func(context.Context) error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -122,6 +123,9 @@ func (p *Proxy) push(ctx context.Context, routed *state.CurrentRelease) error {
 		return fmt.Errorf("read the apps to route: %w", err)
 	}
 	if routed != nil {
+		if conflictErr := domainConflict(current, routed.Record.AppID, routed.Record.Domains); conflictErr != nil {
+			return conflictErr
+		}
 		current = withRouted(current, *routed)
 	}
 

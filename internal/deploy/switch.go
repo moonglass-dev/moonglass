@@ -76,7 +76,7 @@ func (x *Executor) SwitchRelease(ctx context.Context, s *agentv1.SwitchRelease) 
 	if err := x.proxy.PushRouted(ctx, routed, func(ctx context.Context) error {
 		return x.db.RecordSwitch(ctx, appID, releaseID, next, x.now())
 	}); err != nil {
-		return result(agentv1.CommandOutcome_FAILED, err.Error(), st)
+		return result(outcome(err), err.Error(), st)
 	}
 	return result(agentv1.CommandOutcome_SUCCEEDED, "", next)
 }

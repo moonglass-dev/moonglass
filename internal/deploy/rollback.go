@@ -67,7 +67,7 @@ func (x *Executor) Rollback(ctx context.Context, r *agentv1.Rollback) *agentv1.C
 	if err := x.proxy.PushRouted(ctx, routed, func(ctx context.Context) error {
 		return x.db.RecordRollback(ctx, appID, next, x.now())
 	}); err != nil {
-		return result(agentv1.CommandOutcome_FAILED, err.Error(), st)
+		return result(outcome(err), err.Error(), st)
 	}
 	return result(agentv1.CommandOutcome_SUCCEEDED, "", next)
 }
