@@ -52,6 +52,8 @@ func TestRollbackUnderLoadIsUnderFiveSeconds(t *testing.T) {
 
 	l := startLoad(cfg)
 	marks := s.tenDeploys()
+	// A beat of steady load, so the r10 mark gets its answer before the rollback.
+	time.Sleep(200 * time.Millisecond)
 
 	called := time.Now()
 	res := s.x.Rollback(context.Background(), "rollback-"+s.app, &agentv1.Rollback{AppId: s.app})
