@@ -1,0 +1,17 @@
+{
+  "round": 1,
+  "verdict": "changes",
+  "skipped": false,
+  "reason": "",
+  "commit": "2cc3e846722e48925297d7efd77619664fa6b52a",
+  "blockers": [],
+  "majors": [
+    {
+      "file": "test/deploy/load_test.go",
+      "line": 191,
+      "issue": "attempt() classifies every non-timeout error that arrives before the first answer byte as errCutBeforeAnswer, so get() retries it. The spec (docs/specs/deploy-suite.md, 'What the suite asserts') and the ticket allow one retry only when the connection closed before any answer byte. A dial failure (connection refused) or a TLS failure (x509 verification error, or a TLS alert from the proxy) is not a closed connection, yet it is retried, and when the retry succeeds it is counted as retried instead of failed. This weakens the zero-failed-requests claim that TestTenDeploysUnderLoadDropNothing and TestRollbackUnderLoadIsUnderFiveSeconds exist to prove, and neither load-generator test covers it.",
+      "scenario": "During a Caddy reload, the proxy briefly serves a certificate the local CA did not sign, sends a TLS internal_error alert, or refuses the connection for one request. The client gets 'tls: failed to verify certificate' / 'remote error: tls: internal error' / 'connect: connection refused', answered is false and the error is not a timeout. The request is retried on a new connection, the retry gets 200, res.failed stays 0 and the suite passes, although a browser would have shown that request as an error. Narrow the cut test to a connection closed by the peer (for example errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET), which covers a close mid-handshake), and add a case to a load-generator test where a refused or TLS-failed attempt counts as failed and is not retried."
+    }
+  ],
+  "minors": []
+}
