@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -84,6 +85,7 @@ func startProcess(t *testing.T, name, bin string, args ...string) *exec.Cmd {
 }
 
 func TestProxyAndAgentIdleUnderBudget(t *testing.T) {
+	testEngine(t)
 	ctx := context.Background()
 	tmp, err := os.MkdirTemp("/tmp", "mgmem")
 	if err != nil {
@@ -150,7 +152,7 @@ func TestProxyAndAgentIdleUnderBudget(t *testing.T) {
 
 	adminSock := filepath.Join(tmp, "admin.sock")
 	proxyCmd := startProcess(t, "proxy", bin, "proxy", "--data-dir", filepath.Join(tmp, "proxy"), "--admin-socket", adminSock)
-	agentCmd := startProcess(t, "agent", bin, "agent", "connect", "--data-dir", agentDir, "--url", "https://"+ln.Addr().String())
+	agentCmd := startProcess(t, "agent", bin, "agent", "connect", "--data-dir", agentDir, "--proxy-socket", adminSock, "--tls-issuer", "internal", "--url", "https://"+ln.Addr().String())
 
 	deadline := time.Now().Add(startTimeout)
 	for upgrades.Load() == 0 {
@@ -165,6 +167,26 @@ func TestProxyAndAgentIdleUnderBudget(t *testing.T) {
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("proxy admin socket %s did not appear within %s", adminSock, startTimeout)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	admin := adminClient(adminSock)
+	var grace any
+	var graceErr error
+	for {
+		resp, err := admin.Get("http://localhost/config/apps/http/grace_period")
+		if err != nil {
+			graceErr = err
+		} else {
+			grace = nil
+			graceErr = json.NewDecoder(resp.Body).Decode(&grace)
+			_ = resp.Body.Close()
+		}
+		if graceErr == nil && grace == "30s" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("GET /config/apps/http/grace_period on %s: expected %q (the agent's first push) within %s, got %#v (error %v)", adminSock, "30s", startTimeout, grace, graceErr)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
