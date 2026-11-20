@@ -474,3 +474,4 @@ Every choice below is one no ADR or existing spec already fixes. One line each, 
 28. `trial` is one JSON file with `"format": 1`, deleted at the first hour or on the next offer, and a re-sent offer is answered from it rather than from agent state.
 29. `NOT_CONNECTED` is recorded by the new agent when the pinned connection is still missing at the deadline; `DEADLINE` is the gate's reason when the new agent could not record one.
 30. An agent that finds no proxy running passes the proxy condition and pushes its config; no error is raised.
+31. `Heartbeat.update_channel` from `agent.toml` (FR5-2, decided 2026-11-20): absent means stable. `update.channel = "stable"` reports `STABLE`, `"canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE`, so `docs/specs/container-policy.md`, ADR-0004's schema and `internal/policy` stay as they are. W7-6e sets the field.
