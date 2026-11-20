@@ -10,7 +10,7 @@
     "done:ticket": 1,
     "fix": 1,
     "review": 2,
-    "worker": 1
+    "worker": 2
   },
   "claim": null
 }
