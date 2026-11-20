@@ -535,7 +535,9 @@ var ownerTestEdits = map[string]map[string]bool{
 		// commands table.
 	},
 	"W2-7": {
-		"test/deploy/load_test.go": true,
+		"test/deploy/load_test.go":    true,
+		"test/deploy/deploy_test.go":  true,
+		"test/deploy/helpers_test.go": true,
 	},
 }
 
