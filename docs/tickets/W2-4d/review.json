@@ -1,0 +1,17 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "23b3476490fe532ae32e22c202cd20d58e617732",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/deploy/rollback_test.go",
+      "line": 330,
+      "issue": "The refusal cases check only that projectContainerIDs is unchanged. That does not prove the criterion 'no Engine container call': an added inspect or start before the refusal checks would still pass. Reading the code shows the refusals return before any Engine call, so today's behaviour is correct.",
+      "scenario": "A later change calls x.engine.runState before st.Rollback(). TestRollbackRefusalsAndPushFailure stays green, because an inspect changes no container IDs."
+    }
+  ]
+}

@@ -41,6 +41,7 @@ moonglass.dev/moonglass/internal/agent/state TestRecordCandidateKeepsBinding
 moonglass.dev/moonglass/internal/agent/state TestRecordCandidateRejectsOtherBinding
 moonglass.dev/moonglass/internal/agent/state TestRecordFailedLeavesStateUnchanged
 moonglass.dev/moonglass/internal/agent/state TestRecordPreDeployOutcome
+moonglass.dev/moonglass/internal/agent/state TestRecordRollbackRestoresPrevious
 moonglass.dev/moonglass/internal/agent/state TestRecordStoresTextVerbatim
 moonglass.dev/moonglass/internal/agent/state TestRecordSwitchWritesStatusesAndStopAfter
 moonglass.dev/moonglass/internal/api TestBodyInputsDecoded
@@ -88,6 +89,11 @@ moonglass.dev/moonglass/internal/deploy TestProxyRunPushesAgainWhenRunningConfig
 moonglass.dev/moonglass/internal/deploy TestReconcileKeepsReferencedReleases
 moonglass.dev/moonglass/internal/deploy TestReconcileRemovesUnreferencedContainers
 moonglass.dev/moonglass/internal/deploy TestResolveRefParsing
+moonglass.dev/moonglass/internal/deploy TestRollbackLeavesCandidateUntouched
+moonglass.dev/moonglass/internal/deploy TestRollbackPreviousContainerGone
+moonglass.dev/moonglass/internal/deploy TestRollbackRefusalsAndPushFailure
+moonglass.dev/moonglass/internal/deploy TestRollbackRunningPreviousRoutesAndCommits
+moonglass.dev/moonglass/internal/deploy TestRollbackStoppedPreviousStartsAndGates
 moonglass.dev/moonglass/internal/deploy TestRunPreDeployEngineErrorAborts
 moonglass.dev/moonglass/internal/deploy TestRunPreDeployFailureAbortsDeploy
 moonglass.dev/moonglass/internal/deploy TestRunPreDeployOutputStaysOutOfResult

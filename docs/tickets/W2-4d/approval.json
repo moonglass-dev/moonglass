@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "The six named tests are in the right packages, cover every acceptance bullet, use temp directories and per-run Docker labels, and do not change existing tests. The running-path five-second bound is the G2 check the ticket names; a healthy gate also finishes in about two seconds, so that bound does not by itself prove the gate was skipped. Refusal details are asserted non-empty, matching the switch tests, and there is no goroutine count because one would depend on timing."
+}

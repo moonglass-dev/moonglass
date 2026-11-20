@@ -128,11 +128,11 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 
 ### Rollback
 
-1. Apply `State.Rollback` in memory. Illegal is `REJECTED`. From W6-1c, an app whose current or previous release mounts a named volume is also `REJECTED`, with `app <app_id> mounts a volume; Moonglass does not roll back a service with a volume`, before anything is touched ("Volumes" below).
-2. If the previous container is running, push the config with it routed. It finishes in under 5 seconds (G2).
-3. If it is stopped, start it, run the health gate, then push. This takes as long as the app takes to start.
-4. If it is gone, answer `FAILED` with `the previous release's container is gone; deploy again`.
-5. In one transaction: commit, set the restored release `current`, and the release rolled back from `retired` with `stop_after` = now + 30 seconds. Answer `SUCCEEDED`.
+1. Read the app's stored state. An unknown app is `REJECTED` with `app <app_id> has no release on this server; deploy it first`, and nothing else is read or touched. Apply `State.Rollback` in memory; illegal is `REJECTED` with the machine's error. From W6-1c, an app whose current or previous release mounts a named volume is also `REJECTED`, with `app <app_id> mounts a volume; Moonglass does not roll back a service with a volume`, before anything is touched ("Volumes" below).
+2. Read the previous release's record. A missing record is `FAILED`. A record with an empty `container_id`, or a container the Engine does not find, is `FAILED` with `the previous release's container is gone; deploy again`; nothing is pushed and the stored state is unchanged.
+3. If the container is running, it is neither started nor gated, so the rollback finishes in under 5 seconds (G2). If it is stopped, it is started with the executor's one start path and then the health gate runs on it with the app's project. A failed start or gate is `FAILED` with its detail and the stored state unchanged: nothing is pushed, nothing is committed, and the container is left in place as the app's previous release.
+4. The complete proxy config is pushed with the previous release routed in place of the app's stored current release, through `Proxy.PushRouted`, with the commit inside that push's lock. A failed push or commit is `FAILED` with the stored state unchanged, and the rollback can then be sent again.
+5. The commit is one transaction: the restored release becomes `current` with `switched_at` = now and `stop_after` cleared, so no stop is due on the serving release; the release rolled back from becomes `retired` with `stop_after` = now + 30 seconds; the candidate row, the app's candidate and its phase are untouched. Answer `SUCCEEDED` with the new state.
 
 ### Proxy config
 

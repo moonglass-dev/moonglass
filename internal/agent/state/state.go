@@ -466,6 +466,54 @@ func (d *DB) RecordSwitch(ctx context.Context, appID, releaseID string, next rel
 	return nil
 }
 
+// RecordRollback records a rollback in one transaction: the restored row becomes
+// current with switched_at = now and no stop_after, the row rolled back from
+// becomes retired due to stop at now + 30 seconds, and the apps row becomes next.
+// The candidate row, the app's candidate and its phase are left as they are. It
+// writes nothing and returns an error when next is not the state Rollback
+// returned for the stored one.
+func (d *DB) RecordRollback(ctx context.Context, appID string, next release.State, now time.Time) error {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("record rollback of app %s: %w", appID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, stored, known, err := readState(ctx, tx, appID)
+	if err != nil {
+		return fmt.Errorf("record rollback of app %s: %w", appID, err)
+	}
+	if !known {
+		return fmt.Errorf("record rollback of app %s: app is not in agent state; deploy it first", appID)
+	}
+	want, err := stored.Rollback()
+	if err != nil {
+		return fmt.Errorf("record rollback of app %s: %w", appID, err)
+	}
+	if !sameState(want, next) {
+		return fmt.Errorf("record rollback of app %s: the given state does not follow from the stored one; record the state Rollback returned", appID)
+	}
+
+	if err = updateOne(ctx, tx,
+		`UPDATE releases SET status = ?, switched_at = ?, stop_after = NULL
+		WHERE app_id = ? AND release_id = ? AND status = ?`,
+		statusCurrent, formatTime(now), appID, stored.Previous.ID, statusPrevious); err != nil {
+		return fmt.Errorf("record rollback of app %s: %w", appID, err)
+	}
+	if err = updateOne(ctx, tx,
+		`UPDATE releases SET status = ?, stop_after = ? WHERE app_id = ? AND release_id = ? AND status = ?`,
+		statusRetired, formatTime(now.Add(retiredStopAfter)), appID, stored.Current.ID, statusCurrent); err != nil {
+		return fmt.Errorf("record rollback of app %s: %w", appID, err)
+	}
+	if err = setAppState(ctx, tx, appID, next); err != nil {
+		return fmt.Errorf("record rollback of app %s: %w", appID, err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("record rollback of app %s: %w", appID, err)
+	}
+	return nil
+}
+
 // RecordAbort records a candidate its health gate gave up on in one transaction:
 // the row becomes aborted with detail as error and an empty container_id, and
 // the apps row becomes next. Current and Previous are untouched. It writes
