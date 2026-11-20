@@ -89,7 +89,7 @@ The messages are `docs/specs/protocol.md`. The SSE routes are `docs/specs/live.m
 
 ## Route registration
 
-The operation registry does not exist yet, so `/v1/agent` is mounted beside its authorisation (an enrolled client certificate). It joins the fixed route list when W2-1 lands.
+`GET /v1/agent` is not a registry operation. It is on `registry.NonOperationRoutes`, the fixed list of routes outside the registry (`docs/specs/registry.md`). It is mounted only on the agent listener (`--agent-listen`), not on the `--listen` API listener. Its authorisation is the mutual TLS 1.3 handshake in "Transport": the server accepts only a client leaf key that is an enrolled server's public key in the store, and proof of possession is TLS 1.3 CertificateVerify. No other authorisation runs on the route. `TestAgentRoutesMatchTheDeclaredList` in `internal/server` fails when the agent listener mounts a route that is not on `registry.NonOperationRoutes`.
 
 ## Out of scope
 
