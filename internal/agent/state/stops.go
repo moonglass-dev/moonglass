@@ -26,8 +26,10 @@ type DueStop struct {
 	StopAfter   time.Time
 	AppID       string
 	ReleaseID   string
-	Status      string
 	ContainerID string
+	// Retired is true for a retired row, whose container a stop removes, and
+	// false for a previous row, whose container a stop keeps.
+	Retired bool
 }
 
 const selectDueStops = `SELECT app_id, release_id, status, container_id, stop_after
@@ -50,11 +52,13 @@ func (d *DB) DueStops(ctx context.Context, now time.Time) ([]DueStop, error) {
 	for rows.Next() {
 		var (
 			stop     DueStop
+			status   string
 			stopText string
 		)
-		if err = rows.Scan(&stop.AppID, &stop.ReleaseID, &stop.Status, &stop.ContainerID, &stopText); err != nil {
+		if err = rows.Scan(&stop.AppID, &stop.ReleaseID, &status, &stop.ContainerID, &stopText); err != nil {
 			return nil, fmt.Errorf("read due stops from agent state %s: %w", d.path, err)
 		}
+		stop.Retired = status == statusRetired
 		stop.StopAfter, err = time.Parse(time.RFC3339, stopText)
 		if err != nil {
 			return nil, fmt.Errorf("read due stops from agent state %s: parse stop_after %q of release %s of app %s: %w",

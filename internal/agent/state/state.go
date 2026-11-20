@@ -32,7 +32,8 @@ const (
 	statusFailed    = "failed"
 	statusAborted   = "aborted"
 
-	// The command types the agent records; W3-7 and W5-5b add more.
+	// The command types the agent records; W3-4 adds build, and W5-5b adds
+	// stop_app and remove_app.
 	CommandDeploy        = "deploy"
 	CommandSwitchRelease = "switch_release"
 	CommandRollback      = "rollback"
