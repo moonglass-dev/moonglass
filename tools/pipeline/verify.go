@@ -766,7 +766,6 @@ func addedLines(dir, base string, paths ...string) (map[string]map[int]string, e
 // exists (ADR-0016, ticket W2-Sb).
 func bannedWordsSkip(f string) bool {
 	return strings.HasSuffix(f, ".md") || strings.HasPrefix(f, "docs/") || f == "go.mod" || f == "go.sum" ||
-		f == "ui/svelte.config.js" ||
 		f == "ui/vite.config.ts" ||
 		f == "ui/scaffold_test.go"
 }

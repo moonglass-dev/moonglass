@@ -150,7 +150,7 @@ func TestBannedWordsSkip(t *testing.T) {
 		"docs/adr/0016-ui-toolchain.md":     true,
 		"go.mod":                            true,
 		"go.sum":                            true,
-		"ui/svelte.config.js":               true,
+		"ui/svelte.config.js":               false,
 		"ui/vite.config.ts":                 true,
 		"ui/scaffold_test.go":               true,
 		"internal/agent/agent.go":           false,
