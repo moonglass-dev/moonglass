@@ -100,19 +100,19 @@ func TestDueStopsListsPreviousAndRetiredPastStopAfter(t *testing.T) {
 			now:  t0.Add(20 * time.Minute),
 			want: []DueStop{
 				{
-					AppID: "app-b", ReleaseID: "b-r1", Status: "retired",
+					AppID: "app-b", ReleaseID: "b-r1", Retired: true,
 					ContainerID: "container-b-r1", StopAfter: t0.Add(-8 * time.Minute),
 				},
 				{
-					AppID: "app-a", ReleaseID: "a-r1", Status: "retired",
+					AppID: "app-a", ReleaseID: "a-r1", Retired: true,
 					ContainerID: "container-a-r1", StopAfter: t0.Add(90 * time.Second),
 				},
 				{
-					AppID: "app-b", ReleaseID: "b-r2", Status: "previous",
+					AppID: "app-b", ReleaseID: "b-r2", Retired: false,
 					ContainerID: "container-b-r2", StopAfter: t0.Add(90 * time.Second),
 				},
 				{
-					AppID: "app-a", ReleaseID: "a-r3", Status: "retired",
+					AppID: "app-a", ReleaseID: "a-r3", Retired: true,
 					ContainerID: "container-a-r3", StopAfter: t0.Add(150 * time.Second),
 				},
 			},
@@ -123,15 +123,15 @@ func TestDueStopsListsPreviousAndRetiredPastStopAfter(t *testing.T) {
 			now:  t0.Add(90 * time.Second),
 			want: []DueStop{
 				{
-					AppID: "app-b", ReleaseID: "b-r1", Status: "retired",
+					AppID: "app-b", ReleaseID: "b-r1", Retired: true,
 					ContainerID: "container-b-r1", StopAfter: t0.Add(-8 * time.Minute),
 				},
 				{
-					AppID: "app-a", ReleaseID: "a-r1", Status: "retired",
+					AppID: "app-a", ReleaseID: "a-r1", Retired: true,
 					ContainerID: "container-a-r1", StopAfter: t0.Add(90 * time.Second),
 				},
 				{
-					AppID: "app-b", ReleaseID: "b-r2", Status: "previous",
+					AppID: "app-b", ReleaseID: "b-r2", Retired: false,
 					ContainerID: "container-b-r2", StopAfter: t0.Add(90 * time.Second),
 				},
 			},
@@ -141,7 +141,7 @@ func TestDueStopsListsPreviousAndRetiredPastStopAfter(t *testing.T) {
 			now:  t0.Add(31 * time.Second),
 			want: []DueStop{
 				{
-					AppID: "app-b", ReleaseID: "b-r1", Status: "retired",
+					AppID: "app-b", ReleaseID: "b-r1", Retired: true,
 					ContainerID: "container-b-r1", StopAfter: t0.Add(-8 * time.Minute),
 				},
 			},
@@ -158,6 +158,145 @@ func TestDueStopsListsPreviousAndRetiredPastStopAfter(t *testing.T) {
 				t.Errorf("DueStops(%s) = %+v, want %+v", tc.now, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestDueStopsMarksRetiredRows covers what a due row tells the executor of
+// docs/specs/agent-state.md: Retired is true for a retired row, whose container
+// a stop removes, and false for a previous row, whose container a stop keeps,
+// with the other fields as stored.
+func TestDueStopsMarksRetiredRows(t *testing.T) {
+	d, t0 := stopRecordSetup(t)
+	now := t0.Add(20 * time.Minute)
+
+	due, err := d.DueStops(context.Background(), now)
+	if err != nil {
+		t.Fatalf("DueStops(%s) error = %v, want nil", now, err)
+	}
+
+	cases := []struct {
+		name      string
+		releaseID string
+		want      DueStop
+	}{
+		{
+			name:      "a retired row",
+			releaseID: "r1",
+			want: DueStop{
+				StopAfter:   t0.Add(90 * time.Second),
+				AppID:       "app-1",
+				ReleaseID:   "r1",
+				ContainerID: "container-r1",
+				Retired:     true,
+			},
+		},
+		{
+			name:      "a previous row",
+			releaseID: "r2",
+			want: DueStop{
+				StopAfter:   t0.Add(11 * time.Minute),
+				AppID:       "app-1",
+				ReleaseID:   "r2",
+				ContainerID: "container-r2",
+				Retired:     false,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, found := DueStop{}, false
+			for _, stop := range due {
+				if stop.AppID == "app-1" && stop.ReleaseID == tc.releaseID {
+					got, found = stop, true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("DueStops(%s) = %+v, want a row for app %q release %q", now, due, "app-1", tc.releaseID)
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("DueStop of app %q release %q = %+v, want %+v", "app-1", tc.releaseID, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDueStopRetiredAfterSwitch covers three switches of one app: the old
+// previous row is retired and due after its 30-second drain, and the old
+// current row is previous and due after its ten-minute window.
+func TestDueStopRetiredAfterSwitch(t *testing.T) {
+	d, _ := openTemp(t)
+	t0 := testTime()
+
+	st := switchApp(t, d, "app-1", "r1", t0, t0, release.State{})
+	st = switchApp(t, d, "app-1", "r2", t0, t0.Add(time.Minute), st)
+	switchApp(t, d, "app-1", "r3", t0, t0.Add(2*time.Minute), st)
+
+	now := t0.Add(20 * time.Minute)
+	got, err := d.DueStops(context.Background(), now)
+	if err != nil {
+		t.Fatalf("DueStops(%s) error = %v, want nil", now, err)
+	}
+
+	want := []DueStop{
+		{
+			StopAfter:   t0.Add(2*time.Minute + 30*time.Second),
+			AppID:       "app-1",
+			ReleaseID:   "r1",
+			ContainerID: "container-r1",
+			Retired:     true,
+		},
+		{
+			StopAfter:   t0.Add(12 * time.Minute),
+			AppID:       "app-1",
+			ReleaseID:   "r2",
+			ContainerID: "container-r2",
+			Retired:     false,
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("DueStops(%s) = %+v, want %+v", now, got, want)
+	}
+}
+
+// TestDueStopRetiredAfterRollback covers a rollback: the row rolled back from
+// is retired and due 30 seconds later, and the restored release is never
+// listed, so its container is never stopped.
+func TestDueStopRetiredAfterRollback(t *testing.T) {
+	d, _ := openTemp(t)
+	t0 := testTime()
+
+	st := switchApp(t, d, "app-1", "r1", t0, t0, release.State{})
+	st = switchApp(t, d, "app-1", "r2", t0, t0.Add(time.Minute), st)
+
+	rolledBack := mustRollback(t, st)
+	if err := d.RecordRollback(context.Background(), testCommand(t, "app-1"), "app-1", rolledBack, t0.Add(2*time.Minute)); err != nil {
+		t.Fatalf("RecordRollback(app-1) error = %v, want nil", err)
+	}
+
+	now := t0.Add(20 * time.Minute)
+	got, err := d.DueStops(context.Background(), now)
+	if err != nil {
+		t.Fatalf("DueStops(%s) error = %v, want nil", now, err)
+	}
+
+	want := []DueStop{
+		{
+			StopAfter:   t0.Add(2*time.Minute + 30*time.Second),
+			AppID:       "app-1",
+			ReleaseID:   "r2",
+			ContainerID: "container-r2",
+			Retired:     true,
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("DueStops(%s) = %+v, want %+v", now, got, want)
+	}
+	for _, stop := range got {
+		if stop.ReleaseID == "r1" {
+			t.Errorf("DueStops(%s) = %+v, want no entry for the restored release r1", now, got)
+		}
 	}
 }
 

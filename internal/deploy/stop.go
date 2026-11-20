@@ -22,8 +22,6 @@ const (
 	// retainInterval is how often Run applies retention. It is an Executor
 	// field, so tests can shorten it.
 	retainInterval = time.Hour
-	// statusRetired is the release row a stop removes with its container.
-	statusRetired = "retired"
 )
 
 // lockApp holds the app's lock until the returned function runs, so a stop and
@@ -88,7 +86,7 @@ func (x *Executor) stopOne(ctx context.Context, appID, releaseID string, now tim
 			if err := x.engine.stop(ctx, stop.ContainerID); err != nil {
 				return fmt.Errorf("stop release %s of app %s: %w", releaseID, appID, err)
 			}
-			if stop.Status == statusRetired {
+			if stop.Retired {
 				if err := x.engine.remove(ctx, stop.ContainerID); err != nil {
 					return fmt.Errorf("stop release %s of app %s: %w", releaseID, appID, err)
 				}
@@ -96,7 +94,7 @@ func (x *Executor) stopOne(ctx context.Context, appID, releaseID string, now tim
 		}
 	}
 
-	if stop.Status == statusRetired {
+	if stop.Retired {
 		if err := x.engine.clearName(ctx, preDeployName(appID, releaseID), appID, releaseID); err != nil {
 			return fmt.Errorf("stop release %s of app %s: %w", releaseID, appID, err)
 		}

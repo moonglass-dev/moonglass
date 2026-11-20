@@ -36,7 +36,10 @@ moonglass.dev/moonglass/internal/agent TestServerOfflineThenRecovers
 moonglass.dev/moonglass/internal/agent/state TestCommandResultReturnsStoredResult
 moonglass.dev/moonglass/internal/agent/state TestCommandsResultIsNotNull
 moonglass.dev/moonglass/internal/agent/state TestCurrentReleasesListsEveryAppsCurrentRelease
+moonglass.dev/moonglass/internal/agent/state TestDueStopRetiredAfterRollback
+moonglass.dev/moonglass/internal/agent/state TestDueStopRetiredAfterSwitch
 moonglass.dev/moonglass/internal/agent/state TestDueStopsListsPreviousAndRetiredPastStopAfter
+moonglass.dev/moonglass/internal/agent/state TestDueStopsMarksRetiredRows
 moonglass.dev/moonglass/internal/agent/state TestOpenCreatesFileMode0600
 moonglass.dev/moonglass/internal/agent/state TestOpenErrorNamesPath
 moonglass.dev/moonglass/internal/agent/state TestOpenMigratesSpecSchema
@@ -94,6 +97,7 @@ moonglass.dev/moonglass/internal/deploy TestCommandWithNothingElseWrittenIsRecor
 moonglass.dev/moonglass/internal/deploy TestConnectRequiresUnixSocket
 moonglass.dev/moonglass/internal/deploy TestCreateOptionsCarriesCheckedSpec
 moonglass.dev/moonglass/internal/deploy TestCreateOptionsRefusesUncarriedFields
+moonglass.dev/moonglass/internal/deploy TestDeployDeclaresNoReleaseStatusText
 moonglass.dev/moonglass/internal/deploy TestDeployFailuresLeaveStateUnchanged
 moonglass.dev/moonglass/internal/deploy TestDeployImportedImageStartsCandidate
 moonglass.dev/moonglass/internal/deploy TestDeployRejectsBeforeActing

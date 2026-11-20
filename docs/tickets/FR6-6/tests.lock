@@ -1,0 +1,3 @@
+# base 7c6497abdc10a30faabf3a47bd913bb743f611cd
+35d6914e047dd66db4f6d9a1dc54934a397e84ecfb3f496b603a9357ed287056  internal/agent/state/stops_test.go
+d0f03a3e0fedf110b54e3d2a918c85b0722d0a96e4cb0dfadb0db1e08ef28fdb  internal/deploy/status_text_test.go
