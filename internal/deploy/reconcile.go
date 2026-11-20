@@ -4,11 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/moby/moby/client"
 
 	"moonglass.dev/moonglass/internal/release"
 )
+
+// ScopeReconcile narrows Reconcile, and so Run's start-up reconcile, to managed
+// containers that also carry every given key=value label; another run's
+// containers on the same Engine are left alone. It is called before Run, and
+// production never calls it: every managed container on the server is the
+// agent's own (docs/specs/release.md, "Run").
+func (x *Executor) ScopeReconcile(labels ...string) {
+	x.scope = slices.Clone(labels)
+}
 
 // Reconcile removes the managed containers no release references and then
 // carries out the stops due at the time it runs (docs/specs/release.md,

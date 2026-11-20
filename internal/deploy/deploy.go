@@ -36,8 +36,8 @@ type Executor struct {
 	// now is the executor's one clock, so every recorded time comes from it and
 	// a test can move it.
 	now func() time.Time
-	// scope narrows the container list Reconcile reads. It is nil in production,
-	// where every managed container on the server is ours.
+	// scope is set only by ScopeReconcile; nil in production, where every
+	// managed container on the server is ours.
 	scope []string
 
 	preDeployLimit time.Duration

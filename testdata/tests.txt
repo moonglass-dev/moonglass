@@ -115,6 +115,8 @@ moonglass.dev/moonglass/internal/deploy TestPreDeploySpecDerivesFromCandidate
 moonglass.dev/moonglass/internal/deploy TestProxyPushBuildsCompleteConfig
 moonglass.dev/moonglass/internal/deploy TestProxyPushFailuresPushNothing
 moonglass.dev/moonglass/internal/deploy TestProxyPushIssuers
+moonglass.dev/moonglass/internal/deploy TestProxyPushListenSetsAddressAndDisablesRedirects
+moonglass.dev/moonglass/internal/deploy TestProxyPushRefusesMalformedListen
 moonglass.dev/moonglass/internal/deploy TestProxyPushRoutedRejectsDomainBeforePosting
 moonglass.dev/moonglass/internal/deploy TestProxyPushesOneAtATime
 moonglass.dev/moonglass/internal/deploy TestProxyRunPushesAgainWhenRunningConfigDiffers
@@ -138,6 +140,7 @@ moonglass.dev/moonglass/internal/deploy TestRunPreDeployReplacesLeftoverStepCont
 moonglass.dev/moonglass/internal/deploy TestRunPreDeploySuccessStartsCandidate
 moonglass.dev/moonglass/internal/deploy TestRunPreDeployTimeoutKillsStep
 moonglass.dev/moonglass/internal/deploy TestRunningAfterStart
+moonglass.dev/moonglass/internal/deploy TestScopeReconcileRemovesOnlyMatchingContainers
 moonglass.dev/moonglass/internal/deploy TestStopNeverStopsRestoredRelease
 moonglass.dev/moonglass/internal/deploy TestStopPreviousStopsAndKeepsContainer
 moonglass.dev/moonglass/internal/deploy TestStopRefusesUnmanagedContainer
@@ -408,6 +411,10 @@ moonglass.dev/moonglass/internal/update TestVerifyRejectsTamperedSignature
 moonglass.dev/moonglass/internal/update TestVerifyRejectsUnpinnedKey
 moonglass.dev/moonglass/internal/update TestVerifyRejectsWrongEnvelope
 moonglass.dev/moonglass/internal/update TestVerifyRequiresExactFlags
+moonglass.dev/moonglass/test/deploy TestLoadGeneratorCountsEveryNon2xx
+moonglass.dev/moonglass/test/deploy TestLoadGeneratorRetriesOnceACutBeforeAnswer
+moonglass.dev/moonglass/test/deploy TestRollbackUnderLoadIsUnderFiveSeconds
+moonglass.dev/moonglass/test/deploy TestTenDeploysUnderLoadDropNothing
 moonglass.dev/moonglass/tools/pipeline TestBannedWordsSkip
 moonglass.dev/moonglass/tools/pipeline TestBlockedChildStopsOnlyItsTicketAndResumes
 moonglass.dev/moonglass/tools/pipeline TestBranchWaitsForUnmergedDependencies
