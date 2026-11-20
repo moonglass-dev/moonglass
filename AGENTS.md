@@ -9,7 +9,7 @@ One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and th
 | Path | What |
 |---|---|
 | `cmd/moonglass/` | The binary's entry point and role wiring |
-| `internal/<package>/` | Product code, one package per area: `agent`, `api`, `cli`, `keys`, `policy`, `protocol`, `proxy`, `registry`, `release`, `server`, `store`, and `installtest` (tests for `scripts/install`) |
+| `internal/<package>/` | Product code, one package per area: `agent`, `api`, `cli`, `deploy`, `keys`, `policy`, `protocol`, `proxy`, `registry`, `release`, `server`, `store`, `update`, and `installtest` (tests for `scripts/install`) and `releasetest` (tests for `.github/workflows/release.yml`) |
 | `proto/` | Protocol `.proto` sources; generated Go is in `internal/protocol/agentv1/` |
 | `scripts/` | `install`, `measure-memory`, `fleet/`, and the pipeline wrappers `ticket-status`, `verify`, `ship` |
 | `tools/pipeline/` | The pipeline's deterministic logic, behind those wrappers |
