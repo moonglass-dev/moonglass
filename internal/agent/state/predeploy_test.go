@@ -175,7 +175,7 @@ func TestRecordPreDeployOutcome(t *testing.T) {
 			next := tc.next(t, stored)
 			before := snapshot(t, d)
 
-			err := d.RecordPreDeploy(ctx, "app-1", tc.releaseID, next, tc.reversible, tc.detail)
+			err := d.RecordPreDeploy(ctx, testCommand(t, "app-1"), "app-1", tc.releaseID, next, tc.reversible, tc.detail, testTime())
 
 			if tc.wantErr {
 				if err == nil {

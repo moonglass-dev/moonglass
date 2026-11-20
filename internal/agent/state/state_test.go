@@ -17,9 +17,11 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	agentv1 "moonglass.dev/moonglass/internal/protocol/agentv1"
 	"moonglass.dev/moonglass/internal/release"
 )
 
@@ -35,6 +37,23 @@ func testTime() time.Time {
 
 func testTimeText(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
+}
+
+// testCommandSeq numbers the request ids testCommand mints, so every command
+// written to one database has its own row.
+var testCommandSeq atomic.Int64
+
+// testCommand is the Command an existing test passes to a state write. Its
+// result is never read back, so only carrying one matters.
+func testCommand(t *testing.T, appID string) Command {
+	t.Helper()
+	return Command{
+		RequestID: fmt.Sprintf("c-test-%d", testCommandSeq.Add(1)),
+		Type:      CommandDeploy,
+		AppID:     appID,
+		Received:  testTime(),
+		Result:    &agentv1.CommandResult{Outcome: agentv1.CommandOutcome_SUCCEEDED},
+	}
 }
 
 func contains(values []string, want string) bool {
@@ -101,7 +120,7 @@ func mustSwitch(t *testing.T, s release.State, releaseID string) release.State {
 
 func mustRecord(t *testing.T, d *DB, b Binding, r Record, s release.State, now time.Time) {
 	t.Helper()
-	if err := d.RecordCandidate(context.Background(), b, r, s, now); err != nil {
+	if err := d.RecordCandidate(context.Background(), testCommand(t, r.AppID), b, r, s, now); err != nil {
 		t.Fatalf("RecordCandidate(app %q, release %q) error = %v, want nil", r.AppID, r.ReleaseID, err)
 	}
 }
@@ -371,7 +390,8 @@ func assertReleaseRow(t *testing.T, got releaseRow, r Record, status, errText st
 }
 
 // TestPackageImportsReleaseAndStoreOnly pins the imports of the package's own
-// files: key material, protocol messages and the deploy executor stay out.
+// files: key material and the deploy executor stay out, and the command
+// records' own messages are the one protocol import.
 func TestPackageImportsReleaseAndStoreOnly(t *testing.T) {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -410,7 +430,13 @@ func TestPackageImportsReleaseAndStoreOnly(t *testing.T) {
 		"moonglass.dev/moonglass/internal/protocol",
 		"moonglass.dev/moonglass/internal/deploy",
 	}
+	// The command rows are the CommandResult protobuf, so the state package
+	// imports exactly that message package and nothing else under protocol.
+	const commandMessages = "moonglass.dev/moonglass/internal/protocol/agentv1"
 	for importPath, users := range importers {
+		if importPath == commandMessages {
+			continue
+		}
 		for _, prefix := range forbidden {
 			if importPath != prefix && !strings.HasPrefix(importPath, prefix+"/") {
 				continue
@@ -513,7 +539,7 @@ func TestOpenMigratesSpecSchema(t *testing.T) {
 	ctx := context.Background()
 	d, dir := openTemp(t)
 
-	wantTables := []string{"apps", "releases", "schema_migrations"}
+	wantTables := []string{"apps", "commands", "releases", "schema_migrations"}
 	if got := tableNames(t, d); !reflect.DeepEqual(got, wantTables) {
 		t.Fatalf("tables = %v, want %v", got, wantTables)
 	}
@@ -555,6 +581,9 @@ func TestOpenMigratesSpecSchema(t *testing.T) {
 	}
 	if !contains(versions, "0001_releases.sql") {
 		t.Errorf("schema_migrations versions = %v, want them to contain %q", versions, "0001_releases.sql")
+	}
+	if !contains(versions, "0002_commands.sql") {
+		t.Errorf("schema_migrations versions = %v, want them to contain %q", versions, "0002_commands.sql")
 	}
 
 	r := sampleRecord("app-1", "rel-1")
@@ -806,7 +835,7 @@ func TestRecordCandidateRejectsOtherBinding(t *testing.T) {
 			before := snapshot(t, d)
 			r2 := sampleRecord("app-1", "rel-2")
 			s2 := mustDeploy(t, mustSwitch(t, s1, r1.ReleaseID), r2)
-			err := d.RecordCandidate(ctx, tc.other, r2, s2, t1.Add(time.Hour))
+			err := d.RecordCandidate(ctx, testCommand(t, r2.AppID), tc.other, r2, s2, t1.Add(time.Hour))
 			if err == nil {
 				t.Fatalf("RecordCandidate with binding %+v for an app bound to %+v error = nil, want an error naming the stored binding", tc.other, b)
 			}
@@ -875,7 +904,7 @@ func TestRecordCandidateIsAtomic(t *testing.T) {
 			known: false,
 			prepare: func(t *testing.T, d *DB) attempt {
 				r := sampleRecord("app-1", "rel-1")
-				if err := d.RecordFailed(ctx, r, "pull failed: manifest unknown", t1); err != nil {
+				if err := d.RecordFailed(ctx, testCommand(t, r.AppID), r, "pull failed: manifest unknown", t1); err != nil {
 					t.Fatalf("RecordFailed(app %q, release %q) error = %v, want nil", r.AppID, r.ReleaseID, err)
 				}
 				s := mustDeploy(t, release.State{}, r)
@@ -889,7 +918,7 @@ func TestRecordCandidateIsAtomic(t *testing.T) {
 			a := tc.prepare(t, d)
 			before := snapshot(t, d)
 
-			err := d.RecordCandidate(ctx, a.binding, a.record, a.state, t1.Add(time.Hour))
+			err := d.RecordCandidate(ctx, testCommand(t, a.record.AppID), a.binding, a.record, a.state, t1.Add(time.Hour))
 			if err == nil {
 				t.Fatalf("RecordCandidate(app %q, release %q) error = nil, want an error", a.record.AppID, a.record.ReleaseID)
 			}
@@ -939,7 +968,7 @@ func TestRecordFailedLeavesStateUnchanged(t *testing.T) {
 
 			r := sampleRecord("app-1", "rel-failed")
 			failedAt := now.Add(time.Hour)
-			if err := d.RecordFailed(ctx, r, detail, failedAt); err != nil {
+			if err := d.RecordFailed(ctx, testCommand(t, r.AppID), r, detail, failedAt); err != nil {
 				t.Fatalf("RecordFailed(app %q, release %q) error = %v, want nil", r.AppID, r.ReleaseID, err)
 			}
 			assertReleaseRow(t, readRelease(t, d, r.AppID, r.ReleaseID), r, "failed", detail, failedAt)
@@ -974,7 +1003,7 @@ func TestRecordFailedLeavesStateUnchanged(t *testing.T) {
 			}
 
 			beforeSecond := snapshot(t, d)
-			secondErr := d.RecordFailed(ctx, r, detail, failedAt.Add(time.Hour))
+			secondErr := d.RecordFailed(ctx, testCommand(t, r.AppID), r, detail, failedAt.Add(time.Hour))
 			if secondErr == nil {
 				t.Fatalf("second RecordFailed(app %q, release %q) error = nil, want an error", r.AppID, r.ReleaseID)
 			}
@@ -1006,11 +1035,11 @@ func TestRecordFailedLeavesStateUnchanged(t *testing.T) {
 
 		var errs []error
 		logs := captureStandardLogs(t, func() {
-			if err := d.RecordFailed(ctx, r, detail, now); err != nil {
+			if err := d.RecordFailed(ctx, testCommand(t, r.AppID), r, detail, now); err != nil {
 				t.Errorf("RecordFailed(app %q, release %q) error = %v, want nil", r.AppID, r.ReleaseID, err)
 			}
-			errs = append(errs, d.RecordFailed(ctx, r, detail, now.Add(time.Hour)))
-			errs = append(errs, d.RecordCandidate(ctx, other, r2, s2, now))
+			errs = append(errs, d.RecordFailed(ctx, testCommand(t, r.AppID), r, detail, now.Add(time.Hour)))
+			errs = append(errs, d.RecordCandidate(ctx, testCommand(t, r2.AppID), other, r2, s2, now))
 		})
 		if len(errs) != 2 {
 			t.Fatalf("errors collected = %d, want 2", len(errs))
@@ -1054,8 +1083,8 @@ func TestRecordStoresTextVerbatim(t *testing.T) {
 		mustRecord(t, d, b, r, s, now)
 
 		assertReleaseRow(t, readRelease(t, d, r.AppID, r.ReleaseID), r, "candidate", "", now)
-		if got := tableNames(t, d); !reflect.DeepEqual(got, []string{"apps", "releases", "schema_migrations"}) {
-			t.Errorf("tables after a record with hostile text = %v, want [apps releases schema_migrations]", got)
+		if got := tableNames(t, d); !reflect.DeepEqual(got, []string{"apps", "commands", "releases", "schema_migrations"}) {
+			t.Errorf("tables after a record with hostile text = %v, want [apps commands releases schema_migrations]", got)
 		}
 		gotBinding, gotState, known, err := d.App(ctx, r.AppID)
 		if err != nil {
@@ -1078,7 +1107,7 @@ func TestRecordStoresTextVerbatim(t *testing.T) {
 		r := sampleRecord("app-1", "rel-1")
 		r.Domains = nil
 		detail := `pull failed: "not found"; --`
-		if err := d.RecordFailed(ctx, r, detail, now); err != nil {
+		if err := d.RecordFailed(ctx, testCommand(t, r.AppID), r, detail, now); err != nil {
 			t.Fatalf("RecordFailed(app %q, release %q) error = %v, want nil", r.AppID, r.ReleaseID, err)
 		}
 		row := readRelease(t, d, r.AppID, r.ReleaseID)

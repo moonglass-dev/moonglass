@@ -20,7 +20,7 @@ func switchApp(t *testing.T, d *DB, appID, releaseID string, created, switched t
 	next := mustDeploy(t, st, r)
 	mustRecord(t, d, sampleBinding(), r, next, created)
 	after := mustSwitch(t, next, releaseID)
-	if err := d.RecordSwitch(context.Background(), appID, releaseID, after, switched); err != nil {
+	if err := d.RecordSwitch(context.Background(), testCommand(t, appID), appID, releaseID, after, switched); err != nil {
 		t.Fatalf("RecordSwitch(app %q, release %q) error = %v, want nil", appID, releaseID, err)
 	}
 	return after
@@ -54,7 +54,7 @@ func dueStopsApps(t *testing.T) (*DB, time.Time) {
 	st = switchApp(t, d, "app-a", "a-r3", t0, t0.Add(60*time.Second), st)
 
 	rolledBack := mustRollback(t, st)
-	if err := d.RecordRollback(ctx, "app-a", rolledBack, t0.Add(2*time.Minute)); err != nil {
+	if err := d.RecordRollback(ctx, testCommand(t, "app-a"), "app-a", rolledBack, t0.Add(2*time.Minute)); err != nil {
 		t.Fatalf("RecordRollback(app-a) error = %v, want nil", err)
 	}
 
@@ -65,7 +65,7 @@ func dueStopsApps(t *testing.T) (*DB, time.Time) {
 	if err != nil {
 		t.Fatalf("State.Abort(%q) error = %v, want nil", "a-r4", err)
 	}
-	if err := d.RecordAbort(ctx, "app-a", "a-r4", aborted, "health gate failed"); err != nil {
+	if err := d.RecordAbort(ctx, testCommand(t, "app-a"), "app-a", "a-r4", aborted, "health gate failed", t0.Add(2*time.Minute)); err != nil {
 		t.Fatalf("RecordAbort(app-a) error = %v, want nil", err)
 	}
 
@@ -73,7 +73,7 @@ func dueStopsApps(t *testing.T) (*DB, time.Time) {
 	ready := mustDeploy(t, aborted, r5)
 	mustRecord(t, d, sampleBinding(), r5, ready, t0.Add(3*time.Minute))
 
-	if err := d.RecordFailed(ctx, sampleRecord("app-a", "a-failed"), "pull failed", t0.Add(3*time.Minute)); err != nil {
+	if err := d.RecordFailed(ctx, testCommand(t, "app-a"), sampleRecord("app-a", "a-failed"), "pull failed", t0.Add(3*time.Minute)); err != nil {
 		t.Fatalf("RecordFailed(app-a) error = %v, want nil", err)
 	}
 
@@ -317,7 +317,7 @@ func recordRetained(t *testing.T, d *DB, rel retainRelease, st release.State) re
 	next := mustDeploy(t, st, r)
 	mustRecord(t, d, sampleBinding(), r, next, rel.created)
 	after := mustSwitch(t, next, rel.releaseID)
-	if err := d.RecordSwitch(context.Background(), rel.appID, rel.releaseID, after, rel.switched); err != nil {
+	if err := d.RecordSwitch(context.Background(), testCommand(t, rel.appID), rel.appID, rel.releaseID, after, rel.switched); err != nil {
 		t.Fatalf("RecordSwitch(app %q, release %q) error = %v, want nil", rel.appID, rel.releaseID, err)
 	}
 	return after
@@ -416,10 +416,10 @@ func TestRetainKeepsFiveAndPrunesOldRows(t *testing.T) {
 	}
 
 	// Failed and aborted rows on both sides of the seven-day line.
-	if err := d.RecordFailed(ctx, sampleRecord("app-e", "e-old"), "pull failed", now.Add(-8*24*time.Hour)); err != nil {
+	if err := d.RecordFailed(ctx, testCommand(t, "app-e"), sampleRecord("app-e", "e-old"), "pull failed", now.Add(-8*24*time.Hour)); err != nil {
 		t.Fatalf("RecordFailed(app-e/e-old) error = %v, want nil", err)
 	}
-	if err := d.RecordFailed(ctx, sampleRecord("app-e", "e-new"), "pull failed", now.Add(-6*24*time.Hour)); err != nil {
+	if err := d.RecordFailed(ctx, testCommand(t, "app-e"), sampleRecord("app-e", "e-new"), "pull failed", now.Add(-6*24*time.Hour)); err != nil {
 		t.Fatalf("RecordFailed(app-e/e-new) error = %v, want nil", err)
 	}
 
@@ -438,7 +438,7 @@ func TestRetainKeepsFiveAndPrunesOldRows(t *testing.T) {
 		if err != nil {
 			t.Fatalf("State.Abort(%q) error = %v, want nil", tc.releaseID, err)
 		}
-		if err := d.RecordAbort(ctx, "app-d", tc.releaseID, aborted, "health gate failed"); err != nil {
+		if err := d.RecordAbort(ctx, testCommand(t, "app-d"), "app-d", tc.releaseID, aborted, "health gate failed", now); err != nil {
 			t.Fatalf("RecordAbort(%s) error = %v, want nil", tc.releaseID, err)
 		}
 		stD = aborted

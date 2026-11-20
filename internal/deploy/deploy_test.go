@@ -29,7 +29,7 @@ func TestDeployImportedImageStartsCandidate(t *testing.T) {
 	msg := deployMsg(p.name, app, "r1", ref)
 	msg.Port = 8080
 
-	res := x.Deploy(ctx, msg)
+	res := x.Deploy(ctx, requestID(t), msg)
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Deploy outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -123,7 +123,7 @@ func TestDeployWithPreDeployLeavesContainerCreated(t *testing.T) {
 	msg := deployMsg(p.name, app, "r1", ref)
 	msg.HasPreDeploy = true
 
-	res := x.Deploy(ctx, msg)
+	res := x.Deploy(ctx, requestID(t), msg)
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Deploy(has_pre_deploy) outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -233,7 +233,7 @@ func TestDeployRejectsBeforeActing(t *testing.T) {
 			beforeNetworks := projectNetworkNames(t, e, p)
 			beforeBinding, beforeState, beforeKnown := storedApp(t, dir, app)
 
-			res := x.Deploy(ctx, msg)
+			res := x.Deploy(ctx, requestID(t), msg)
 
 			if got, want := res.GetOutcome(), agentv1.CommandOutcome_REJECTED; got != want {
 				t.Fatalf("Deploy outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -333,7 +333,7 @@ func TestDeployFailuresLeaveStateUnchanged(t *testing.T) {
 
 			msg, wantDetail := tc.run(t, x, p, app)
 
-			res := x.Deploy(ctx, msg)
+			res := x.Deploy(ctx, requestID(t), msg)
 
 			if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
 				t.Fatalf("Deploy outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -387,7 +387,7 @@ func TestDeployReplacesLeftoverContainer(t *testing.T) {
 	name := testContainerName(app, "r1")
 	leftover := createFixture(t, e, emptyPolicy(t, policy.Env{}), fixtureSpec(p, app, "r1", ref, true), name)
 
-	res := x.Deploy(ctx, deployMsg(p.name, app, "r1", ref))
+	res := x.Deploy(ctx, requestID(t), deployMsg(p.name, app, "r1", ref))
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Deploy over a leftover container outcome = %v with detail %q, want %v",

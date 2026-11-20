@@ -62,43 +62,86 @@ type rejectedError struct{ error }
 
 func (e rejectedError) Unwrap() error { return e.error }
 func rejected(err error) error        { return rejectedError{err} }
-func (x *Executor) Deploy(ctx context.Context, d *agentv1.Deploy) *agentv1.CommandResult {
+
+// once answers a stored request id, refuses an empty one, and records a result
+// that wrote no state change on its own (docs/specs/agent-state.md).
+func (x *Executor) once(ctx context.Context, requestID, typ, appID string, run func(state.Command) (*agentv1.CommandResult, bool)) *agentv1.CommandResult {
+	cmd := state.Command{Received: x.now(), RequestID: requestID, Type: typ, AppID: appID}
+	if requestID == "" {
+		return result(agentv1.CommandOutcome_REJECTED,
+			"the command has no request id; send it in an envelope with its request id", release.State{})
+	}
+
+	stored, found, err := x.db.CommandResult(ctx, requestID)
+	if err != nil {
+		return x.recordAlone(ctx, cmd, result(agentv1.CommandOutcome_FAILED, fmt.Sprintf("read command %s: %v", requestID, err), release.State{}))
+	}
+	if found {
+		return stored
+	}
+
+	res, written := run(cmd)
+	if written {
+		return res
+	}
+	return x.recordAlone(ctx, cmd, res)
+}
+
+// recordAlone writes a result alone, appending a failed write to its detail.
+func (x *Executor) recordAlone(ctx context.Context, cmd state.Command, res *agentv1.CommandResult) *agentv1.CommandResult {
+	cmd.Result = res
+	if err := x.db.RecordCommand(ctx, cmd, x.now()); err != nil {
+		res.Detail = truncate(res.Detail + "; recording the command also failed: " + err.Error())
+	}
+	return res
+}
+
+// Deploy runs one Deploy under its request id (docs/specs/release.md).
+func (x *Executor) Deploy(ctx context.Context, requestID string, d *agentv1.Deploy) *agentv1.CommandResult {
+	return x.once(ctx, requestID, state.CommandDeploy, d.GetAppId(), func(cmd state.Command) (*agentv1.CommandResult, bool) {
+		return x.deploy(ctx, cmd, d)
+	})
+}
+
+// deploy is Deploy's body; written reports whether its result is committed.
+func (x *Executor) deploy(ctx context.Context, cmd state.Command, d *agentv1.Deploy) (*agentv1.CommandResult, bool) {
 	appID := d.GetAppId()
 	stored, st, known, err := x.db.App(ctx, appID)
 	if err != nil {
-		return result(agentv1.CommandOutcome_FAILED, fmt.Sprintf("read app %s: %v", appID, err), release.State{})
+		return result(agentv1.CommandOutcome_FAILED, fmt.Sprintf("read app %s: %v", appID, err), release.State{}), false
 	}
 	binding := state.Binding{Project: d.GetProject(), Environment: d.GetEnvironment(), Service: d.GetService()}
 	if known && stored != binding {
 		detail := fmt.Sprintf("app %s is bound to project %q, environment %q, service %q; deploy it with that binding or use a new app id", appID, stored.Project, stored.Environment, stored.Service)
-		return result(agentv1.CommandOutcome_REJECTED, detail, st)
+		return result(agentv1.CommandOutcome_REJECTED, detail, st), false
 	}
 	next, err := st.Deploy(d.GetReleaseId(), d.GetImage(), d.GetHasPreDeploy())
 	if err != nil {
-		return result(agentv1.CommandOutcome_REJECTED, err.Error(), st)
+		return result(agentv1.CommandOutcome_REJECTED, err.Error(), st), false
 	}
 	rec := state.Record{
 		AppID: appID, ReleaseID: d.GetReleaseId(), ImageRef: d.GetImage(), Port: d.GetPort(),
 		HealthPath: d.GetHealthPath(), Domains: d.GetDomains(), HasPreDeploy: d.GetHasPreDeploy(),
 	}
 	if domErr := x.checkDomains(ctx, appID, d.GetDomains()); domErr != nil {
-		return x.fail(ctx, rec, st, domErr)
+		return x.fail(ctx, cmd, rec, st, domErr)
 	}
 	img, err := x.prepare(ctx, d, &rec)
 	if err != nil {
-		return x.fail(ctx, rec, st, err)
-	}
-	if err := x.db.RecordCandidate(ctx, binding, rec, next, x.now()); err != nil {
-		if rmErr := x.engine.remove(ctx, rec.ContainerID); rmErr != nil {
-			err = fmt.Errorf("%w; removing the container also failed: %w", err, rmErr)
-		}
-		rec.ContainerID = ""
-		return x.fail(ctx, rec, st, err)
+		return x.fail(ctx, cmd, rec, st, err)
 	}
 	res := result(agentv1.CommandOutcome_SUCCEEDED, "", next)
 	res.ImageId = img.ID
 	res.RepoDigest = img.RepoDigest
-	return res
+	cmd.Result = res
+	if err := x.db.RecordCandidate(ctx, cmd, binding, rec, next, x.now()); err != nil {
+		if rmErr := x.engine.remove(ctx, rec.ContainerID); rmErr != nil {
+			err = fmt.Errorf("%w; removing the container also failed: %w", err, rmErr)
+		}
+		rec.ContainerID = ""
+		return x.fail(ctx, cmd, rec, st, err)
+	}
+	return res, true
 }
 
 // checkDomains refuses a domain that another app's current release routes. The
@@ -182,14 +225,17 @@ func (x *Executor) prepare(ctx context.Context, d *agentv1.Deploy, rec *state.Re
 	return img, nil
 }
 
-func (x *Executor) fail(ctx context.Context, rec state.Record, st release.State, cause error) *agentv1.CommandResult {
+// fail records a failed release and answers its result, unless that row fails.
+func (x *Executor) fail(ctx context.Context, cmd state.Command, rec state.Record, st release.State, cause error) (*agentv1.CommandResult, bool) {
 	rec.ContainerID = ""
 	detail := truncate(cause.Error())
-	if err := x.db.RecordFailed(ctx, rec, detail, x.now()); err != nil {
-		detail += "; recording the failure also failed: " + err.Error()
-	}
 	o := outcome(cause)
-	return result(o, detail, st)
+	res := result(o, detail, st)
+	cmd.Result = res
+	if err := x.db.RecordFailed(ctx, cmd, rec, detail, x.now()); err != nil {
+		return result(o, detail+"; recording the failure also failed: "+err.Error(), st), false
+	}
+	return res, true
 }
 
 func appSpec(d *agentv1.Deploy, img resolved) policy.Spec {

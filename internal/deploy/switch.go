@@ -41,63 +41,73 @@ var healthClient = &http.Client{
 // SwitchRelease runs the health gate on the ready candidate, pushes the complete
 // proxy config with the candidate routed, and commits the switch in one state
 // transaction (docs/specs/release.md, "SwitchRelease").
-func (x *Executor) SwitchRelease(ctx context.Context, s *agentv1.SwitchRelease) *agentv1.CommandResult {
+func (x *Executor) SwitchRelease(ctx context.Context, requestID string, s *agentv1.SwitchRelease) *agentv1.CommandResult {
+	return x.once(ctx, requestID, state.CommandSwitchRelease, s.GetAppId(), func(cmd state.Command) (*agentv1.CommandResult, bool) {
+		return x.switchRelease(ctx, cmd, s)
+	})
+}
+
+// switchRelease is SwitchRelease's body; written reports a committed result.
+func (x *Executor) switchRelease(ctx context.Context, cmd state.Command, s *agentv1.SwitchRelease) (*agentv1.CommandResult, bool) {
 	appID := s.GetAppId()
 	releaseID := s.GetReleaseId()
 	defer x.lockApp(appID)()
 
 	b, st, known, err := x.db.App(ctx, appID)
 	if err != nil {
-		return result(agentv1.CommandOutcome_FAILED, fmt.Sprintf("read app %s: %v", appID, err), release.State{})
+		return result(agentv1.CommandOutcome_FAILED, fmt.Sprintf("read app %s: %v", appID, err), release.State{}), false
 	}
 	if !known {
 		return result(agentv1.CommandOutcome_REJECTED,
-			fmt.Sprintf("app %s has no release on this server; deploy it first", appID), st)
+			fmt.Sprintf("app %s has no release on this server; deploy it first", appID), st), false
 	}
 	next, err := st.Switch(releaseID)
 	if err != nil {
-		return result(agentv1.CommandOutcome_REJECTED, err.Error(), st)
+		return result(agentv1.CommandOutcome_REJECTED, err.Error(), st), false
 	}
 
 	rec, found, err := x.db.Release(ctx, appID, releaseID)
 	if err != nil {
-		return result(agentv1.CommandOutcome_FAILED, err.Error(), st)
+		return result(agentv1.CommandOutcome_FAILED, err.Error(), st), false
 	}
 	if !found {
 		return result(agentv1.CommandOutcome_FAILED,
-			fmt.Sprintf("release %s of app %s has no record on this server; deploy it again", releaseID, appID), st)
+			fmt.Sprintf("release %s of app %s has no record on this server; deploy it again", releaseID, appID), st), false
 	}
 
 	if gateErr := x.healthGate(ctx, b.Project, rec); gateErr != nil {
-		return x.abortSwitch(ctx, st, rec, gateErr.Error())
+		return x.abortSwitch(ctx, cmd, st, rec, gateErr.Error())
 	}
 
+	res := result(agentv1.CommandOutcome_SUCCEEDED, "", next)
+	cmd.Result = res
 	routed := state.CurrentRelease{Binding: b, Record: rec}
 	if err := x.proxy.PushRouted(ctx, routed, func(ctx context.Context) error {
-		return x.db.RecordSwitch(ctx, appID, releaseID, next, x.now())
+		return x.db.RecordSwitch(ctx, cmd, appID, releaseID, next, x.now())
 	}); err != nil {
-		return result(outcome(err), err.Error(), st)
+		return result(outcome(err), err.Error(), st), false
 	}
-	return result(agentv1.CommandOutcome_SUCCEEDED, "", next)
+	return res, true
 }
 
 // abortSwitch clears the candidate, removes its container, records the aborted
 // row and answers FAILED. Current and Previous never change, so the old release
 // keeps serving.
-func (x *Executor) abortSwitch(ctx context.Context, st release.State, rec state.Record, cause string) *agentv1.CommandResult {
+func (x *Executor) abortSwitch(ctx context.Context, cmd state.Command, st release.State, rec state.Record, cause string) (*agentv1.CommandResult, bool) {
 	aborted, err := st.Abort(rec.ReleaseID)
 	if err != nil {
-		return result(agentv1.CommandOutcome_FAILED, cause+"; aborting the release also failed: "+err.Error(), st)
+		return result(agentv1.CommandOutcome_FAILED, cause+"; aborting the release also failed: "+err.Error(), st), false
 	}
 	detail := truncate(cause)
 	if rmErr := x.engine.remove(ctx, rec.ContainerID); rmErr != nil && !isNotFound(rmErr) {
 		detail += "; removing the candidate container also failed: " + rmErr.Error()
 	}
-	if recErr := x.db.RecordAbort(ctx, rec.AppID, rec.ReleaseID, aborted, truncate(detail)); recErr != nil {
-		detail += "; recording the abort also failed: " + recErr.Error()
-		return result(agentv1.CommandOutcome_FAILED, detail, st)
+	res := result(agentv1.CommandOutcome_FAILED, detail, aborted)
+	cmd.Result = res
+	if recErr := x.db.RecordAbort(ctx, cmd, rec.AppID, rec.ReleaseID, aborted, truncate(detail), x.now()); recErr != nil {
+		return result(agentv1.CommandOutcome_FAILED, detail+"; recording the abort also failed: "+recErr.Error(), st), false
 	}
-	return result(agentv1.CommandOutcome_FAILED, detail, aborted)
+	return res, true
 }
 
 // healthGate blocks until the candidate is healthy, it exits or restarts, or the

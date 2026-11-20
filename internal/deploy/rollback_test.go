@@ -23,7 +23,7 @@ func switchTwice(t *testing.T, e *Engine, x *Executor, p *project, app, domain s
 	for _, rel := range []string{"r1", "r2"} {
 		requireDeployOutcome(t, deployDomains(t, e, x, p, app, rel, []string{domain}),
 			agentv1.CommandOutcome_SUCCEEDED, "")
-		res := x.SwitchRelease(context.Background(), switchMsg(app, rel))
+		res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(app, rel))
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 			t.Fatalf("SwitchRelease(%s) outcome = %v with detail %q, want %v", rel, got, res.GetDetail(), want)
 		}
@@ -79,7 +79,7 @@ func TestRollbackRunningPreviousRoutesAndCommits(t *testing.T) {
 	loads := fake.loadCount()
 	containers := projectContainerIDs(t, e, p)
 	before := time.Now()
-	res := x.Rollback(context.Background(), rollbackMsg(app))
+	res := x.Rollback(context.Background(), requestID(t), rollbackMsg(app))
 	after := time.Now()
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
@@ -158,7 +158,7 @@ func TestRollbackStoppedPreviousStartsAndGates(t *testing.T) {
 		}
 
 		loads := fake.loadCount()
-		res := x.Rollback(context.Background(), rollbackMsg(app))
+		res := x.Rollback(context.Background(), requestID(t), rollbackMsg(app))
 
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 			t.Fatalf("Rollback() outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -190,11 +190,11 @@ func TestRollbackStoppedPreviousStartsAndGates(t *testing.T) {
 		// passes and each switch succeeds. The stored health path of r1 is set
 		// afterwards, so only the rollback's restart meets the failing status.
 		r1 := deployGate(t, e, x, p, app, "r1", []string{"/app", "health", "/healthz", "500"}, 8080, "")
-		if res := x.SwitchRelease(context.Background(), switchMsg(app, r1.ReleaseID)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+		if res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(app, r1.ReleaseID)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 			t.Fatalf("SwitchRelease(r1) outcome = %v with detail %q, want SUCCEEDED", res.GetOutcome(), res.GetDetail())
 		}
 		r2 := deployGate(t, e, x, p, app, "r2", []string{"/app"}, 8080, "")
-		if res := x.SwitchRelease(context.Background(), switchMsg(app, r2.ReleaseID)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+		if res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(app, r2.ReleaseID)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 			t.Fatalf("SwitchRelease(r2) outcome = %v with detail %q, want SUCCEEDED", res.GetOutcome(), res.GetDetail())
 		}
 
@@ -208,7 +208,7 @@ func TestRollbackStoppedPreviousStartsAndGates(t *testing.T) {
 		loads := fake.loadCount()
 		rows := stateText(t, dir)
 
-		res := x.Rollback(context.Background(), rollbackMsg(app))
+		res := x.Rollback(context.Background(), requestID(t), rollbackMsg(app))
 
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
 			t.Fatalf("Rollback() with a failing gate outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -273,7 +273,7 @@ func TestRollbackPreviousContainerGone(t *testing.T) {
 			loads := fake.loadCount()
 			rows := stateText(t, dir)
 
-			res := x.Rollback(context.Background(), rollbackMsg(app))
+			res := x.Rollback(context.Background(), requestID(t), rollbackMsg(app))
 
 			const goneDetail = "the previous release's container is gone; deploy again"
 			if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
@@ -310,7 +310,7 @@ func TestRollbackRefusalsAndPushFailure(t *testing.T) {
 			prepare: func(t *testing.T, e *Engine, x *Executor, p *project, app string) {
 				requireDeployOutcome(t, deployDomains(t, e, x, p, app, "r1", nil),
 					agentv1.CommandOutcome_SUCCEEDED, "")
-				if res := x.SwitchRelease(ctx, switchMsg(app, "r1")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+				if res := x.SwitchRelease(ctx, requestID(t), switchMsg(app, "r1")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 					t.Fatalf("SwitchRelease(r1) outcome = %v with detail %q, want SUCCEEDED", res.GetOutcome(), res.GetDetail())
 				}
 			},
@@ -319,7 +319,7 @@ func TestRollbackRefusalsAndPushFailure(t *testing.T) {
 			name: "an app right after a rollback",
 			prepare: func(t *testing.T, e *Engine, x *Executor, p *project, app string) {
 				switchTwice(t, e, x, p, app, "refuse.example.com")
-				if res := x.Rollback(ctx, rollbackMsg(app)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+				if res := x.Rollback(ctx, requestID(t), rollbackMsg(app)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 					t.Fatalf("the first Rollback() outcome = %v with detail %q, want SUCCEEDED", res.GetOutcome(), res.GetDetail())
 				}
 			},
@@ -338,7 +338,7 @@ func TestRollbackRefusalsAndPushFailure(t *testing.T) {
 			rows := stateText(t, dir)
 			containers := projectContainerIDs(t, e, p)
 
-			res := x.Rollback(ctx, rollbackMsg(app))
+			res := x.Rollback(ctx, requestID(t), rollbackMsg(app))
 
 			if got, want := res.GetOutcome(), agentv1.CommandOutcome_REJECTED; got != want {
 				t.Fatalf("Rollback() outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -371,7 +371,7 @@ func TestRollbackRefusalsAndPushFailure(t *testing.T) {
 			Previous: &release.Release{ID: "r1"},
 		}
 
-		res := x.Rollback(ctx, rollbackMsg(app))
+		res := x.Rollback(ctx, requestID(t), rollbackMsg(app))
 
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
 			t.Fatalf("Rollback() with /load answering 500 outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -385,7 +385,7 @@ func TestRollbackRefusalsAndPushFailure(t *testing.T) {
 		requireEqual(t, "POST /load count after the failed push", fake.loadCount(), loads+1)
 
 		fake.setLoadResponse(http.StatusOK, "")
-		res = x.Rollback(ctx, rollbackMsg(app))
+		res = x.Rollback(ctx, requestID(t), rollbackMsg(app))
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 			t.Fatalf("the re-sent Rollback() outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
 		}
@@ -411,7 +411,7 @@ func TestRollbackLeavesCandidateUntouched(t *testing.T) {
 	requireRunning(t, e, testContainerName(app, "r3"))
 
 	loads := fake.loadCount()
-	res := x.Rollback(context.Background(), rollbackMsg(app))
+	res := x.Rollback(context.Background(), requestID(t), rollbackMsg(app))
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Rollback() outcome = %v with detail %q, want %v", got, res.GetDetail(), want)

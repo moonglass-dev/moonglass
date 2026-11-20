@@ -53,7 +53,7 @@ func TestExecutorRunStopsAndRetainsUntilCancelled(t *testing.T) {
 		fixtureSpec(p, appB, "b0", "moonglass.local/"+p.name+"/web:b1", true), ghostName)
 
 	oldFailed := state.Record{AppID: app, ReleaseID: "r-failed-old"}
-	if err := x.db.RecordFailed(ctx, oldFailed, "pull failed", time.Now().Add(-8*24*time.Hour)); err != nil {
+	if err := x.db.RecordFailed(ctx, seedCommand(t, oldFailed.AppID), oldFailed, "pull failed", time.Now().Add(-8*24*time.Hour)); err != nil {
 		t.Fatalf("RecordFailed(%q) error = %v, want nil", oldFailed.ReleaseID, err)
 	}
 
@@ -122,7 +122,7 @@ func TestExecutorRunStopsAndRetainsUntilCancelled(t *testing.T) {
 	}
 
 	newFailed := state.Record{AppID: app, ReleaseID: "r-failed-new"}
-	if err := x.db.RecordFailed(ctx, newFailed, "pull failed", time.Now().Add(-8*24*time.Hour)); err != nil {
+	if err := x.db.RecordFailed(ctx, seedCommand(t, newFailed.AppID), newFailed, "pull failed", time.Now().Add(-8*24*time.Hour)); err != nil {
 		t.Fatalf("RecordFailed(%q) error = %v, want nil", newFailed.ReleaseID, err)
 	}
 	waitFor(t, "the second old failed row to be deleted by retention", 3*time.Second, func() bool {

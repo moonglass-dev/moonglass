@@ -30,7 +30,7 @@ func deployGate(t *testing.T, e *Engine, x *Executor, p *project, app, rel strin
 	msg := deployMsg(p.name, app, rel, ref)
 	msg.Port = port
 	msg.HealthPath = healthPath
-	res := x.Deploy(context.Background(), msg)
+	res := x.Deploy(context.Background(), requestID(t), msg)
 	if got := res.GetOutcome(); got != agentv1.CommandOutcome_SUCCEEDED {
 		t.Fatalf("Deploy(%s/%s) outcome = %v with detail %q, want SUCCEEDED", app, rel, got, res.GetDetail())
 	}
@@ -465,7 +465,7 @@ func TestSwitchReleaseRoutesCandidateAndCommits(t *testing.T) {
 		loads := fake.loadCount()
 		seenBefore := len(seen)
 		before := time.Now()
-		res := x.SwitchRelease(context.Background(), switchMsg(app, rel))
+		res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(app, rel))
 		after := time.Now()
 
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
@@ -554,7 +554,7 @@ func TestSwitchReleaseHealthFailureAborts(t *testing.T) {
 
 	requireDeployOutcome(t, deployDomains(t, e, x, p, app, "r1", nil),
 		agentv1.CommandOutcome_SUCCEEDED, "")
-	res := x.SwitchRelease(context.Background(), switchMsg(app, "r1"))
+	res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(app, "r1"))
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("SwitchRelease(r1) outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
 	}
@@ -562,7 +562,7 @@ func TestSwitchReleaseHealthFailureAborts(t *testing.T) {
 
 	deployGate(t, e, x, p, app, "r2", []string{"/app", "health", "/healthz", "500"}, 8080, "/healthz")
 
-	res = x.SwitchRelease(context.Background(), switchMsg(app, "r2"))
+	res = x.SwitchRelease(context.Background(), requestID(t), switchMsg(app, "r2"))
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
 		t.Fatalf("SwitchRelease(r2) outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -620,7 +620,7 @@ func TestSwitchReleaseRefusalsAndPushFailure(t *testing.T) {
 			prepare: func(t *testing.T, e *Engine, x *Executor, p *project, app string) {
 				requireDeployOutcome(t, deployDomains(t, e, x, p, app, "r1", nil),
 					agentv1.CommandOutcome_SUCCEEDED, "")
-				res := x.SwitchRelease(ctx, switchMsg(app, "r1"))
+				res := x.SwitchRelease(ctx, requestID(t), switchMsg(app, "r1"))
 				if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 					t.Fatalf("SwitchRelease(r1) outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
 				}
@@ -644,7 +644,7 @@ func TestSwitchReleaseRefusalsAndPushFailure(t *testing.T) {
 				msg := deployMsg(p.name, app, "r1", ref)
 				msg.Port = 8080
 				msg.HasPreDeploy = true
-				res := x.Deploy(ctx, msg)
+				res := x.Deploy(ctx, requestID(t), msg)
 				if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 					t.Fatalf("Deploy with a pre-deploy step outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
 				}
@@ -665,7 +665,7 @@ func TestSwitchReleaseRefusalsAndPushFailure(t *testing.T) {
 			rows := stateText(t, dir)
 			containers := projectContainerIDs(t, e, p)
 
-			res := x.SwitchRelease(ctx, switchMsg(app, tc.releaseID))
+			res := x.SwitchRelease(ctx, requestID(t), switchMsg(app, tc.releaseID))
 
 			if got, want := res.GetOutcome(), agentv1.CommandOutcome_REJECTED; got != want {
 				t.Fatalf("SwitchRelease(%s) outcome = %v with detail %q, want %v", tc.releaseID, got, res.GetDetail(), want)
@@ -699,7 +699,7 @@ func TestSwitchReleaseRefusalsAndPushFailure(t *testing.T) {
 		}
 
 		fake.setLoadResponse(http.StatusInternalServerError, "nope")
-		res := x.SwitchRelease(ctx, switchMsg(app, "r1"))
+		res := x.SwitchRelease(ctx, requestID(t), switchMsg(app, "r1"))
 
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
 			t.Fatalf("SwitchRelease(r1) with /load answering 500 outcome = %v with detail %q, want %v",
@@ -718,7 +718,7 @@ func TestSwitchReleaseRefusalsAndPushFailure(t *testing.T) {
 		requireRunning(t, e, testContainerName(app, "r1"))
 
 		fake.setLoadResponse(http.StatusOK, "")
-		res = x.SwitchRelease(ctx, switchMsg(app, "r1"))
+		res = x.SwitchRelease(ctx, requestID(t), switchMsg(app, "r1"))
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 			t.Fatalf("the re-sent SwitchRelease(r1) outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
 		}

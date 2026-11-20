@@ -22,7 +22,7 @@ func stopSetClock(x *Executor, t time.Time) {
 // stopRequireSwitch switches app to rel and requires SUCCEEDED.
 func stopRequireSwitch(t *testing.T, x *Executor, app, rel string) {
 	t.Helper()
-	res := x.SwitchRelease(context.Background(), switchMsg(app, rel))
+	res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(app, rel))
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("SwitchRelease(%s) outcome = %v with detail %q, want %v", rel, got, res.GetDetail(), want)
 	}
@@ -38,7 +38,7 @@ func stopDeployPending(t *testing.T, e *Engine, x *Executor, p *project, app, re
 	msg := deployMsg(p.name, app, rel, ref)
 	msg.Port = 8080
 	msg.HasPreDeploy = true
-	res := x.Deploy(context.Background(), msg)
+	res := x.Deploy(context.Background(), requestID(t), msg)
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Deploy(%s/%s) with a pre-deploy step outcome = %v with detail %q, want %v",
 			app, rel, got, res.GetDetail(), want)
@@ -105,7 +105,7 @@ func TestStopPreviousStopsAndKeepsContainer(t *testing.T) {
 		t.Errorf("r1 stop_after after the stop = %q, want NULL", times.stopAfter.String)
 	}
 
-	res := x.Rollback(ctx, rollbackMsg(app))
+	res := x.Rollback(ctx, requestID(t), rollbackMsg(app))
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Rollback() after the stop outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
 	}
@@ -127,7 +127,7 @@ func TestStopRetiredRemovesContainerAndPreDeployStep(t *testing.T) {
 
 	// r1 is deployed with a pre-deploy step, so its -pre container stays behind.
 	stopDeployPending(t, e, x, p, app, "r1")
-	if res := x.RunPreDeploy(ctx, preDeployMsg(app, "r1", false, "exit", "0")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+	if res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, "r1", false, "exit", "0")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 		t.Fatalf("RunPreDeploy(r1) outcome = %v with detail %q, want SUCCEEDED", res.GetOutcome(), res.GetDetail())
 	}
 	stopRequireSwitch(t, x, app, "r1")
@@ -198,7 +198,7 @@ func TestStopNeverStopsRestoredRelease(t *testing.T) {
 	now := time.Now()
 	stale := stopDueRow(t, x, app, "r1", now)
 
-	res := x.Rollback(ctx, rollbackMsg(app))
+	res := x.Rollback(ctx, requestID(t), rollbackMsg(app))
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Rollback() outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
 	}
@@ -235,7 +235,7 @@ func TestStopNeverStopsRestoredRelease(t *testing.T) {
 	rollbackDone := make(chan *agentv1.CommandResult, 1)
 	go func() {
 		close(started)
-		rollbackDone <- x.Rollback(ctx, rollbackMsg(app))
+		rollbackDone <- x.Rollback(ctx, requestID(t), rollbackMsg(app))
 	}()
 	<-started
 	select {

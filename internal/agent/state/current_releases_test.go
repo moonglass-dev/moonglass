@@ -45,7 +45,7 @@ func TestCurrentReleasesListsEveryAppsCurrentRelease(t *testing.T) {
 	mustRecord(t, d, b, recC, mustDeploy(t, release.State{}, recC), now)
 
 	recD := sampleRecord("app-d", "r1")
-	if err := d.RecordFailed(ctx, recD, "pull failed: manifest unknown", now); err != nil {
+	if err := d.RecordFailed(ctx, testCommand(t, recD.AppID), recD, "pull failed: manifest unknown", now); err != nil {
 		t.Fatalf("RecordFailed(app %q, release %q) error = %v, want nil", recD.AppID, recD.ReleaseID, err)
 	}
 
