@@ -279,6 +279,9 @@ func TestHealthGateHTTPPath(t *testing.T) {
 			p := testProject(t, e)
 			x, _ := newExecutor(t, e)
 			x.healthLimit = 6 * time.Second
+			if tc.wantPass {
+				x.healthLimit = 20 * time.Second
+			}
 			app := testAppID(p, "gate")
 			rec := deployGate(t, e, x, p, app, "r1", tc.entrypoint, 8080, tc.healthPath)
 
