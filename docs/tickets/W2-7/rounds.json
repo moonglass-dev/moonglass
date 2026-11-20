@@ -9,8 +9,12 @@
     "done:tests": 1,
     "done:ticket": 1,
     "fix": 1,
+    "repair": 1,
     "review": 2,
     "worker": 2
   },
-  "claim": null
+  "claim": {
+    "step": "repair",
+    "round": 1
+  }
 }
