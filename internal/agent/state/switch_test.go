@@ -77,7 +77,7 @@ func TestRecordSwitchWritesStatusesAndStopAfter(t *testing.T) {
 		s1 := mustDeploy(t, release.State{}, r1)
 		mustRecord(t, d, b, r1, s1, now1)
 		next1 := mustSwitch(t, s1, r1.ReleaseID)
-		if err := d.RecordSwitch(ctx, "app-1", r1.ReleaseID, next1, now1); err != nil {
+		if err := d.RecordSwitch(ctx, testCommand(t, "app-1"), "app-1", r1.ReleaseID, next1, now1); err != nil {
 			t.Fatalf("RecordSwitch(rel-1) error = %v, want nil", err)
 		}
 		row := readSwitchRow(t, d, "app-1", "rel-1")
@@ -93,7 +93,7 @@ func TestRecordSwitchWritesStatusesAndStopAfter(t *testing.T) {
 		s2 := mustDeploy(t, next1, r2)
 		mustRecord(t, d, b, r2, s2, now2)
 		next2 := mustSwitch(t, s2, r2.ReleaseID)
-		if err := d.RecordSwitch(ctx, "app-1", r2.ReleaseID, next2, now2); err != nil {
+		if err := d.RecordSwitch(ctx, testCommand(t, "app-1"), "app-1", r2.ReleaseID, next2, now2); err != nil {
 			t.Fatalf("RecordSwitch(rel-2) error = %v, want nil", err)
 		}
 		row = readSwitchRow(t, d, "app-1", "rel-2")
@@ -115,7 +115,7 @@ func TestRecordSwitchWritesStatusesAndStopAfter(t *testing.T) {
 		s3 := mustDeploy(t, next2, r3)
 		mustRecord(t, d, b, r3, s3, now3)
 		next3 := mustSwitch(t, s3, r3.ReleaseID)
-		if err := d.RecordSwitch(ctx, "app-1", r3.ReleaseID, next3, now3); err != nil {
+		if err := d.RecordSwitch(ctx, testCommand(t, "app-1"), "app-1", r3.ReleaseID, next3, now3); err != nil {
 			t.Fatalf("RecordSwitch(rel-3) error = %v, want nil", err)
 		}
 		row = readSwitchRow(t, d, "app-1", "rel-3")
@@ -191,7 +191,7 @@ func TestRecordSwitchWritesStatusesAndStopAfter(t *testing.T) {
 				d, releaseID, next := tc.setup(t)
 				before := snapshot(t, d)
 
-				err := d.RecordSwitch(ctx, "app-1", releaseID, next, testTime().Add(time.Hour))
+				err := d.RecordSwitch(ctx, testCommand(t, "app-1"), "app-1", releaseID, next, testTime().Add(time.Hour))
 
 				if err == nil {
 					t.Fatalf("RecordSwitch on %s error = nil, want an error", tc.reason)
@@ -269,14 +269,14 @@ func TestRecordAbortMarksCandidateAborted(t *testing.T) {
 	}
 
 	before := snapshot(t, d)
-	if err := d.RecordAbort(ctx, "app-1", r3.ReleaseID, stored, detail); err == nil {
+	if err := d.RecordAbort(ctx, testCommand(t, "app-1"), "app-1", r3.ReleaseID, stored, detail, testTime()); err == nil {
 		t.Fatalf("RecordAbort with a state that does not follow from the stored one error = nil, want an error")
 	}
 	if after := snapshot(t, d); !reflect.DeepEqual(before, after) {
 		t.Fatalf("snapshot changed after illegal RecordAbort: before = %+v, after = %+v", before, after)
 	}
 
-	if err := d.RecordAbort(ctx, "app-1", r3.ReleaseID, next, detail); err != nil {
+	if err := d.RecordAbort(ctx, testCommand(t, "app-1"), "app-1", r3.ReleaseID, next, detail, testTime()); err != nil {
 		t.Fatalf("RecordAbort(rel-3) error = %v, want nil", err)
 	}
 

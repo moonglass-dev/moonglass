@@ -58,7 +58,7 @@ func TestDeployResolvesRegistryImages(t *testing.T) {
 		t.Fatalf("fixture image IDs = both %s, want two different images", imageAID)
 	}
 
-	res := x.Deploy(ctx, deployMsg(p.name, appA, "r1", tag))
+	res := x.Deploy(ctx, requestID(t), deployMsg(p.name, appA, "r1", tag))
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Deploy(tag) outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -84,7 +84,7 @@ func TestDeployResolvesRegistryImages(t *testing.T) {
 	if _, err := e.cli.ContainerRemove(ctx, registryID, client.ContainerRemoveOptions{Force: true}); err != nil {
 		t.Fatalf("ContainerRemove(registry %s) error = %v, want nil", registryID, err)
 	}
-	res = x.Deploy(ctx, deployMsg(p.name, appB, "r2", digestRef))
+	res = x.Deploy(ctx, requestID(t), deployMsg(p.name, appB, "r2", digestRef))
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Deploy(digest, registry stopped) outcome = %v with detail %q, want %v",
 			got, res.GetDetail(), want)

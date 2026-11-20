@@ -49,7 +49,7 @@ func deployPending(t *testing.T, e *Engine, x *Executor, p *project, app, rel st
 	importImage(t, e, ref, []string{"/app"})
 	msg := deployMsg(p.name, app, rel, ref)
 	msg.HasPreDeploy = true
-	res := x.Deploy(context.Background(), msg)
+	res := x.Deploy(context.Background(), requestID(t), msg)
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Deploy(%s/%s) with has_pre_deploy outcome = %v with detail %q, want %v",
 			app, rel, got, res.GetDetail(), want)
@@ -258,7 +258,7 @@ func TestRunPreDeploySuccessStartsCandidate(t *testing.T) {
 				t.Fatalf("releases row for %s/%s = missing, want the pending candidate", app, rel)
 			}
 
-			res := x.RunPreDeploy(ctx, preDeployMsg(app, rel, reversible, "exit", "0"))
+			res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, rel, reversible, "exit", "0"))
 
 			if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 				t.Fatalf("RunPreDeploy outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -338,7 +338,7 @@ func TestRunPreDeployFailureAbortsDeploy(t *testing.T) {
 	deployPending(t, e, x, p, app, rel)
 	bindingBefore, stateBefore, knownBefore := storedApp(t, dir, app)
 
-	res := x.RunPreDeploy(ctx, preDeployMsg(app, rel, true, "exit", "3"))
+	res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, rel, true, "exit", "3"))
 
 	wantDetail := fmt.Sprintf("pre-deploy step exited with code 3; its output is in the logs of container %s", preName)
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
@@ -393,7 +393,7 @@ func TestRunPreDeployOutputStaysOutOfResult(t *testing.T) {
 
 	deployPending(t, e, x, p, app, rel)
 
-	res := x.RunPreDeploy(ctx, preDeployMsg(app, rel, true, "print", marker, "1"))
+	res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, rel, true, "print", marker, "1"))
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
 		t.Fatalf("RunPreDeploy(print, exit 1) outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
@@ -441,7 +441,7 @@ func TestRunPreDeployTimeoutKillsStep(t *testing.T) {
 	deployPending(t, e, x, p, app, rel)
 
 	start := time.Now()
-	res := x.RunPreDeploy(ctx, preDeployMsg(app, rel, true, "sleep", "120"))
+	res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, rel, true, "sleep", "120"))
 	elapsed := time.Since(start)
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
@@ -495,7 +495,7 @@ func TestRunPreDeployEngineErrorAborts(t *testing.T) {
 		t.Fatalf("ContainerRemove(%s) error = %v, want nil", candidateID, err)
 	}
 
-	res := x.RunPreDeploy(ctx, preDeployMsg(app, rel, true, "exit", "0"))
+	res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, rel, true, "exit", "0"))
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
 		t.Fatalf("RunPreDeploy without a candidate container outcome = %v with detail %q, want %v",
@@ -563,7 +563,7 @@ func TestRunPreDeployRejectsIllegalTransition(t *testing.T) {
 			name: "second run after a successful one",
 			prepare: func(t *testing.T, x *Executor, p *project, app string) *agentv1.RunPreDeploy {
 				deployPending(t, e, x, p, app, "r1")
-				res := x.RunPreDeploy(ctx, preDeployMsg(app, "r1", true, "exit", "0"))
+				res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, "r1", true, "exit", "0"))
 				if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 					t.Fatalf("first RunPreDeploy outcome = %v with detail %q, want %v", got, res.GetDetail(), want)
 				}
@@ -596,7 +596,7 @@ func TestRunPreDeployRejectsIllegalTransition(t *testing.T) {
 				candidateStartedAt = c.State.StartedAt
 			}
 
-			res := x.RunPreDeploy(ctx, msg)
+			res := x.RunPreDeploy(ctx, requestID(t), msg)
 
 			if got, want := res.GetOutcome(), agentv1.CommandOutcome_REJECTED; got != want {
 				t.Fatalf("RunPreDeploy(%s) outcome = %v with detail %q, want %v", tc.name, got, res.GetDetail(), want)
@@ -636,7 +636,7 @@ func TestRunPreDeployReplacesLeftoverStepContainer(t *testing.T) {
 		leftover := createFixture(t, e, emptyPolicy(t, policy.Env{}),
 			fixtureSpec(p, app, rel, row.ImageID, true), preName)
 
-		res := x.RunPreDeploy(ctx, preDeployMsg(app, rel, true, "exit", "0"))
+		res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, rel, true, "exit", "0"))
 
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 			t.Fatalf("RunPreDeploy over a leftover step container outcome = %v with detail %q, want %v",
@@ -666,7 +666,7 @@ func TestRunPreDeployReplacesLeftoverStepContainer(t *testing.T) {
 		foreign := createFixture(t, e, emptyPolicy(t, policy.Env{}),
 			fixtureSpec(p, app, rel, row.ImageID, false), preName)
 
-		res := x.RunPreDeploy(ctx, preDeployMsg(app, rel, true, "exit", "0"))
+		res := x.RunPreDeploy(ctx, requestID(t), preDeployMsg(app, rel, true, "exit", "0"))
 
 		if got, want := res.GetOutcome(), agentv1.CommandOutcome_FAILED; got != want {
 			t.Fatalf("RunPreDeploy over a foreign step container outcome = %v with detail %q, want %v",

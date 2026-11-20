@@ -20,7 +20,7 @@ func recordSwitchTwice(t *testing.T, d *DB, now1, now2 time.Time) release.State 
 	s1 := mustDeploy(t, release.State{}, r1)
 	mustRecord(t, d, b, r1, s1, now1)
 	next1 := mustSwitch(t, s1, r1.ReleaseID)
-	if err := d.RecordSwitch(context.Background(), "app-1", r1.ReleaseID, next1, now1); err != nil {
+	if err := d.RecordSwitch(context.Background(), testCommand(t, "app-1"), "app-1", r1.ReleaseID, next1, now1); err != nil {
 		t.Fatalf("RecordSwitch(rel-1) error = %v, want nil", err)
 	}
 
@@ -28,7 +28,7 @@ func recordSwitchTwice(t *testing.T, d *DB, now1, now2 time.Time) release.State 
 	s2 := mustDeploy(t, next1, r2)
 	mustRecord(t, d, b, r2, s2, now2)
 	next2 := mustSwitch(t, s2, r2.ReleaseID)
-	if err := d.RecordSwitch(context.Background(), "app-1", r2.ReleaseID, next2, now2); err != nil {
+	if err := d.RecordSwitch(context.Background(), testCommand(t, "app-1"), "app-1", r2.ReleaseID, next2, now2); err != nil {
 		t.Fatalf("RecordSwitch(rel-2) error = %v, want nil", err)
 	}
 	return next2
@@ -62,7 +62,7 @@ func TestRecordRollbackRestoresPrevious(t *testing.T) {
 		stored := recordSwitchTwice(t, d, now1, now2)
 		next := mustRollback(t, stored)
 
-		if err := d.RecordRollback(ctx, "app-1", next, now3); err != nil {
+		if err := d.RecordRollback(ctx, testCommand(t, "app-1"), "app-1", next, now3); err != nil {
 			t.Fatalf("RecordRollback() error = %v, want nil", err)
 		}
 
@@ -114,7 +114,7 @@ func TestRecordRollbackRestoresPrevious(t *testing.T) {
 		candidateBefore := readSwitchRow(t, d, "app-1", "rel-3")
 
 		next := mustRollback(t, s3)
-		if err := d.RecordRollback(ctx, "app-1", next, now4); err != nil {
+		if err := d.RecordRollback(ctx, testCommand(t, "app-1"), "app-1", next, now4); err != nil {
 			t.Fatalf("RecordRollback() with a candidate error = %v, want nil", err)
 		}
 
@@ -166,7 +166,7 @@ func TestRecordRollbackRestoresPrevious(t *testing.T) {
 					s1 := mustDeploy(t, release.State{}, r1)
 					mustRecord(t, d, sampleBinding(), r1, s1, now)
 					next := mustSwitch(t, s1, r1.ReleaseID)
-					if err := d.RecordSwitch(context.Background(), "app-1", r1.ReleaseID, next, now); err != nil {
+					if err := d.RecordSwitch(context.Background(), testCommand(t, "app-1"), "app-1", r1.ReleaseID, next, now); err != nil {
 						t.Fatalf("RecordSwitch(rel-1) error = %v, want nil", err)
 					}
 					return d, "app-1", next
@@ -190,7 +190,7 @@ func TestRecordRollbackRestoresPrevious(t *testing.T) {
 				d, appID, next := tc.setup(t)
 				before := snapshot(t, d)
 
-				err := d.RecordRollback(ctx, appID, next, testTime().Add(2*time.Hour))
+				err := d.RecordRollback(ctx, testCommand(t, appID), appID, next, testTime().Add(2*time.Hour))
 
 				if err == nil {
 					t.Fatalf("RecordRollback on %s error = nil, want an error", tc.reason)

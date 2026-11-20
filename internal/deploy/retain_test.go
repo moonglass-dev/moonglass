@@ -84,14 +84,14 @@ func TestRetainRemovesImagesOutsideFive(t *testing.T) {
 			t.Fatalf("State.Deploy(%q, %q, false) error = %v, want nil", rel, refs[i], err)
 		}
 		created := base.Add(time.Duration(i) * time.Minute)
-		if err := x.db.RecordCandidate(ctx, b, rec, next, created); err != nil {
+		if err := x.db.RecordCandidate(ctx, seedCommand(t, rec.AppID), b, rec, next, created); err != nil {
 			t.Fatalf("RecordCandidate(%q) error = %v, want nil", rel, err)
 		}
 		switched, err := next.Switch(rel)
 		if err != nil {
 			t.Fatalf("State.Switch(%q) error = %v, want nil", rel, err)
 		}
-		if err := x.db.RecordSwitch(ctx, app, rel, switched, created.Add(30*time.Minute)); err != nil {
+		if err := x.db.RecordSwitch(ctx, seedCommand(t, app), app, rel, switched, created.Add(30*time.Minute)); err != nil {
 			t.Fatalf("RecordSwitch(%q) error = %v, want nil", rel, err)
 		}
 		st = switched

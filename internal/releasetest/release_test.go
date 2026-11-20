@@ -265,19 +265,22 @@ func parseBlockScalar(t *testing.T, path string, lines []sourceLine, idx *int, p
 	return strings.Join(out, "\n")
 }
 
+// parseSteps parses the release workflow's steps: it has one job, so exactly
+// one steps: key in the whole file.
 func parseSteps(t *testing.T, text string) []step {
 	t.Helper()
-	return parseStepsAt(t, workflowPath, text)
+	if n := len(findNodes(parseWorkflow(t, workflowPath, text), "steps")); n != 1 {
+		t.Fatalf("%s: %d steps: keys, want exactly 1", workflowPath, n)
+	}
+	return parseStepsAt(t, workflowPath, text, "release")
 }
 
-func parseStepsAt(t *testing.T, path, text string) []step {
+// parseStepsAt parses the steps: of jobs.<job> in the workflow at path. Other
+// jobs in the same file are not read.
+func parseStepsAt(t *testing.T, path, text, job string) []step {
 	t.Helper()
 	root := parseWorkflow(t, path, text)
-	stepsNodes := findNodes(root, "steps")
-	if len(stepsNodes) != 1 {
-		t.Fatalf("%s: %d steps: keys, want exactly 1", path, len(stepsNodes))
-	}
-	sn := stepsNodes[0]
+	sn := pathNode(t, path, root, "jobs", job, "steps")
 	if sn.value != "" || len(sn.kids) == 0 {
 		t.Fatalf("%s:%d: steps: %q, want a non-empty list", path, sn.line, sn.value)
 	}
@@ -334,6 +337,27 @@ func findNodes(nodes []*node, key string) []*node {
 	}
 	walk(nodes)
 	return out
+}
+
+// pathNode walks keys from the top level, wanting each key exactly once among
+// its parent's children.
+func pathNode(t *testing.T, path string, nodes []*node, keys ...string) *node {
+	t.Helper()
+	var n *node
+	for i, key := range keys {
+		var found []*node
+		for _, c := range nodes {
+			if c.key == key {
+				found = append(found, c)
+			}
+		}
+		if len(found) != 1 {
+			t.Fatalf("%s: %d %s: keys, want exactly 1", path, len(found), strings.Join(keys[:i+1], "."))
+		}
+		n = found[0]
+		nodes = n.kids
+	}
+	return n
 }
 
 func onlyNode(t *testing.T, nodes []*node, key string) *node {
@@ -872,7 +896,7 @@ func TestReleaseWorkflowUploadsToDraftRelease(t *testing.T) {
 func TestReleaseWorkflowPinsEveryAction(t *testing.T) {
 	text := workflowText(t)
 	root := parseWorkflow(t, workflowPath, text)
-	ciSteps := parseStepsAt(t, ciPath, readRepoFile(t, ciPath))
+	ciSteps := parseStepsAt(t, ciPath, readRepoFile(t, ciPath), "ci")
 
 	usesNodes := findNodes(root, "uses")
 	if len(usesNodes) == 0 {

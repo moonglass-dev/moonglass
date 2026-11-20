@@ -17,6 +17,8 @@ const (
 	// retentionFailedAge is how old a failed or aborted row must be to be
 	// deleted.
 	retentionFailedAge = 7 * 24 * time.Hour
+	// retentionCommandAge is how old a commands row must be to be deleted.
+	retentionCommandAge = 7 * 24 * time.Hour
 )
 
 // DueStop is a previous or retired release whose stop_after has come.
@@ -128,6 +130,8 @@ func (d *DB) RecordStopped(ctx context.Context, appID, releaseID string, now tim
 
 const deleteOldFailures = `DELETE FROM releases WHERE status IN (?, ?) AND created_at < ?`
 
+const deleteOldCommands = `DELETE FROM commands WHERE finished_at < ?`
+
 // selectPrunableRetired lists the retired rows outside the newest
 // retentionRetired of their app whose stop has run. Newest means created_at,
 // then insertion order: the later row wins a tie.
@@ -153,7 +157,8 @@ type prunedRetired struct {
 // newest are deleted once their stop has run. It returns the image IDs of the
 // deleted rows that no remaining candidate, current, previous or retired row of
 // any app names, sorted, so the caller removes exactly those images. It never
-// writes an apps row.
+// writes an apps row. Command rows finished more than seven days ago are deleted
+// too.
 func (d *DB) Retain(ctx context.Context, now time.Time) ([]string, error) {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -163,6 +168,9 @@ func (d *DB) Retain(ctx context.Context, now time.Time) ([]string, error) {
 
 	if _, err = tx.ExecContext(ctx, deleteOldFailures, statusFailed, statusAborted, formatTime(now.Add(-retentionFailedAge))); err != nil {
 		return nil, fmt.Errorf("retain agent state %s: delete failed and aborted rows: %w", d.path, err)
+	}
+	if _, err = tx.ExecContext(ctx, deleteOldCommands, formatTime(now.Add(-retentionCommandAge))); err != nil {
+		return nil, fmt.Errorf("retain agent state %s: delete old command rows: %w", d.path, err)
 	}
 
 	prunable, err := prunableRetired(ctx, tx)

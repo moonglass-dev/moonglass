@@ -30,7 +30,7 @@ func deployDomainsPort(t *testing.T, e *Engine, x *Executor, p *project, app, re
 	msg := deployMsg(p.name, app, rel, ref)
 	msg.Port = port
 	msg.Domains = domains
-	return x.Deploy(context.Background(), msg)
+	return x.Deploy(context.Background(), requestID(t), msg)
 }
 
 // requireDeployOutcome fails with the detail when Deploy's outcome is not want;

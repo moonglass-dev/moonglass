@@ -45,73 +45,83 @@ func preDeployName(appID, releaseID string) string {
 
 // RunPreDeploy runs the pending candidate's one-off step, then starts the
 // candidate or aborts the deploy (docs/specs/release.md).
-func (x *Executor) RunPreDeploy(ctx context.Context, r *agentv1.RunPreDeploy) *agentv1.CommandResult {
+func (x *Executor) RunPreDeploy(ctx context.Context, requestID string, r *agentv1.RunPreDeploy) *agentv1.CommandResult {
+	return x.once(ctx, requestID, state.CommandRunPreDeploy, r.GetAppId(), func(cmd state.Command) (*agentv1.CommandResult, bool) {
+		return x.runPreDeploy(ctx, cmd, r)
+	})
+}
+
+// runPreDeploy is RunPreDeploy's body; written reports a committed result.
+func (x *Executor) runPreDeploy(ctx context.Context, cmd state.Command, r *agentv1.RunPreDeploy) (*agentv1.CommandResult, bool) {
 	appID := r.GetAppId()
 	releaseID := r.GetReleaseId()
 
 	b, st, known, err := x.db.App(ctx, appID)
 	if err != nil {
-		return result(agentv1.CommandOutcome_FAILED, fmt.Sprintf("read app %s: %v", appID, err), release.State{})
+		return result(agentv1.CommandOutcome_FAILED, fmt.Sprintf("read app %s: %v", appID, err), release.State{}), false
 	}
 	if !known {
 		return result(agentv1.CommandOutcome_REJECTED,
-			fmt.Sprintf("app %s has no release on this server; deploy it first", appID), st)
+			fmt.Sprintf("app %s has no release on this server; deploy it first", appID), st), false
 	}
 
 	ready, err := st.PreDeployDone(releaseID, true)
 	if err != nil {
-		return result(agentv1.CommandOutcome_REJECTED, err.Error(), st)
+		return result(agentv1.CommandOutcome_REJECTED, err.Error(), st), false
 	}
 
 	rec, found, err := x.db.Release(ctx, appID, releaseID)
 	if err != nil {
-		return result(agentv1.CommandOutcome_FAILED, err.Error(), st)
+		return result(agentv1.CommandOutcome_FAILED, err.Error(), st), false
 	}
 	if !found {
 		return result(agentv1.CommandOutcome_FAILED,
-			fmt.Sprintf("release %s of app %s has no record on this server; deploy it again", releaseID, appID), st)
+			fmt.Sprintf("release %s of app %s has no record on this server; deploy it again", releaseID, appID), st), false
 	}
 
 	checked, err := x.policy.Check(preDeploySpec(b, rec, r.GetArgs()))
 	if err != nil {
-		return result(agentv1.CommandOutcome_REJECTED, err.Error(), st)
+		return result(agentv1.CommandOutcome_REJECTED, err.Error(), st), false
 	}
 
 	code, err := x.engine.runStep(ctx, checked, b.Project, rec, x.preDeployLimit)
 	if err != nil {
-		return x.abortPreDeploy(ctx, st, rec, r.GetReversible(), err.Error())
+		return x.abortPreDeploy(ctx, cmd, st, rec, r.GetReversible(), err.Error())
 	}
 	if code != 0 {
-		return x.abortPreDeploy(ctx, st, rec, r.GetReversible(),
+		return x.abortPreDeploy(ctx, cmd, st, rec, r.GetReversible(),
 			fmt.Sprintf("pre-deploy step exited with code %d; its output is in the logs of container %s",
 				code, preDeployName(appID, releaseID)))
 	}
 
 	if err := x.engine.start(ctx, rec.ContainerID); err != nil {
-		return x.abortPreDeploy(ctx, st, rec, r.GetReversible(), err.Error())
+		return x.abortPreDeploy(ctx, cmd, st, rec, r.GetReversible(), err.Error())
 	}
-	if err := x.db.RecordPreDeploy(ctx, appID, releaseID, ready, r.GetReversible(), ""); err != nil {
-		return x.abortPreDeploy(ctx, st, rec, r.GetReversible(), err.Error())
+	res := result(agentv1.CommandOutcome_SUCCEEDED, "", ready)
+	cmd.Result = res
+	if err := x.db.RecordPreDeploy(ctx, cmd, appID, releaseID, ready, r.GetReversible(), "", x.now()); err != nil {
+		return x.abortPreDeploy(ctx, cmd, st, rec, r.GetReversible(), err.Error())
 	}
-	return result(agentv1.CommandOutcome_SUCCEEDED, "", ready)
+	return res, true
 }
 
 // abortPreDeploy clears the candidate, removes its container, records the
 // aborted row and answers FAILED. Current and Previous never change.
-func (x *Executor) abortPreDeploy(ctx context.Context, st release.State, rec state.Record, reversible bool, cause string) *agentv1.CommandResult {
+func (x *Executor) abortPreDeploy(ctx context.Context, cmd state.Command, st release.State, rec state.Record, reversible bool, cause string) (*agentv1.CommandResult, bool) {
 	aborted, err := st.PreDeployDone(rec.ReleaseID, false)
 	if err != nil {
-		return result(agentv1.CommandOutcome_FAILED, cause+"; aborting the release also failed: "+err.Error(), st)
+		return result(agentv1.CommandOutcome_FAILED, cause+"; aborting the release also failed: "+err.Error(), st), false
 	}
 	detail := truncate(cause)
 	if rmErr := x.engine.remove(ctx, rec.ContainerID); rmErr != nil && !isNotFound(rmErr) {
 		detail += "; removing the candidate container also failed: " + rmErr.Error()
 	}
-	if recErr := x.db.RecordPreDeploy(ctx, rec.AppID, rec.ReleaseID, aborted, reversible, truncate(detail)); recErr != nil {
-		detail += "; recording the abort also failed: " + recErr.Error()
-		return result(agentv1.CommandOutcome_FAILED, detail, st)
+	res := result(agentv1.CommandOutcome_FAILED, detail, aborted)
+	cmd.Result = res
+	if recErr := x.db.RecordPreDeploy(ctx, cmd, rec.AppID, rec.ReleaseID, aborted, reversible, truncate(detail), x.now()); recErr != nil {
+		return result(agentv1.CommandOutcome_FAILED, detail+"; recording the abort also failed: "+recErr.Error(), st), false
 	}
-	return result(agentv1.CommandOutcome_FAILED, detail, aborted)
+	return res, true
 }
 
 // runStep creates and starts the step container at its -pre name and waits for

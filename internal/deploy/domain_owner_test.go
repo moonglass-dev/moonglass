@@ -33,7 +33,7 @@ func TestSwitchReleaseRejectsDomainRoutedByAnotherApp(t *testing.T) {
 	requireDeployOutcome(t, deployDomains(t, e, x, p, appB, "r1", []string{domain}),
 		agentv1.CommandOutcome_SUCCEEDED, "")
 
-	if res := x.SwitchRelease(context.Background(), switchMsg(appA, "r1")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+	if res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(appA, "r1")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 		t.Fatalf("SwitchRelease(%s/r1) outcome = %v with detail %q, want SUCCEEDED",
 			appA, res.GetOutcome(), res.GetDetail())
 	}
@@ -53,7 +53,7 @@ func TestSwitchReleaseRejectsDomainRoutedByAnotherApp(t *testing.T) {
 		t.Fatalf("pushed documents before the second switch = 0, want the first switch's push")
 	}
 
-	res := x.SwitchRelease(context.Background(), switchMsg(appB, "r1"))
+	res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(appB, "r1"))
 
 	wantDetail := "domain " + domain + " is already routed to app " + appA
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_REJECTED; got != want {
@@ -100,14 +100,14 @@ func TestRollbackRejectsDomainRoutedByAnotherApp(t *testing.T) {
 	for _, step := range steps {
 		requireDeployOutcome(t, deployDomains(t, e, x, p, step.app, step.rel, []string{step.domain}),
 			agentv1.CommandOutcome_SUCCEEDED, "")
-		if res := x.SwitchRelease(context.Background(), switchMsg(step.app, step.rel)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+		if res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(step.app, step.rel)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 			t.Fatalf("SwitchRelease(%s/%s) outcome = %v with detail %q, want SUCCEEDED",
 				step.app, step.rel, res.GetOutcome(), res.GetDetail())
 		}
 	}
 
 	loads := fake.loadCount()
-	res := x.Rollback(context.Background(), rollbackMsg(appA))
+	res := x.Rollback(context.Background(), requestID(t), rollbackMsg(appA))
 
 	wantDetail := "domain " + domainX + " is already routed to app " + appB
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_REJECTED; got != want {
@@ -148,7 +148,7 @@ func TestRollbackStoppedPreviousRejectedForDomain(t *testing.T) {
 	for _, step := range steps {
 		requireDeployOutcome(t, deployDomains(t, e, x, p, step.app, step.rel, []string{step.domain}),
 			agentv1.CommandOutcome_SUCCEEDED, "")
-		if res := x.SwitchRelease(context.Background(), switchMsg(step.app, step.rel)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+		if res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(step.app, step.rel)); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 			t.Fatalf("SwitchRelease(%s/%s) outcome = %v with detail %q, want SUCCEEDED",
 				step.app, step.rel, res.GetOutcome(), res.GetDetail())
 		}
@@ -162,7 +162,7 @@ func TestRollbackStoppedPreviousRejectedForDomain(t *testing.T) {
 	loads := fake.loadCount()
 	rows := stateText(t, dir)
 
-	res := x.Rollback(context.Background(), rollbackMsg(appA))
+	res := x.Rollback(context.Background(), requestID(t), rollbackMsg(appA))
 
 	wantDetail := "domain " + domainX + " is already routed to app " + appB
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_REJECTED; got != want {
@@ -197,13 +197,13 @@ func TestSwitchReleaseKeepsOwnDomains(t *testing.T) {
 
 	requireDeployOutcome(t, deployDomains(t, e, x, p, appA, "r1", []string{domainX}),
 		agentv1.CommandOutcome_SUCCEEDED, "")
-	if res := x.SwitchRelease(context.Background(), switchMsg(appA, "r1")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+	if res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(appA, "r1")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 		t.Fatalf("SwitchRelease(%s/r1) outcome = %v with detail %q, want SUCCEEDED",
 			appA, res.GetOutcome(), res.GetDetail())
 	}
 	requireDeployOutcome(t, deployDomains(t, e, x, p, appB, "r1", []string{domainY}),
 		agentv1.CommandOutcome_SUCCEEDED, "")
-	if res := x.SwitchRelease(context.Background(), switchMsg(appB, "r1")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
+	if res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(appB, "r1")); res.GetOutcome() != agentv1.CommandOutcome_SUCCEEDED {
 		t.Fatalf("SwitchRelease(%s/r1) outcome = %v with detail %q, want SUCCEEDED",
 			appB, res.GetOutcome(), res.GetDetail())
 	}
@@ -215,7 +215,7 @@ func TestSwitchReleaseKeepsOwnDomains(t *testing.T) {
 		t.Fatalf("pushed documents before the switch = 0, want the earlier switches' pushes")
 	}
 
-	res := x.SwitchRelease(context.Background(), switchMsg(appA, "r2"))
+	res := x.SwitchRelease(context.Background(), requestID(t), switchMsg(appA, "r2"))
 
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("SwitchRelease(%s/r2) outcome = %v with detail %q, want %v", appA, got, res.GetDetail(), want)

@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
@@ -58,6 +59,26 @@ func randHex(t *testing.T, n int) string {
 		t.Fatalf("rand.Read: %v", err)
 	}
 	return hex.EncodeToString(b)
+}
+
+// requestID is a fresh request id for one command: c followed by 32 lowercase
+// hex, as the control plane mints them.
+func requestID(t *testing.T) string {
+	t.Helper()
+	return "c" + randHex(t, 16)
+}
+
+// seedCommand is the command record an existing test passes to a state write it
+// makes directly, with its own request id and a result it never reads back.
+func seedCommand(t *testing.T, appID string) state.Command {
+	t.Helper()
+	return state.Command{
+		RequestID: requestID(t),
+		Type:      state.CommandDeploy,
+		AppID:     appID,
+		Received:  time.Now(),
+		Result:    &agentv1.CommandResult{Outcome: agentv1.CommandOutcome_SUCCEEDED},
+	}
 }
 
 // project is one test run's project name plus the networks and images the test
@@ -281,7 +302,7 @@ func deployImported(t *testing.T, e *Engine, x *Executor, p *project, app, rel s
 	p.registerImage(ref)
 	importImage(t, e, ref, []string{"/app"})
 	msg := deployMsg(p.name, app, rel, ref)
-	res := x.Deploy(context.Background(), msg)
+	res := x.Deploy(context.Background(), requestID(t), msg)
 	if got, want := res.GetOutcome(), agentv1.CommandOutcome_SUCCEEDED; got != want {
 		t.Fatalf("Deploy(%s/%s) outcome = %v with detail %q, want %v", app, rel, got, res.GetDetail(), want)
 	}

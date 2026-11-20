@@ -1,5 +1,5 @@
-// Package state is the agent's on-server database: the release records of the
-// apps that run on this server and nothing else (docs/specs/agent-state.md).
+// Package state is the agent's on-server database: the release and command
+// records of the apps here and nothing else (docs/specs/agent-state.md).
 package state
 
 import (
@@ -14,8 +14,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	_ "modernc.org/sqlite"
 
+	agentv1 "moonglass.dev/moonglass/internal/protocol/agentv1"
 	"moonglass.dev/moonglass/internal/release"
 	"moonglass.dev/moonglass/internal/store"
 )
@@ -29,6 +31,12 @@ const (
 	statusRetired   = "retired"
 	statusFailed    = "failed"
 	statusAborted   = "aborted"
+
+	// The command types the agent records; W3-7 and W5-5b add more.
+	CommandDeploy        = "deploy"
+	CommandSwitchRelease = "switch_release"
+	CommandRollback      = "rollback"
+	CommandRunPreDeploy  = "run_pre_deploy"
 )
 
 const (
@@ -69,6 +77,13 @@ type Record struct {
 	Domains      []string
 	Port         uint32
 	HasPreDeploy bool
+}
+
+// Command is one recorded command and the result it produced.
+type Command struct {
+	Received               time.Time
+	Result                 *agentv1.CommandResult
+	RequestID, Type, AppID string
 }
 
 // Open opens <dataDir>/agent.db, applies the embedded migrations and returns
@@ -295,7 +310,7 @@ func parsePhase(text string) (release.Phase, error) {
 // state. It writes nothing and returns an error when the app is bound to
 // another binding, when state's candidate is not r, or when the release is
 // already recorded.
-func (d *DB) RecordCandidate(ctx context.Context, b Binding, r Record, state release.State, now time.Time) error {
+func (d *DB) RecordCandidate(ctx context.Context, cmd Command, b Binding, r Record, state release.State, now time.Time) error {
 	if state.Candidate == nil {
 		return fmt.Errorf("record candidate %s of app %s: state has no candidate; record the state's candidate", r.ReleaseID, r.AppID)
 	}
@@ -349,6 +364,9 @@ func (d *DB) RecordCandidate(ctx context.Context, b Binding, r Record, state rel
 	if err != nil {
 		return fmt.Errorf("record candidate %s of app %s: write apps row: %w", r.ReleaseID, r.AppID, err)
 	}
+	if err = insertCommand(ctx, tx, cmd, now); err != nil {
+		return err
+	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("record candidate %s of app %s: %w", r.ReleaseID, r.AppID, err)
 	}
@@ -361,7 +379,7 @@ func (d *DB) RecordCandidate(ctx context.Context, b Binding, r Record, state rel
 // an error when next does not follow from the stored state of that release, so
 // only the pending candidate's outcome is ever recorded. detail is stored as
 // given and never logged.
-func (d *DB) RecordPreDeploy(ctx context.Context, appID, releaseID string, next release.State, reversible bool, detail string) error {
+func (d *DB) RecordPreDeploy(ctx context.Context, cmd Command, appID, releaseID string, next release.State, reversible bool, detail string, now time.Time) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
@@ -404,6 +422,9 @@ func (d *DB) RecordPreDeploy(ctx context.Context, appID, releaseID string, next 
 	if err = setAppState(ctx, tx, appID, next); err != nil {
 		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
 	}
+	if err = insertCommand(ctx, tx, cmd, now); err != nil {
+		return err
+	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("record pre-deploy outcome of release %s of app %s: %w", releaseID, appID, err)
 	}
@@ -416,7 +437,7 @@ func (d *DB) RecordPreDeploy(ctx context.Context, appID, releaseID string, next 
 // at now + 30 seconds, and the apps row becomes next. It writes nothing and
 // returns an error when next does not follow from the stored state of that
 // release.
-func (d *DB) RecordSwitch(ctx context.Context, appID, releaseID string, next release.State, now time.Time) error {
+func (d *DB) RecordSwitch(ctx context.Context, cmd Command, appID, releaseID string, next release.State, now time.Time) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
@@ -460,6 +481,9 @@ func (d *DB) RecordSwitch(ctx context.Context, appID, releaseID string, next rel
 	if err = setAppState(ctx, tx, appID, next); err != nil {
 		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
 	}
+	if err = insertCommand(ctx, tx, cmd, now); err != nil {
+		return err
+	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("record switch of release %s of app %s: %w", releaseID, appID, err)
 	}
@@ -472,7 +496,7 @@ func (d *DB) RecordSwitch(ctx context.Context, appID, releaseID string, next rel
 // The candidate row, the app's candidate and its phase are left as they are. It
 // writes nothing and returns an error when next is not the state Rollback
 // returned for the stored one.
-func (d *DB) RecordRollback(ctx context.Context, appID string, next release.State, now time.Time) error {
+func (d *DB) RecordRollback(ctx context.Context, cmd Command, appID string, next release.State, now time.Time) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("record rollback of app %s: %w", appID, err)
@@ -508,6 +532,9 @@ func (d *DB) RecordRollback(ctx context.Context, appID string, next release.Stat
 	if err = setAppState(ctx, tx, appID, next); err != nil {
 		return fmt.Errorf("record rollback of app %s: %w", appID, err)
 	}
+	if err = insertCommand(ctx, tx, cmd, now); err != nil {
+		return err
+	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("record rollback of app %s: %w", appID, err)
 	}
@@ -519,7 +546,7 @@ func (d *DB) RecordRollback(ctx context.Context, appID string, next release.Stat
 // the apps row becomes next. Current and Previous are untouched. It writes
 // nothing and returns an error when next does not follow from the stored state
 // of that release. detail is stored as given and never logged.
-func (d *DB) RecordAbort(ctx context.Context, appID, releaseID string, next release.State, detail string) error {
+func (d *DB) RecordAbort(ctx context.Context, cmd Command, appID, releaseID string, next release.State, detail string, now time.Time) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
@@ -549,6 +576,9 @@ func (d *DB) RecordAbort(ctx context.Context, appID, releaseID string, next rele
 	}
 	if err = setAppState(ctx, tx, appID, next); err != nil {
 		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
+	}
+	if err = insertCommand(ctx, tx, cmd, now); err != nil {
+		return err
 	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("record abort of release %s of app %s: %w", releaseID, appID, err)
@@ -603,7 +633,7 @@ func sameRelease(a, b *release.Release) bool {
 // RecordFailed records a failed release in one transaction. It never creates or
 // changes an apps row, so the binding and the release state stay as they were.
 // detail is stored as given and never logged.
-func (d *DB) RecordFailed(ctx context.Context, r Record, detail string, now time.Time) error {
+func (d *DB) RecordFailed(ctx context.Context, cmd Command, r Record, detail string, now time.Time) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("record failed release %s of app %s: %w", r.ReleaseID, r.AppID, err)
@@ -616,8 +646,63 @@ func (d *DB) RecordFailed(ctx context.Context, r Record, detail string, now time
 	if err = insertRelease(ctx, tx, r, statusFailed, detail, now); err != nil {
 		return err
 	}
+	if err = insertCommand(ctx, tx, cmd, now); err != nil {
+		return err
+	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("record failed release %s of app %s: %w", r.ReleaseID, r.AppID, err)
+	}
+	return nil
+}
+
+// RecordCommand records one command's result alone, in its own transaction.
+func (d *DB) RecordCommand(ctx context.Context, cmd Command, finished time.Time) error {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("record command %s: %w", cmd.RequestID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err = insertCommand(ctx, tx, cmd, finished); err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("record command %s: %w", cmd.RequestID, err)
+	}
+	return nil
+}
+
+// CommandResult returns the stored result of requestID, if there is one.
+func (d *DB) CommandResult(ctx context.Context, requestID string) (*agentv1.CommandResult, bool, error) {
+	var encoded []byte
+	err := d.db.QueryRowContext(ctx, `SELECT result FROM commands WHERE request_id = ?`, requestID).Scan(&encoded)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("read command %s from agent state %s: %w", requestID, d.path, err)
+	}
+	res := &agentv1.CommandResult{}
+	if err = proto.Unmarshal(encoded, res); err != nil {
+		return nil, false, fmt.Errorf("read command %s from agent state %s: decode its result: %w", requestID, d.path, err)
+	}
+	return res, true, nil
+}
+
+// insertCommand writes one commands row inside tx, the only encoder of
+// commands.result. A plain INSERT fails on an existing request id.
+func insertCommand(ctx context.Context, tx *sql.Tx, cmd Command, finished time.Time) error {
+	if cmd.RequestID == "" || cmd.Result == nil {
+		return fmt.Errorf("write commands row: the command needs a request id and a result; pass the envelope's id and the result it returned")
+	}
+	encoded, err := proto.Marshal(cmd.Result)
+	if err != nil {
+		return fmt.Errorf("command %s: encode its result: %w", cmd.RequestID, err)
+	}
+	if _, err = tx.ExecContext(ctx,
+		`INSERT INTO commands (request_id, type, app_id, result, received_at, finished_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		cmd.RequestID, cmd.Type, cmd.AppID, encoded, formatTime(cmd.Received), formatTime(finished)); err != nil {
+		return fmt.Errorf("command %s: write commands row: %w", cmd.RequestID, err)
 	}
 	return nil
 }
