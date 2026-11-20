@@ -508,7 +508,8 @@ var ownerTestEdits = map[string]map[string]bool{
 		"internal/proxy/memory_test.go": true,
 	},
 	"W2-11d": {
-		"internal/api/routes_test.go": true,
+		"internal/api/routes_test.go":        true,
+		"internal/registry/projects_test.go": true,
 	},
 	"W2-10a": {
 		"internal/agent/state/state_test.go":            true,
