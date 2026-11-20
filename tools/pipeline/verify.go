@@ -543,6 +543,8 @@ var ownerTestEdits = map[string]map[string]bool{
 		"internal/registry/routes_test.go": true,
 		"internal/agent/connect_test.go":   true,
 		"cmd/moonglass/connect_test.go":    true,
+		"internal/agent/dispatch_test.go":  true,
+		"internal/agent/resend_test.go":    true,
 	},
 	"FR6-6": {
 		"internal/agent/state/stops_test.go": true,

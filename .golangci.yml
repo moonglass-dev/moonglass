@@ -206,6 +206,10 @@ linters:
         linters:
           - govet
         text: "fieldalignment:"
+      # Exhaustive switch on protobuf MessageType in locked W2-10b tests.
+      - path: internal/agent/(dispatch|resend)_test\.go
+        linters:
+          - exhaustive
       # gosec does not run on tests, so nolint:gosec in them is "unused".
       - path: _test\.go
         linters:
