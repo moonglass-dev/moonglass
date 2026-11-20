@@ -1,6 +1,66 @@
 {
   "components": {
     "schemas": {
+      "EnvironmentInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "description": "When the environment was created, RFC 3339",
+            "type": "string"
+          },
+          "id": {
+            "description": "Environment id",
+            "type": "string"
+          },
+          "name": {
+            "description": "Environment name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "EnvironmentsCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Environment name",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "name"
+        ],
+        "type": "object"
+      },
+      "EnvironmentsListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "environments": {
+            "description": "Environments of the project",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentInfo"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "environments"
+        ],
+        "type": "object"
+      },
       "ErrorDetail": {
         "additionalProperties": false,
         "properties": {
@@ -73,6 +133,61 @@
         },
         "type": "object"
       },
+      "ProjectInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "description": "When the project was created, RFC 3339",
+            "type": "string"
+          },
+          "id": {
+            "description": "Project id",
+            "type": "string"
+          },
+          "name": {
+            "description": "Project name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ProjectsCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Project name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "ProjectsListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "projects": {
+            "description": "Projects of the caller's org",
+            "items": {
+              "$ref": "#/components/schemas/ProjectInfo"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "type": "object"
+      },
       "ServerInfo": {
         "additionalProperties": false,
         "properties": {
@@ -109,6 +224,81 @@
           "servers"
         ],
         "type": "object"
+      },
+      "ServiceInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "description": "When the service was created, RFC 3339",
+            "type": "string"
+          },
+          "id": {
+            "description": "Service id",
+            "type": "string"
+          },
+          "name": {
+            "description": "Service name",
+            "type": "string"
+          },
+          "server": {
+            "description": "Server id the service runs on",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "server",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ServicesCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "environment": {
+            "description": "Environment name",
+            "type": "string"
+          },
+          "name": {
+            "description": "Service name",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project name",
+            "type": "string"
+          },
+          "server": {
+            "description": "Server id of the caller's org",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "environment",
+          "name",
+          "server"
+        ],
+        "type": "object"
+      },
+      "ServicesListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "services": {
+            "description": "Services of the environment",
+            "items": {
+              "$ref": "#/components/schemas/ServiceInfo"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "services"
+        ],
+        "type": "object"
       }
     }
   },
@@ -118,6 +308,187 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/v1/environments": {
+      "get": {
+        "operationId": "environments.list",
+        "parameters": [
+          {
+            "description": "Bearer token: Authorization: Bearer mg_...",
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token: Authorization: Bearer mg_...",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Project name",
+            "in": "query",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentsListOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List environments"
+      },
+      "post": {
+        "operationId": "environments.create",
+        "parameters": [
+          {
+            "description": "Bearer token: Authorization: Bearer mg_...",
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token: Authorization: Bearer mg_...",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvironmentsCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create an environment"
+      }
+    },
+    "/v1/projects": {
+      "get": {
+        "operationId": "projects.list",
+        "parameters": [
+          {
+            "description": "Bearer token: Authorization: Bearer mg_...",
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token: Authorization: Bearer mg_...",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectsListOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List projects"
+      },
+      "post": {
+        "operationId": "projects.create",
+        "parameters": [
+          {
+            "description": "Bearer token: Authorization: Bearer mg_...",
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token: Authorization: Bearer mg_...",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectsCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a project"
+      }
+    },
     "/v1/servers": {
       "get": {
         "operationId": "servers.list",
@@ -155,6 +526,110 @@
           }
         },
         "summary": "List servers"
+      }
+    },
+    "/v1/services": {
+      "get": {
+        "operationId": "services.list",
+        "parameters": [
+          {
+            "description": "Bearer token: Authorization: Bearer mg_...",
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token: Authorization: Bearer mg_...",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Project name",
+            "in": "query",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Environment name",
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServicesListOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List services"
+      },
+      "post": {
+        "operationId": "services.create",
+        "parameters": [
+          {
+            "description": "Bearer token: Authorization: Bearer mg_...",
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token: Authorization: Bearer mg_...",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicesCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a service"
       }
     }
   }

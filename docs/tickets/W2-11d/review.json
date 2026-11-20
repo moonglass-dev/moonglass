@@ -1,0 +1,17 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "f9d876815f97ed956e1c573d13bb14c66cd93b15",
+  "blockers": [],
+  "majors": [],
+  "minors": [
+    {
+      "file": "internal/registry/registry.go",
+      "line": 166,
+      "issue": "services.create maps every store.ErrNotFound from CreateService to `server \"\u003cserver\u003e\" not found`, but CreateService also returns ErrNotFound when the environment is gone (store/projects.go:146). The ticket asks for this mapping, so the code is correct, but the message can name the wrong row.",
+      "scenario": "The environment is removed after Invoke resolves the target and before CreateService runs. The caller gets 404 `server \"srv-1\" not found` for a server that exists."
+    }
+  ]
+}

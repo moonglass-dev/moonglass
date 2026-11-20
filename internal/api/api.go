@@ -84,6 +84,12 @@ func config() huma.Config {
 
 func build(api huma.API, reg *registry.Registry) {
 	mount(api, reg, reg.ServersList)
+	mount(api, reg, reg.ProjectsCreate)
+	mount(api, reg, reg.ProjectsList)
+	mount(api, reg, reg.EnvironmentsCreate)
+	mount(api, reg, reg.EnvironmentsList)
+	mount(api, reg, reg.ServicesCreate)
+	mount(api, reg, reg.ServicesList)
 }
 
 // input is one field of an operation's In: a query parameter for GET, or a
