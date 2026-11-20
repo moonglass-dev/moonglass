@@ -3,7 +3,11 @@
     "done:plan": 1,
     "done:ticket": 1,
     "plan": 1,
+    "tests": 1,
     "worker": 1
   },
-  "claim": null
+  "claim": {
+    "step": "tests",
+    "round": 1
+  }
 }
