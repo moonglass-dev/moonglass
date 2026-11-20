@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -86,6 +87,13 @@ type load struct {
 // errCutBeforeAnswer marks an attempt whose connection closed before any byte
 // of an answer arrived, without a timeout.
 var errCutBeforeAnswer = errors.New("connection closed before any answer byte")
+
+// closedByPeer reports whether err is the peer closing the connection rather
+// than refusing it or failing its TLS handshake: the end of a stream, a reset,
+// or a close mid-handshake.
+func closedByPeer(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET)
+}
 
 // newLoadClient builds the one client the load generator uses: a new connection
 // per request, a 5-second limit per request, and only the proxy's local CA root,
@@ -184,7 +192,7 @@ func (l *load) attempt() (string, error) {
 	res, err := l.client.Do(req)
 	if err != nil {
 		var netErr net.Error
-		if !answered.Load() && (!errors.As(err, &netErr) || !netErr.Timeout()) {
+		if !answered.Load() && closedByPeer(err) && (!errors.As(err, &netErr) || !netErr.Timeout()) {
 			return "", fmt.Errorf("GET %s: %w: %w", l.cfg.host, errCutBeforeAnswer, err)
 		}
 		return "", fmt.Errorf("GET %s: %w", l.cfg.host, err)
@@ -330,6 +338,31 @@ func TestLoadGeneratorCountsEveryNon2xx(t *testing.T) {
 		if r.release != "r1" {
 			t.Errorf("a 2xx response carried release %q, want r1", r.release)
 		}
+	}
+
+	// A refused connection and a TLS verification failure are not a connection
+	// closed before an answer byte: each is one failed request, never retried.
+	for _, tc := range []struct {
+		name string
+		cfg  loadConfig
+	}{
+		{"refused connection", loadConfig{addr: reservePort(t), host: "example.com", roots: roots}},
+		{"untrusted certificate", loadConfig{addr: srv.Listener.Addr().String(), host: "example.com", roots: x509.NewCertPool()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			l := newLoad(tc.cfg)
+			l.get()
+			got := l.result()
+			if got.total != 1 || got.failed != 1 || got.retried != 0 {
+				t.Fatalf("load generator %s, want 1 of 1 request failed with 0 retried", got)
+			}
+			if got.firstErr == nil {
+				t.Fatal("the failed request recorded no error")
+			}
+			if len(got.responses) != 0 {
+				t.Errorf("recorded %d 2xx responses, want 0", len(got.responses))
+			}
+		})
 	}
 }
 

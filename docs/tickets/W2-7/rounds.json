@@ -3,6 +3,7 @@
     "build": 1,
     "done:approve": 1,
     "done:build": 1,
+    "done:fix": 1,
     "done:plan": 1,
     "done:review": 1,
     "done:tests": 1,
@@ -11,8 +12,5 @@
     "review": 1,
     "worker": 1
   },
-  "claim": {
-    "step": "fix",
-    "round": 1
-  }
+  "claim": null
 }
