@@ -4,4 +4,10 @@ package cli
 
 var generated = []command{
 	{Name: "servers list", Method: "GET", Path: "/v1/servers", Summary: "List servers"},
+	{Name: "projects create", Method: "POST", Path: "/v1/projects", Summary: "Create a project", Inputs: []input{{Flag: "name", JSON: "name", Kind: kindString, Required: true, Doc: "Project name"}}},
+	{Name: "projects list", Method: "GET", Path: "/v1/projects", Summary: "List projects"},
+	{Name: "environments create", Method: "POST", Path: "/v1/environments", Summary: "Create an environment", Inputs: []input{{Flag: "project", JSON: "project", Kind: kindString, Required: true, Doc: "Project name"}, {Flag: "name", JSON: "name", Kind: kindString, Required: true, Doc: "Environment name"}}},
+	{Name: "environments list", Method: "GET", Path: "/v1/environments", Summary: "List environments", Inputs: []input{{Flag: "project", JSON: "project", Kind: kindString, Required: true, Doc: "Project name"}}},
+	{Name: "services create", Method: "POST", Path: "/v1/services", Summary: "Create a service", Inputs: []input{{Flag: "project", JSON: "project", Kind: kindString, Required: true, Doc: "Project name"}, {Flag: "env", JSON: "environment", Kind: kindString, Required: true, Doc: "Environment name"}, {Flag: "name", JSON: "name", Kind: kindString, Required: true, Doc: "Service name"}, {Flag: "server", JSON: "server", Kind: kindString, Required: true, Doc: "Server id of the caller's org"}}},
+	{Name: "services list", Method: "GET", Path: "/v1/services", Summary: "List services", Inputs: []input{{Flag: "project", JSON: "project", Kind: kindString, Required: true, Doc: "Project name"}, {Flag: "env", JSON: "environment", Kind: kindString, Required: true, Doc: "Environment name"}}},
 }

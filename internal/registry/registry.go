@@ -86,6 +86,18 @@ type Registry struct {
 	names map[string]bool
 	// ServersList is the shipped servers.list operation.
 	ServersList *Operation[ServersListIn, ServersListOut]
+	// ProjectsCreate is the shipped projects.create operation.
+	ProjectsCreate *Operation[ProjectsCreateIn, ProjectInfo]
+	// ProjectsList is the shipped projects.list operation.
+	ProjectsList *Operation[ProjectsListIn, ProjectsListOut]
+	// EnvironmentsCreate is the shipped environments.create operation.
+	EnvironmentsCreate *Operation[EnvironmentsCreateIn, EnvironmentInfo]
+	// EnvironmentsList is the shipped environments.list operation.
+	EnvironmentsList *Operation[EnvironmentsListIn, EnvironmentsListOut]
+	// ServicesCreate is the shipped services.create operation.
+	ServicesCreate *Operation[ServicesCreateIn, ServiceInfo]
+	// ServicesList is the shipped services.list operation.
+	ServicesList *Operation[ServicesListIn, ServicesListOut]
 }
 
 var roleRank = map[store.Role]int{store.RoleViewer: 1, store.RoleMember: 2, store.RoleAdmin: 3, store.RoleOwner: 4}
@@ -104,7 +116,99 @@ func New(st store.Store, now func() time.Time) *Registry {
 		}
 		return out, nil
 	})
+	r.ProjectsCreate = registerShipped(r, projectsCreateSpec, func(ctx context.Context, c Call, in ProjectsCreateIn) (ProjectInfo, error) {
+		p, err := st.CreateProject(ctx, c.OrgID, in.Name)
+		if err != nil {
+			return ProjectInfo{}, createRefusal(err, "project", in.Name,
+				fmt.Sprintf("project %q already exists", in.Name), "")
+		}
+		return projectInfo(p), nil
+	})
+	r.ProjectsList = registerShipped(r, projectsListSpec, func(ctx context.Context, c Call, _ ProjectsListIn) (ProjectsListOut, error) {
+		projects, err := st.Projects(ctx, c.OrgID)
+		if err != nil {
+			return ProjectsListOut{}, fmt.Errorf("list projects: %w", err)
+		}
+		out := ProjectsListOut{Projects: make([]ProjectInfo, 0, len(projects))}
+		for _, p := range projects {
+			out.Projects = append(out.Projects, projectInfo(p))
+		}
+		return out, nil
+	})
+	r.EnvironmentsCreate = registerShipped(r, environmentsCreateSpec, func(ctx context.Context, c Call, in EnvironmentsCreateIn) (EnvironmentInfo, error) {
+		e, err := st.CreateEnvironment(ctx, c.OrgID, c.ProjectID, in.Name)
+		if err != nil {
+			return EnvironmentInfo{}, createRefusal(err, "environment", in.Name,
+				fmt.Sprintf("environment %q already exists in project %q", in.Name, in.Project),
+				fmt.Sprintf("project %q not found", in.Project))
+		}
+		return environmentInfo(e), nil
+	})
+	r.EnvironmentsList = registerShipped(r, environmentsListSpec, func(ctx context.Context, c Call, _ EnvironmentsListIn) (EnvironmentsListOut, error) {
+		envs, err := st.Environments(ctx, c.OrgID, c.ProjectID)
+		if err != nil {
+			return EnvironmentsListOut{}, fmt.Errorf("list environments: %w", err)
+		}
+		out := EnvironmentsListOut{Environments: make([]EnvironmentInfo, 0, len(envs))}
+		for _, e := range envs {
+			out.Environments = append(out.Environments, environmentInfo(e))
+		}
+		return out, nil
+	})
+	r.ServicesCreate = registerShipped(r, servicesCreateSpec, func(ctx context.Context, c Call, in ServicesCreateIn) (ServiceInfo, error) {
+		s, err := st.CreateService(ctx, c.OrgID, c.EnvironmentID, in.Name, in.Server)
+		if err != nil {
+			return ServiceInfo{}, createRefusal(err, "service", in.Name,
+				fmt.Sprintf("service %q already exists in environment %q of project %q", in.Name, in.Environment, in.Project),
+				fmt.Sprintf("server %q not found", in.Server))
+		}
+		return serviceInfo(s), nil
+	})
+	r.ServicesList = registerShipped(r, servicesListSpec, func(ctx context.Context, c Call, _ ServicesListIn) (ServicesListOut, error) {
+		services, err := st.Services(ctx, c.OrgID, c.EnvironmentID)
+		if err != nil {
+			return ServicesListOut{}, fmt.Errorf("list services: %w", err)
+		}
+		out := ServicesListOut{Services: make([]ServiceInfo, 0, len(services))}
+		for _, s := range services {
+			out.Services = append(out.Services, serviceInfo(s))
+		}
+		return out, nil
+	})
 	return r
+}
+
+// projectInfo is the caller's view of one project row.
+func projectInfo(p store.Project) ProjectInfo {
+	return ProjectInfo{ID: p.ID, Name: p.Name, CreatedAt: p.CreatedAt}
+}
+
+// environmentInfo is the caller's view of one environment row.
+func environmentInfo(e store.Environment) EnvironmentInfo {
+	return EnvironmentInfo{ID: e.ID, Name: e.Name, CreatedAt: e.CreatedAt}
+}
+
+// serviceInfo is the caller's view of one service row.
+func serviceInfo(s store.Service) ServiceInfo {
+	return ServiceInfo{ID: s.ID, Name: s.Name, Server: s.ServerID, CreatedAt: s.CreatedAt}
+}
+
+// createRefusal maps a create's store error to a refusal built from the
+// caller's inputs and fixed text. notFound is empty for a create with no
+// not-found case. Any other error is wrapped, so it is not a refusal and
+// becomes a 500.
+func createRefusal(err error, kind, name, duplicate, notFound string) error {
+	switch {
+	case errors.Is(err, store.ErrInvalidName):
+		return Refuse(ErrInvalidInput, fmt.Sprintf(
+			"%s name %q must be 1 to 63 bytes of [a-z0-9-], starting and ending with a letter or digit", kind, name))
+	case errors.Is(err, store.ErrDuplicate):
+		return Refuse(ErrConflict, duplicate)
+	case notFound != "" && errors.Is(err, store.ErrNotFound):
+		return Refuse(ErrNotFound, notFound)
+	default:
+		return fmt.Errorf("create %s: %w", kind, err)
+	}
 }
 
 // Register adds an operation. It rejects an empty or duplicate name, a missing

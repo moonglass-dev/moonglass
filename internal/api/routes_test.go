@@ -2,6 +2,8 @@ package api_test
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -77,10 +79,42 @@ func TestEveryMountedRouteIsOperationOrAllowlisted(t *testing.T) {
 		t.Errorf("POST /v1/enroll is not mounted, want it served and listed")
 	}
 
-	// Each declared authorisation is what the route enforces.
+	// Each declared authorisation is what the route enforces. Every operation is
+	// called with inputs that pass its schema, over rows this test seeds, so the
+	// token decides: a request with a missing required input is 400 before
+	// authentication and would prove nothing about the authorisation.
+	project, err := st.CreateProject(ctx, orgID, "web")
+	if err != nil {
+		t.Fatalf("CreateProject(%q) error = %v, want nil", "web", err)
+	}
+	if _, err := st.CreateEnvironment(ctx, orgID, project.ID, "prod"); err != nil {
+		t.Fatalf("CreateEnvironment(%q) error = %v, want nil", "prod", err)
+	}
+	enrolled, err := st.AddServer(ctx, orgID, "routes-test-key", "age1routes-test")
+	if err != nil {
+		t.Fatalf("AddServer error = %v, want nil", err)
+	}
+	requests := map[string]struct{ query, body string }{
+		"servers.list":        {},
+		"projects.create":     {body: `{"name":"routes-p"}`},
+		"projects.list":       {},
+		"environments.create": {body: `{"project":"web","name":"routes-e"}`},
+		"environments.list":   {query: "project=web"},
+		"services.create": {body: fmt.Sprintf(`{"project":"web","environment":"prod","name":"routes-s","server":%q}`,
+			enrolled.ID)},
+		"services.list": {query: "project=web&environment=prod"},
+	}
+
 	h := srv.Handler()
-	do := func(method, path, bearer string) int {
-		req := httptest.NewRequest(method, path, strings.NewReader(""))
+	do := func(method, path, bearer, body string) int {
+		var r io.Reader
+		if body != "" {
+			r = strings.NewReader(body)
+		}
+		req := httptest.NewRequest(method, path, r)
+		if body != "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
 		if bearer != "" {
 			req.Header.Set("Authorization", "Bearer "+bearer)
 		}
@@ -89,6 +123,15 @@ func TestEveryMountedRouteIsOperationOrAllowlisted(t *testing.T) {
 		return rec.Code
 	}
 	for _, s := range registry.Operations() {
+		request, ok := requests[s.Name]
+		if !ok {
+			t.Errorf("operation %s has no request with inputs that pass its schema: add one so this test checks authorisation", s.Name)
+			continue
+		}
+		path := s.Path
+		if request.query != "" {
+			path += "?" + request.query
+		}
 		tests := []struct {
 			name   string
 			bearer string
@@ -99,12 +142,12 @@ func TestEveryMountedRouteIsOperationOrAllowlisted(t *testing.T) {
 			{"owner token", token, http.StatusOK},
 		}
 		for _, tt := range tests {
-			if got := do(s.Method, s.Path, tt.bearer); got != tt.want {
+			if got := do(s.Method, path, tt.bearer, request.body); got != tt.want {
 				t.Errorf("%s %s with %s: status = %d, want %d", s.Method, s.Path, tt.name, got, tt.want)
 			}
 		}
 	}
-	if got := do("POST", "/v1/enroll", ""); got < 400 || got >= 500 {
+	if got := do("POST", "/v1/enroll", "", ""); got < 400 || got >= 500 {
 		t.Errorf("POST /v1/enroll without an enrolment token: status = %d, want a 4xx rejection", got)
 	}
 }

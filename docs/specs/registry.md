@@ -42,7 +42,21 @@ Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry 
 | W3-2 | `secrets.set` | `PUT /v1/secrets` | member | no | project, environment |
 | W3-2 | `secrets.list` | `GET /v1/secrets` | viewer | no | project, environment |
 
-- `services.create` takes `project`, `environment`, `name` and `server` (a server id of the caller's org).
+The six W2-11 operations take these inputs, each a required string:
+
+| Operation | Inputs |
+|---|---|
+| `projects.create` | `name` |
+| `projects.list` | none |
+| `environments.create` | `project`, `name` |
+| `environments.list` | `project` |
+| `services.create` | `project`, `environment`, `name`, `server` (a server id of the caller's org) |
+| `services.list` | `project`, `environment` |
+
+A create returns the created row: a project and an environment are `id`, `name` and `created_at`; a service is `id`, `name`, `server` (its server id) and `created_at`. A list returns `projects`, `environments` or `services`, the rows in the store's name order, and `[]` rather than null when there are none.
+
+The three creates refuse a store error with fixed text built from the caller's inputs, never from the store's error text: `store.ErrInvalidName` is `ErrInvalidInput`, `<kind> name "<name>" must be 1 to 63 bytes of [a-z0-9-], starting and ending with a letter or digit`, where `<kind>` is `project`, `environment` or `service`; `store.ErrDuplicate` is `ErrConflict`, `project "<name>" already exists`, `environment "<name>" already exists in project "<project>"`, or `service "<name>" already exists in environment "<environment>" of project "<project>"`; `store.ErrNotFound` from `environments.create` is `ErrNotFound`, `project "<project>" not found`, and from `services.create` it is `ErrNotFound`, `server "<server>" not found`. Any other store error is a 500.
+
 - From W6-4b, `services.list` returns each service's `compose_hash`: the hash stored on its current release, or empty when it has none (`docs/specs/compose.md`).
 - `environments.list` returns each environment's `public_key` once it has one, which the CLI pins (`docs/specs/secrets.md`). From W4-2 it also returns `protected`.
 - **`deploy`** takes `project`, `environment`, `service`, exactly one of `image` (a reference) or `git` (`<owner>/<repo>@<40-hex commit>`, from W3-4), and optional `port`, `health_path`, `domain` (repeated), `pre_deploy` (repeated, the argv) and `pre_deploy_reversible`. The rules of `docs/specs/protocol.md` apply to each. It mints the release id, then:
