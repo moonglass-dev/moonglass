@@ -126,10 +126,14 @@ func (s *Server) Routes() []string {
 	return routes
 }
 
-// Handler serves the HTTP API: enrolment and the registry operations.
+// Handler serves the HTTP API: enrolment and the registry operations, each
+// behind http.CrossOriginProtection, which refuses a cross-site browser request
+// with an unsafe method with 403 before any handler runs. It has no trusted
+// origins and no bypass patterns. The CLI sends no Origin or Sec-Fetch-Site, so
+// it is unaffected.
 func (s *Server) Handler() http.Handler {
 	mux, _ := s.mount()
-	return mux
+	return http.NewCrossOriginProtection().Handler(mux)
 }
 
 // MintOwnerToken creates an owner token (scope "* * *") for userID and returns

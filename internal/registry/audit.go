@@ -10,10 +10,13 @@ import (
 	"moonglass.dev/moonglass/internal/store"
 )
 
-// eventHash is SHA-256 over the previous hash and the canonical body. The body
-// is a JSON array of its fields in a fixed order, so no field can bleed into another.
+// eventHash is SHA-256 over the 13 hashed fields of an event, in this fixed
+// order: prev_hash, org_id, seq, id, at, principal_kind, user_id, token_id,
+// session_id, step_up_id, operation, outcome, reason. The body is a JSON array,
+// so no field can bleed into another, and its first element is the previous
+// hash, which chains the events.
 func eventHash(e store.AuditEvent) string {
-	body, err := json.Marshal([]any{e.PrevHash, e.OrgID, e.Seq, e.ID, e.At, e.PrincipalKind, e.UserID, e.TokenID, e.Operation, e.Outcome, e.Reason})
+	body, err := json.Marshal([]any{e.PrevHash, e.OrgID, e.Seq, e.ID, e.At, e.PrincipalKind, e.UserID, e.TokenID, e.SessionID, e.StepUpID, e.Operation, e.Outcome, e.Reason})
 	if err != nil {
 		panic("registry: audit body is not encodable: " + err.Error())
 	}

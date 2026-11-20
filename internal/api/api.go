@@ -32,10 +32,27 @@ const (
 
 	authDoc = "Bearer token: Authorization: Bearer mg_..."
 
+	// sessionCookie carries a sign-in session. Its __Host- prefix makes the
+	// browser refuse it from a subdomain, over plain HTTP and with any Path but /.
+	sessionCookie = "__Host-mg_session"
+	// orgHeader names the org a session request acts in.
+	orgHeader = "Moonglass-Org"
+
 	unauthenticatedDetail = "the token is missing, unknown, expired or revoked: mint a new one"
+	bothDetail            = "send a bearer token or a session cookie, not both"
+	sessionDetail         = "the session is missing, expired or revoked, or Moonglass-Org is missing or names an org you are not a member of: sign in again and send Moonglass-Org"
+	orgMismatchDetail     = "Moonglass-Org names a different org than the token's: drop the header or use a token of that org"
 	pendingApprovalDetail = "this destructive call is pending approval"
 	deniedDetail          = "your role or the token's scope does not allow this operation"
 	internalDetail        = "the control plane could not complete the call; see its logs and retry"
+)
+
+// Refusals the principal check makes before it looks a credential up. Each
+// wraps registry.ErrUnauthenticated so a caller can test either.
+var (
+	errBothCredentials = fmt.Errorf("%w: %s", registry.ErrUnauthenticated, bothDetail)
+	errSession         = fmt.Errorf("%w: %s", registry.ErrUnauthenticated, sessionDetail)
+	errOrgMismatch     = fmt.Errorf("%w: %s", registry.ErrUnauthenticated, orgMismatchDetail)
 )
 
 // New returns the REST handler for reg's operations. It mounts only the
@@ -192,6 +209,7 @@ func mount[In, Out any](api huma.API, reg *registry.Registry, op *registry.Opera
 
 	api.OpenAPI().AddOperation(&hop)
 	api.Adapter().Handle(&hop, func(ctx huma.Context) {
+		req, _ := humago.Unwrap(ctx)
 		in, errs, err := decode[In](ctx, spec.Method, ins, hop.RequestBody, schemas)
 		if len(errs) > 0 {
 			_ = huma.WriteErr(api, ctx, http.StatusBadRequest, "invalid input for "+spec.Name, errs...)
@@ -207,7 +225,7 @@ func mount[In, Out any](api huma.API, reg *registry.Registry, op *registry.Opera
 			writeError(api, ctx, spec.Name, err)
 			return
 		}
-		p, err := principal(ctx.Context(), reg, ctx.Header("Authorization"))
+		p, err := principal(ctx.Context(), reg, req)
 		if err != nil {
 			writeError(api, ctx, spec.Name, err)
 			return
@@ -356,14 +374,40 @@ func decodeBody[In any](ctx huma.Context, body *huma.RequestBody, schemas huma.R
 	return in, nil, nil
 }
 
-func principal(ctx context.Context, reg *registry.Registry, header string) (registry.Principal, error) {
-	token, ok := strings.CutPrefix(header, "Bearer ")
+// principal resolves the authenticated caller of r. A request sends a bearer
+// token or the session cookie, never both: both is refused before either is
+// looked up, so one credential can never authorise a request the other is
+// audited for. A session needs Moonglass-Org, an org its user is a member of. A
+// bearer's org comes from the token, and a Moonglass-Org naming another org is
+// refused.
+func principal(ctx context.Context, reg *registry.Registry, r *http.Request) (registry.Principal, error) {
+	auth := r.Header.Get("Authorization")
+	cookie, cerr := r.Cookie(sessionCookie)
+	hasSession := cerr == nil
+	if auth != "" && hasSession {
+		return registry.Principal{}, errBothCredentials
+	}
+	if hasSession {
+		org := r.Header.Get(orgHeader)
+		if org == "" {
+			return registry.Principal{}, errSession
+		}
+		p, err := reg.AuthenticateSession(ctx, cookie.Value, org)
+		if errors.Is(err, registry.ErrUnauthenticated) {
+			return registry.Principal{}, errSession
+		}
+		return p, err
+	}
+	token, ok := strings.CutPrefix(auth, "Bearer ")
 	if !ok {
 		return registry.Principal{}, fmt.Errorf("read the Authorization header: %w", registry.ErrUnauthenticated)
 	}
 	p, err := reg.Authenticate(ctx, token)
 	if err != nil {
 		return registry.Principal{}, err
+	}
+	if org := r.Header.Get(orgHeader); org != "" && org != p.OrgID {
+		return registry.Principal{}, errOrgMismatch
 	}
 	return p, nil
 }
@@ -378,6 +422,12 @@ func writeError(api huma.API, ctx huma.Context, operation string, err error) {
 // refusal, the handler's own message; another error's text is only logged.
 func httpError(operation string, err error) (int, string) {
 	switch {
+	case errors.Is(err, errBothCredentials):
+		return http.StatusUnauthorized, bothDetail
+	case errors.Is(err, errSession):
+		return http.StatusUnauthorized, sessionDetail
+	case errors.Is(err, errOrgMismatch):
+		return http.StatusUnauthorized, orgMismatchDetail
 	case errors.Is(err, registry.ErrUnauthenticated):
 		return http.StatusUnauthorized, unauthenticatedDetail
 	case errors.Is(err, registry.ErrPendingApproval):
