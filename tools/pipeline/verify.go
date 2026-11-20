@@ -528,6 +528,10 @@ var ownerTestEdits = map[string]map[string]bool{
 		"internal/deploy/stop_test.go":                  true,
 		"internal/deploy/retain_test.go":                true,
 		"internal/deploy/run_test.go":                   true,
+		// A later owner decision the same day also lets state_test.go change two
+		// assertions: TestPackageImportsReleaseAndStoreOnly permits exactly
+		// internal/protocol/agentv1, and TestOpenMigratesSpecSchema wants the
+		// commands table.
 	},
 }
 

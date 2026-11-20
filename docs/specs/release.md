@@ -177,6 +177,8 @@ Per app, the current, the previous and the three newest retired releases keep th
 
 `Executor.Run(ctx, onError)` reconciles and applies retention at start, then carries out the stops due every second and applies retention every hour, until `ctx` ends. A step that fails goes to `onError`, when the caller passed one, and is retried at its next turn; it never stops `Run`. Stops and removals keep the 60-second Engine call limit, and a stop's own wait is 30 seconds. `moonglass agent connect` runs `Executor.Run` for its whole life from W2-10b.
 
+`Executor.ScopeReconcile(labels ...string)` narrows the start-up reconcile to managed containers that also carry every given `key=value` label; other containers on the Engine are left alone. It is called before `Run` and is never called in production, where every managed container on the server is the agent's. Its only caller is the deploy-correctness suite, which scopes it to `dev.moonglass.project=<project>` so a fresh agent database does not remove another run's containers (`docs/specs/deploy-suite.md`; owner decision, 2026-11-20).
+
 ### One deploy per app
 
 The control plane runs at most one deploy per service and queues at most one more; a newer request replaces the queued one (`docs/specs/registry.md`, `deploy`). The agent does not queue: a `Deploy` while a candidate exists stays illegal, and is `REJECTED`.
