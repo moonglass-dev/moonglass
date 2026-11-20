@@ -5,15 +5,12 @@
     "done:build": 1,
     "done:fix": 1,
     "done:plan": 1,
-    "done:review": 1,
+    "done:review": 2,
     "done:tests": 1,
     "done:ticket": 1,
     "fix": 1,
     "review": 2,
     "worker": 1
   },
-  "claim": {
-    "step": "review",
-    "round": 2
-  }
+  "claim": null
 }
