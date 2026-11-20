@@ -1,6 +1,5 @@
 {
   "counts": {
-    "build": 1,
     "done:approve": 1,
     "done:build": 1,
     "done:fix": 1,
@@ -8,11 +7,7 @@
     "done:repair": 1,
     "done:review": 3,
     "done:tests": 1,
-    "done:ticket": 1,
-    "fix": 1,
-    "repair": 1,
-    "review": 3,
-    "worker": 3
+    "done:ticket": 1
   },
   "claim": null
 }
