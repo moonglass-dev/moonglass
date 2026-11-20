@@ -19,7 +19,7 @@ Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milest
 | [0011](0011-proxy-dependencies.md) | `caddy/v2 v2.11.9`, imported only by `internal/proxy`, for the embedded proxy; a proxy upgrade is a drained restart until SPIKE-1 |
 | [0012](0012-connection-dependencies.md) | `coder/websocket v1.8.15`, imported only by `internal/agent` and `internal/server`, for the agent's outbound WSS connection |
 | [0013](0013-api-dependencies.md) | `huma/v2 v2.40.0`, imported only by `internal/api` through the standard-library adapter, for the REST API and OpenAPI generated from the registry |
-| [0014](0014-docker-client.md) | `moby/moby/client v0.6.3` and `moby/moby/api v1.57.0`, imported only by `internal/deploy`, `internal/build` and `internal/agent/disk`; Engine API 1.44 (Docker 25) or newer, negotiated |
+| [0014](0014-docker-client.md) | `moby/moby/client v0.6.3` and `moby/moby/api v1.57.0`, imported only by `internal/deploy`, `internal/build`, `internal/agent/disk` and the `test/deploy/` suite; Engine API 1.44 (Docker 25) or newer, negotiated |
 | [0015](0015-age-dependency.md) | `filippo.io/age v1.3.2`, imported only by `internal/keys`, X25519 only; test vectors checked with the stock `age` tool |
 | [0016](0016-ui-toolchain.md) | Bun 1.4.4 installs and builds the UI, exact pins for Svelte, SvelteKit, Vite, Tailwind and Bits UI; `make ui` builds the embedded UI, and no build output is committed |
 

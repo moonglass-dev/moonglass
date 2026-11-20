@@ -82,18 +82,19 @@ linters:
               desc: only internal/keys may import age (ADR-0015)
         docker-deps:
           # The Docker client (github.com/moby/moby/client and /api) is imported
-          # only by internal/deploy, internal/build and internal/agent/disk
-          # (ADR-0014 decision 2). Every other file is covered, so new packages
-          # are too.
+          # only by internal/deploy, internal/build, internal/agent/disk and the
+          # test/deploy suite, which no binary imports (ADR-0014 decision 2).
+          # Every other file is covered, so new packages are too.
           list-mode: lax
           files:
             - "$all"
             - "!**/internal/deploy/**"
             - "!**/internal/build/**"
             - "!**/internal/agent/disk/**"
+            - "!**/test/deploy/**"
           deny:
             - pkg: github.com/moby/moby
-              desc: only internal/deploy, internal/build and internal/agent/disk may import the Docker client (ADR-0014)
+              desc: only internal/deploy, internal/build, internal/agent/disk and the test/deploy suite may import the Docker client (ADR-0014)
         deploy-deps:
           # internal/deploy never imports internal/proxy, which links Caddy, and
           # never imports Caddy itself (docs/specs/release.md "Proxy config",
