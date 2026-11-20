@@ -36,30 +36,29 @@ linters:
             - github.com/moby/moby/client
             - github.com/moby/moby/api
         proxy-deps:
-          # Caddy is imported only by internal/proxy. cmd/ calls proxy.Run.
+          # Caddy is imported only by internal/proxy (ADR-0011). cmd/ calls
+          # proxy.Run. Every file outside internal/proxy is covered, so new
+          # packages are too.
           list-mode: lax
           files:
-            - "**/cmd/**/*.go"
-            - "**/internal/agent/**/*.go"
-            - "**/internal/keys/**/*.go"
-            - "**/internal/protocol/**/*.go"
-            - "**/internal/policy/**/*.go"
+            - "$all"
+            - "!**/internal/proxy/**"
           deny:
             - pkg: github.com/caddyserver/caddy/v2
-              desc: only internal/proxy may import Caddy
+              desc: only internal/proxy may import Caddy (ADR-0011)
         websocket-deps:
-          # coder/websocket is imported only by internal/agent and internal/server.
-          # cmd/ calls into those packages.
+          # coder/websocket is imported only by internal/agent and
+          # internal/server (ADR-0012). cmd/ calls into those packages. Every
+          # file outside those two directories is covered, so new packages are
+          # too.
           list-mode: lax
           files:
-            - "**/cmd/**/*.go"
-            - "**/internal/protocol/**/*.go"
-            - "**/internal/policy/**/*.go"
-            - "**/internal/keys/**/*.go"
-            - "**/internal/store/**/*.go"
+            - "$all"
+            - "!**/internal/agent/**"
+            - "!**/internal/server/**"
           deny:
             - pkg: github.com/coder/websocket
-              desc: only internal/agent and internal/server may import coder/websocket
+              desc: only internal/agent and internal/server may import coder/websocket (ADR-0012)
         huma-deps:
           # Huma is imported only by internal/api (ADR-0013). Every file
           # outside internal/api is covered, so new packages are too.
@@ -96,17 +95,15 @@ linters:
             - pkg: github.com/moby/moby
               desc: only internal/deploy, internal/build, internal/agent/disk and the test/deploy suite may import the Docker client (ADR-0014)
         deploy-deps:
-          # internal/deploy never imports internal/proxy, which links Caddy, and
-          # never imports Caddy itself (docs/specs/release.md "Proxy config",
-          # ADR-0011). The agent pushes proxy config over the admin socket.
+          # internal/deploy never imports internal/proxy, which links Caddy
+          # (docs/specs/release.md "Proxy config", ADR-0011). The agent pushes
+          # proxy config over the admin socket. proxy-deps denies Caddy itself.
           list-mode: lax
           files:
             - "**/internal/deploy/**"
           deny:
             - pkg: moonglass.dev/moonglass/internal/proxy
               desc: internal/deploy never imports internal/proxy, which links Caddy (docs/specs/release.md, ADR-0011)
-            - pkg: github.com/caddyserver/caddy/v2
-              desc: only internal/proxy may import Caddy (ADR-0011)
         sqlite-deps:
           # modernc sqlite is imported only by internal/store/sqlite and
           # internal/agent/state (ADR-0010, amended 2026-11-17). Every file
