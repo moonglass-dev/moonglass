@@ -22,6 +22,7 @@ Sources are cited as S§ (`docs/plan/stack.md`), V§ (`vision.md`), M§ (`milest
 | [0014](0014-docker-client.md) | `moby/moby/client v0.6.3` and `moby/moby/api v1.57.0`, imported only by `internal/deploy`, `internal/build`, `internal/agent/disk` and the `test/deploy/` suite; Engine API 1.44 (Docker 25) or newer, negotiated |
 | [0015](0015-age-dependency.md) | `filippo.io/age v1.3.2`, imported only by `internal/keys`, X25519 only; test vectors checked with the stock `age` tool |
 | [0016](0016-ui-toolchain.md) | Bun 1.4.4 installs and builds the UI, exact pins for Svelte, SvelteKit, Vite, Tailwind and Bits UI; `make ui` builds the embedded UI, and no build output is committed |
+| [0017](0017-containerd-errdefs-dependency.md) | `github.com/containerd/errdefs v1.0.0`, imported only by `internal/deploy`, for typed HTTP 409 conflict detection on image removal |
 
 Amended 2026-11-17 by the weeks 2–3 preflight: 0001 (decision 3, the admin socket group), 0003 (decisions 2 and 5, new 11 to 13), 0004 (new 10 to 12) and 0010 (the agent database).
 

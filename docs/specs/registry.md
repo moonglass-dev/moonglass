@@ -144,9 +144,9 @@ From W5-1, `MintToken` also mints agent identities' tokens, with 1 to 32 checked
 
 ## Audit
 
-Every `Invoke` by an authenticated principal writes one event after the decision: `allowed`, `denied` (role, scope or pending approval) or `error` (the handler failed). A request whose token fails to authenticate has no org and writes no event. Each event names the principal kind (`human` or `agent`), user id, token id and operation. `reason` never holds a token or handler error text.
+Every `Invoke` by an authenticated principal writes one event after the decision: `allowed`, `denied` (role, scope or pending approval) or `error` (the handler failed). A request whose token fails to authenticate has no org and writes no event. Each event names the principal kind (`human` or `agent`), user id, token id, session id, step-up id and operation. `session_id` and `step_up_id` are empty when they don't apply; `docs/specs/auth.md` gives the session and step-up that set them. `reason` never holds a token or handler error text.
 
-`hash = SHA-256(JSON [prev_hash, org_id, seq, id, at, principal_kind, user_id, token_id, operation, outcome, reason])`, hex encoded. Events start at `seq` 1 with an empty `prev_hash`. `VerifyAudit` recomputes the chain and names the first bad sequence number when an event is changed, removed or reordered.
+`hash = SHA-256(JSON [prev_hash, org_id, seq, id, at, principal_kind, user_id, token_id, session_id, step_up_id, operation, outcome, reason])`, hex encoded. Events start at `seq` 1 with an empty `prev_hash`. `VerifyAudit` recomputes the chain and names the first bad sequence number when an event is changed, removed or reordered.
 
 W5-1b adds `agent_id` to the event and the hash, and W5-5 adds `project_id`, `environment_id` and the `system` principal kind, `audit.list`, and `moonglass audit verify`, which checks the chain on the CLI (`docs/specs/agent-identities.md`, `docs/specs/audit.md`).
 
