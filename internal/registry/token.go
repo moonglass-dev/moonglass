@@ -62,7 +62,7 @@ func MintToken(ctx context.Context, st store.Store, orgID, userID, name string, 
 // Authenticate resolves a bearer token to its principal. A malformed, unknown,
 // expired or revoked token returns ErrUnauthenticated.
 func (r *Registry) Authenticate(ctx context.Context, bearer string) (Principal, error) {
-	if !strings.HasPrefix(bearer, tokenPrefix) || len(bearer) != len(tokenPrefix)+tokenSecretLen {
+	if !wellFormed(bearer) {
 		return Principal{}, fmt.Errorf("%w: expected an mg_ token of %d characters", ErrUnauthenticated, len(tokenPrefix)+tokenSecretLen)
 	}
 	t, role, err := r.st.TokenByHash(ctx, store.HashToken(bearer))
@@ -80,4 +80,44 @@ func (r *Registry) Authenticate(ctx context.Context, bearer string) (Principal, 
 		return Principal{}, ErrUnauthenticated
 	}
 	return Principal{OrgID: t.OrgID, UserID: t.UserID, TokenID: t.ID, Role: role, Scopes: t.Scopes}, nil
+}
+
+// wellFormed reports whether text has the mg_ prefix and a bearer's length.
+func wellFormed(text string) bool {
+	return strings.HasPrefix(text, tokenPrefix) && len(text) == len(tokenPrefix)+tokenSecretLen
+}
+
+// AuthenticateSession resolves a session bearer to its principal in orgID. The
+// session must be live at the registry's clock and its user a member of orgID,
+// which gives the principal the user's role in that org and the one scope row
+// "* * *". A malformed, unknown, expired or revoked session, and an org the user
+// is not a member of, return ErrUnauthenticated with no session text.
+func (r *Registry) AuthenticateSession(ctx context.Context, session, orgID string) (Principal, error) {
+	if !wellFormed(session) || orgID == "" {
+		return Principal{}, ErrUnauthenticated
+	}
+	sess, err := r.st.SessionByHash(ctx, store.HashToken(session), r.now())
+	if errors.Is(err, store.ErrNotFound) {
+		return Principal{}, ErrUnauthenticated
+	}
+	if err != nil {
+		return Principal{}, fmt.Errorf("authenticate session: %w", err)
+	}
+	members, err := r.st.Memberships(ctx, orgID)
+	if err != nil {
+		return Principal{}, fmt.Errorf("authenticate session: list members of the org: %w", err)
+	}
+	for _, m := range members {
+		if m.UserID != sess.UserID {
+			continue
+		}
+		return Principal{
+			OrgID:     orgID,
+			UserID:    sess.UserID,
+			SessionID: sess.ID,
+			Role:      m.Role,
+			Scopes:    []Scope{{Project: "*", Environment: "*", Operation: "*"}},
+		}, nil
+	}
+	return Principal{}, ErrUnauthenticated
 }

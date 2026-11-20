@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "All seven tests named in the ticket are present in the named packages, in new files only, and each acceptance criterion has an assertion that fails when the behaviour is wrong. A live session yields the owner or member principal with an empty token id, Agent false and the scope * * * for each of the user's two orgs, and an unknown, expired, revoked, malformed or non-member session returns ErrUnauthenticated without the session text. A session invoke records that session id with an empty token id and step-up id, and a bearer invoke records an empty session id. The event hash is the SHA-256 of the specified 13-field JSON array, and changing session_id or step_up_id makes VerifyAudit name that sequence. Both credentials get the exact 401 detail with no TokenByHash or SessionByHash call and no audit event. A session is 401 without a member org and 200 with one, and the 401 body does not echo the cookie or the header. A bearer is 401 for another org and 200 for its own org or with no header. A cross-site POST is 403 on /v1/enroll, with the enrolment token unused, and on /v1/servers, while a header-less POST and a cross-site GET reach the handler. The tests use temporary directories and the existing server fixture."
+}

@@ -51,14 +51,16 @@ type Spec struct {
 	Destructive Flag
 }
 
-// Principal is the authenticated caller. Agent marks an agent identity.
+// Principal is the authenticated caller. TokenID names the bearer and SessionID
+// the sign-in session; exactly one is set. Agent marks an agent identity.
 type Principal struct {
-	OrgID   string
-	UserID  string
-	TokenID string
-	Role    store.Role
-	Scopes  []Scope
-	Agent   bool
+	OrgID     string
+	UserID    string
+	TokenID   string
+	SessionID string
+	Role      store.Role
+	Scopes    []Scope
+	Agent     bool
 }
 
 // Call is what a handler may know about its caller. Invoke resolves the
@@ -249,6 +251,7 @@ func (r *Registry) audit(ctx context.Context, p Principal, operation, outcome, r
 	err = r.st.AppendAudit(ctx, p.OrgID, func(prev string, seq int64) store.AuditEvent {
 		return sealEvent(store.AuditEvent{
 			OrgID: p.OrgID, Seq: seq, ID: id, At: at, PrincipalKind: kind, UserID: p.UserID, TokenID: p.TokenID,
+			SessionID: p.SessionID, StepUpID: "",
 			Operation: operation, Outcome: outcome, Reason: reason, PrevHash: prev,
 		})
 	})

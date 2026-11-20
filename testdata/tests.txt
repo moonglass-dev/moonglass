@@ -52,6 +52,8 @@ moonglass.dev/moonglass/internal/agent/state TestRecordStoppedClearsStopAfter
 moonglass.dev/moonglass/internal/agent/state TestRecordStoresTextVerbatim
 moonglass.dev/moonglass/internal/agent/state TestRecordSwitchWritesStatusesAndStopAfter
 moonglass.dev/moonglass/internal/agent/state TestRetainKeepsFiveAndPrunesOldRows
+moonglass.dev/moonglass/internal/api TestBearerAndSessionTogetherIs401
+moonglass.dev/moonglass/internal/api TestBearerWithOtherOrgHeaderIs401
 moonglass.dev/moonglass/internal/api TestBodyInputsDecoded
 moonglass.dev/moonglass/internal/api TestBodyOverLimitIs413
 moonglass.dev/moonglass/internal/api TestEveryMountedRouteIsOperationOrAllowlisted
@@ -62,6 +64,7 @@ moonglass.dev/moonglass/internal/api TestQueryInputsDecoded
 moonglass.dev/moonglass/internal/api TestRefusalStatuses
 moonglass.dev/moonglass/internal/api TestSchemaFailuresAre400
 moonglass.dev/moonglass/internal/api TestServerErrorIsLoggedWithoutTheToken
+moonglass.dev/moonglass/internal/api TestSessionNeedsMemberOrg
 moonglass.dev/moonglass/internal/api TestTargetFilledFromInputs
 moonglass.dev/moonglass/internal/api TestUnknownInputsRefused
 moonglass.dev/moonglass/internal/api TestUnmappedHandlerErrorIs500
@@ -288,6 +291,8 @@ moonglass.dev/moonglass/internal/registry TestAgentConnectSynopsisNamesProxyFlag
 moonglass.dev/moonglass/internal/registry TestAppendAuditIsCalledOnlyByTheRegistry
 moonglass.dev/moonglass/internal/registry TestAuditEventsAreHashChained
 moonglass.dev/moonglass/internal/registry TestAuditEventsWrittenByRegistryNotHandler
+moonglass.dev/moonglass/internal/registry TestAuditHashCoversSessionAndStepUp
+moonglass.dev/moonglass/internal/registry TestAuthenticateSession
 moonglass.dev/moonglass/internal/registry TestDestructiveBelowAdminIsRejected
 moonglass.dev/moonglass/internal/registry TestInvokePassesResolvedIDsToHandler
 moonglass.dev/moonglass/internal/registry TestInvokeResolveStoreFailureIsNotARefusal
@@ -299,6 +304,7 @@ moonglass.dev/moonglass/internal/registry TestOperationsListInTypes
 moonglass.dev/moonglass/internal/registry TestOwnerTokenScopeIsWildcard
 moonglass.dev/moonglass/internal/registry TestRefusalKindsAndAuditReasons
 moonglass.dev/moonglass/internal/registry TestRoleAndScopeAreEnforced
+moonglass.dev/moonglass/internal/registry TestSessionCallAuditsSessionID
 moonglass.dev/moonglass/internal/registry TestTokenStoredHashedOnly
 moonglass.dev/moonglass/internal/registry TestUnmappedStoreErrorIsNotARefusal
 moonglass.dev/moonglass/internal/release TestAbortClearsCandidate
@@ -317,6 +323,7 @@ moonglass.dev/moonglass/internal/releasetest TestReleaseWorkflowUploadsToDraftRe
 moonglass.dev/moonglass/internal/releasetest TestReleaseWorkflowWritesSPDXSBOM
 moonglass.dev/moonglass/internal/server TestAgentEndpointRejectsNonGet
 moonglass.dev/moonglass/internal/server TestAgentRoutesMatchTheDeclaredList
+moonglass.dev/moonglass/internal/server TestCrossOriginWriteRefused
 moonglass.dev/moonglass/internal/server TestEnrollDuplicateKeyStoresNoRecipient
 moonglass.dev/moonglass/internal/server TestEnrollRejectsInvalidToken
 moonglass.dev/moonglass/internal/server TestEnrollRejectsReplay

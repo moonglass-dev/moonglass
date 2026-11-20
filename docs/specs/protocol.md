@@ -62,7 +62,7 @@ No field is a host shell command.
 
 `Heartbeat` carries `agent_version` (string). `HeartbeatAck` has no fields. Both round-trip through the envelope. Opening a Heartbeat acknowledgement as an Enroll request is an error. The control plane is expected to see heartbeats about every 30 seconds (S§5); v0 does not schedule them.
 
-W7-6d adds `update_channel` to `Heartbeat`. It is `"STABLE"` or `"CANARY"` from `update.channel` in agent.toml, byte for byte. It is empty when the agent predates W7-6d or the field is unconfigured, and such an agent is never sent an `UpdateOffer`. Any other non-empty value is rejected: `stable`, `UNSPECIFIED` and whitespace are not accepted. The field carries no `UNSPECIFIED` value; the zero value is empty (`docs/specs/update.md`).
+W7-6d adds `update_channel` to `Heartbeat` and validates it; W7-6e sets it from `update.channel` in agent.toml. The agent maps the file's lower-case value to the upper-case wire value: `update.channel = "stable"` reports `STABLE`, `update.channel = "canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE`. It is empty only from an agent built before W7-6e, and such an agent is never sent an `UpdateOffer`. Any other non-empty value is rejected: `stable`, `UNSPECIFIED` and whitespace are not accepted. The field carries no `UNSPECIFIED` value; the zero value is empty (`docs/specs/update.md` §1).
 
 ## Deploy commands (W2-2)
 
