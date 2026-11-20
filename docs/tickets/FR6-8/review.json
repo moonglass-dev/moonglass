@@ -1,0 +1,10 @@
+{
+  "round": 0,
+  "verdict": "approve",
+  "skipped": true,
+  "reason": "low risk, small, covered, no trusted core or protected paths",
+  "commit": "8912a7e7dbd98d10473c8ef171c9a2961974de21",
+  "blockers": [],
+  "majors": [],
+  "minors": []
+}
