@@ -1,6 +1,10 @@
 package registry
 
-import "moonglass.dev/moonglass/internal/store"
+import (
+	"reflect"
+
+	"moonglass.dev/moonglass/internal/store"
+)
 
 // ServersListIn is the (empty) input of servers.list.
 type ServersListIn struct{}
@@ -16,6 +20,13 @@ type ServersListOut struct {
 	Servers []ServerInfo `json:"servers" doc:"Servers enrolled in the caller's org"`
 }
 
+// Declaration is an operation's Spec and the type of its input; REST and CLI
+// generation read it.
+type Declaration struct {
+	In reflect.Type
+	Spec
+}
+
 var serversListSpec = Spec{
 	Name:        "servers.list",
 	Summary:     "List servers",
@@ -27,6 +38,8 @@ var serversListSpec = Spec{
 
 // Operations returns the declaration of every shipped operation. REST and CLI
 // generation read this list.
-func Operations() []Spec {
-	return []Spec{serversListSpec}
+func Operations() []Declaration {
+	return []Declaration{
+		{Spec: serversListSpec, In: reflect.TypeFor[ServersListIn]()},
+	}
 }

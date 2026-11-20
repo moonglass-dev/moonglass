@@ -16,7 +16,7 @@ An operation is a `Spec` and a handler, registered with `registry.Register`.
 
 `Register` also rejects an empty or duplicate name, an invalid role, and a destructive operation whose `MinRole` is below admin. Deploy and rollback are not destructive. A handler is `func(ctx, Call, In) (Out, error)`; `Call` carries the org and user ids and the target's resolved project and environment ids, and has no methods, so a handler cannot write an audit event.
 
-`registry.Operations()` lists the shipped operations, each with its `Spec` and the type of its `In`, which generation reads ("Inputs and errors"); W2-1 ships `servers.list` (`GET /v1/servers`, viewer, not destructive).
+`registry.Operations()` lists the shipped operations as `registry.Declaration` values, each with its `Spec` and `In`, the `reflect.Type` of its input, which generation reads ("Inputs and errors"); W2-1 ships `servers.list` (`GET /v1/servers`, viewer, not destructive).
 
 ### Operations added in weeks 2 and 3
 
@@ -207,4 +207,4 @@ W2-11c, W2-11f and W2-11g ship no new operation, so these tests register test op
 
 - W2-11c `internal/registry`: `TestInvokeResolvesTargetAfterRoleCheck` (a role denial makes no store call), `TestInvokeUnknownTargetInScopeIsNotFound` (404 error, outcome `error`, reason `not found`, handler not run), `TestInvokeUnknownTargetOutOfScopeIsDenied` (the same error and reason as a known target out of scope), `TestInvokePassesResolvedIDsToHandler`, `TestRefusalKindsAndAuditReasons`, `TestUnmappedStoreErrorIsNotARefusal`.
 - W2-11f `internal/api`: `TestQueryInputsDecoded` (repeated lists, booleans, integers), `TestBodyInputsDecoded`, `TestUnknownInputsRefused` (query and body, 400), `TestSchemaFailuresAre400` (missing required, wrong type; never 422; no `value` in `errors`), `TestRefusalStatuses` (400, 404, 409 with the refusal's message), `TestUnmappedHandlerErrorIs500`.
-- W2-11g `internal/cli`: `TestGeneratedFlagNames` (`--env`, hyphens, no aliases), `TestGeneratedFlagsSentAsQueryOrBody`, `TestGeneratedRepeatedBooleanAndIntegerFlags`, `TestGeneratedMissingRequiredFlagExits2` (nothing sent), `TestGeneratedRefusesPositionalAndUnknownFlags`, `TestGeneratedPrintsErrorDetail`, `TestGenerateRefusesInputWithoutFlag`, `TestGenerateSkipsLocalCommands`.
+- W2-11g `internal/registry`: `TestOperationsListInTypes`; `internal/cli`: `TestGeneratedFlagNames` (`--env`, hyphens, no aliases), `TestGeneratedFlagsSentAsQueryOrBody`, `TestGeneratedRepeatedBooleanAndIntegerFlags`, `TestGeneratedMissingRequiredFlagExits2` (nothing sent), `TestGeneratedRefusesPositionalAndUnknownFlags`, `TestGeneratedPrintsErrorDetail`, `TestGenerateRefusesInputWithoutFlag`, `TestGenerateSkipsLocalCommands`.

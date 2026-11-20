@@ -7,13 +7,14 @@ import (
 	"testing"
 
 	"moonglass.dev/moonglass/internal/cli"
+	"moonglass.dev/moonglass/internal/registry"
 )
 
 var update = flag.Bool("update", false, "rewrite the checked-in generated files")
 
 func TestGeneratedCLIIsCurrent(t *testing.T) {
 	const path = "generated.go"
-	got, err := cli.Generate()
+	got, err := cli.Generate(registry.Operations(), registry.LocalCommands)
 	if err != nil {
 		t.Fatalf("cli.Generate error = %v, want nil", err)
 	}

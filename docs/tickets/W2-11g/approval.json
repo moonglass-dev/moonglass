@@ -1,0 +1,6 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "blockers": [],
+  "notes": "The nine named tests are in internal/registry/operations_test.go and internal/cli/generated_inputs_test.go. They register the test operations, drive them through cli.RunDeclared, and check flag names, query versus JSON body, lists, booleans, integers, the first missing required flag, usage order and docs, problem output, and Generate's kind refusal and local-command skip. The only edit to a test on main is the owner-allowed Generate(registry.Operations(), registry.LocalCommands) call in TestGeneratedCLIIsCurrent; its comparison is unchanged. strings.Index on \"--env\" also matches --environment, and the refused alias, short-flag, positional and unknown-flag cases omit the required flags, so those checks assume a missing required flag does not itself print the usage. testdata/tests.txt does not list the new tests yet."
+}
