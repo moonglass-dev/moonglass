@@ -485,6 +485,7 @@ var ownerTestEdits = map[string]map[string]bool{
 		"internal/server/owner_token_test.go": true,
 		"cmd/moonglass/enroll_test.go":        true,
 		"internal/proxy/memory_test.go":       true,
+		"cmd/moonglass/connect_test.go":       true,
 	},
 	"FR1-2": {
 		"internal/store/conformance_test.go":           true,
