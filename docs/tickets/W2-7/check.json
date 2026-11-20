@@ -1,6 +1,6 @@
 {
-  "commit": "70e9ca683cf56fe568d710d6869fc730f1424a7c",
-  "ok": true,
+  "commit": "fce073676c7cc26178079f4554bf6bf196aa9139",
+  "ok": false,
   "gates": [
     {
       "name": "clean",
@@ -41,11 +41,12 @@
     },
     {
       "name": "make-ci",
-      "ok": true
+      "ok": false,
+      "detail": "ok   proto-check\nok   fmt-check\nok   mod-check\nok   lint\nFAIL test\n--- FAIL: TestExecutorRunStopsAndRetainsUntilCancelled\nCGO_ENABLED=1 go test -count=1 -shuffle=on -race -coverprofile=coverage.out ./...\n# moonglass.dev/moonglass/cmd/moonglass.test\n/Users/moonglass-dev/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.4.darwin-arm64/pkg/tool/darwin_arm64/link: mapping output file failed: no space left on device\n# moonglass.dev/moonglass/internal/proxy.test\n/Users/moonglass-dev/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.4.darwin-arm64/pkg/tool/darwin_arm64/link: mapping output file failed: no space left on device\nFAIL\tmoonglass.dev/moonglass/cmd/moonglass [build failed]\nok  \tmoonglass.dev/moonglass/internal/agent\t5.100s\tcoverage: 77.8% of statements\nok  \tmoonglass.dev/moonglass/internal/agent/state\t5.683s\tcoverage: 78.2% of statements\nok  \tmoonglass.dev/moonglass/internal/api\t12.196s\tcoverage: 91.8% of statements\nok  \tmoonglass.dev/moonglass/internal/cli\t2.383s\tcoverage: 92.9% of statements\n-test.shuffle 1795177577146064000\n--- FAIL: TestExecutorRunStopsAndRetainsUntilCancelled (40.65s)\n    run_test.go:37: Deploy outcome = FAILED with detail \"create container mg-app-run-t0d2e69f3562e92644ccb0a0f-r3: error during connect: Post \\\"http://%2Fvar%2Frun%2Fdocker.sock/v1.56/containers/create?name=mg-app-run-t0d2e69f3562e92644ccb0a0f-r3\\\": EOF\", want SUCCEEDED\n    helpers_test.go:98: cleanup: list containers of project \"t0d2e69f3562e92644ccb0a0f\": Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n    helpers_test.go:98: cleanup: list networks of project \"t0d2e69f3562e92644ccb0a0f\": Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n    helpers_test.go:98: cleanup: remove image moonglass.local/t0d2e69f3562e92644ccb0a0f/web:r1: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n    helpers_test.go:98: cleanup: remove image moonglass.local/t0d2e69f3562e92644ccb0a0f/web:r2: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n    helpers_test.go:98: cleanup: remove image moonglass.local/t0d2e69f3562e92644ccb0a0f/web:r3: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\nFAIL\ncoverage: 71.4% of statements\nFAIL\tmoonglass.dev/moonglass/internal/deploy\t149.304s\nok  \tmoonglass.dev/moonglass/internal/installtest\t14.503s\tcoverage: [no statements]\nok  \tmoonglass.dev/moonglass/internal/keys\t2.610s\tcoverage: 80.0% of statements\nok  \tmoonglass.dev/moonglass/internal/policy\t4.198s\tcoverage: 92.5% of statements\nok  \tmoonglass.dev/moonglass/internal/protocol\t1.527s\tcoverage: 95.6% of statements\n\tmoonglass.dev/moonglass/internal/protocol/agentv1\t\tcoverage: 0.0% of statements\nFAIL\tmoonglass.dev/moonglass/internal/proxy [build failed]\nok  \tmoonglass.dev/moonglass/internal/registry\t14.008s\tcoverage: 84.8% of statements\nok  \tmoonglass.dev/moonglass/internal/release\t1.166s\tcoverage: 96.3% of statements\nok  \tmoonglass.dev/moonglass/internal/releasetest\t1.439s\tcoverage: [no statements]\nok  \tmoonglass.dev/moonglass/internal/server\t5.586s\tcoverage: 78.0% of statements\nok  \tmoonglass.dev/moonglass/internal/store\t19.692s\tcoverage: 83.7% of statements\n\tmoonglass.dev/moonglass/internal/store/migrations\t\tcoverage: 0.0% of statements\n\tmoonglass.dev/moonglass/internal/store/pg\t\tcoverage: 0.0% of statements\n\tmoonglass.dev/moonglass/internal/store/sqlite\t\tcoverage: 0.0% of statements\nok  \tmoonglass.dev/moonglass/internal/update\t1.237s\tcoverage: 96.2% of statements\nok  \tmoonglass.dev/moonglass/test/deploy\t49.208s\tcoverage: [no statements]\nok  \tmoonglass.dev/moonglass/tools/pipeline\t49.033s\tcoverage: 64.3% of statements\nok  \tmoonglass.dev/moonglass/ui\t1.232s\tcoverage: [no statements]\nFAIL\nmake[1]: *** [test] Error 1\nok   check-test-list\nok   build-all\nmake: *** [ci] Error 1"
     }
   ],
   "diff_lines": 123,
-  "changed_line_coverage": 1,
+  "changed_line_coverage": null,
   "skip_review_eligible": false,
-  "skip_review_reason": "risk is standard"
+  "skip_review_reason": "verify check failed"
 }
