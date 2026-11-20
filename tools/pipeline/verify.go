@@ -440,7 +440,7 @@ func fileHash(path string) (string, error) {
 }
 
 // ownerTestEdits are existing test files the owner allowed a ticket to change
-// (W2-8 and W2-12 on 2026-11-17, W3-7, W5-3a, FR1-10, W2-3, W2-11b, W2-6, W4-1d, W5-5a, W2-11c and FR1-2 on 2026-11-18, FR1-1, FR4-4, W2-4b, W2-11g and FR4-1 on 2026-11-19, W2-11d, W2-10a and W2-7 on 2026-11-20). The lines on main no longer match the behaviour those tickets
+// (W2-8 and W2-12 on 2026-11-17, W3-7, W5-3a, FR1-10, W2-3, W2-11b, W2-6, W4-1d, W5-5a, W2-11c and FR1-2 on 2026-11-18, FR1-1, FR4-4, W2-4b, W2-11g and FR4-1 on 2026-11-19, W2-11d, W2-10a, W2-7 and W2-10b on 2026-11-20). The lines on main no longer match the behaviour those tickets
 // have to build. Any other test file that existed on main is still untouchable.
 var ownerTestEdits = map[string]map[string]bool{
 	"W2-8": {
@@ -538,6 +538,11 @@ var ownerTestEdits = map[string]map[string]bool{
 		"test/deploy/load_test.go":    true,
 		"test/deploy/deploy_test.go":  true,
 		"test/deploy/helpers_test.go": true,
+	},
+	"W2-10b": {
+		"internal/registry/routes_test.go": true,
+		"internal/agent/connect_test.go":   true,
+		"cmd/moonglass/connect_test.go":    true,
 	},
 }
 

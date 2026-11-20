@@ -1,0 +1,7 @@
+Rejected build round 2.
+
+Problems:
+- nothing was changed
+
+Changed files (discarded):
+- 
