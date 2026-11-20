@@ -7,7 +7,11 @@ How secrets are kept, set, delivered and revealed, per ADR-0003 as amended on 20
 | Ticket | Builds | Needs step-up (W4-1) |
 |---|---|---|
 | W3-1 | `internal/keys`: age recipients and identities, the key record, wrap and unwrap; `moonglass keys init` writing the recovery key file | no |
-| W3-2 | `keys init` registering and pinning the first recovery recipient, `keys.recovery.list`, creating an environment key wrapped to the pinned recovery recipients only, `secrets set` and `secrets list` | no |
+| W3-2a | The four tables and their store methods (`docs/specs/storage.md`) | no |
+| W3-2b | `keys.recovery.add` and `keys.recovery.list` | no |
+| W3-2c | `keys init` registering the first recovery recipient, and the pins file with its recovery pins | no |
+| W3-2d | `environments.key.create`, `secrets.set`, `secrets.list` and the environment's `public_key` | no |
+| W3-2 | The `secrets set` and `environments key create` local commands: environment-key pins, the recovery check, creating an environment key wrapped to the pinned recovery recipients only, and encrypting each value | no |
 | W4-8 | Granting the first server (the first agent-wrapped copy) and delivering secrets at deploy | yes |
 | W4-9 | `secrets reveal` | yes |
 | W3-3 | `RewrapEnvKey`, `secrets grant` and `secrets rotate` | yes |
@@ -39,28 +43,61 @@ Owner decision D15. There are no plain environment variables: every one is a sec
 
 Names are visible everywhere. Values are write-only: no operation returns a value or its ciphertext, and only `secrets reveal` (W4-9) recovers one. No value appears in a log line, an error, a `CommandResult`, an audit record or a stream (ADR-0004 decision 12).
 
-## Recovery key (W3-1, W3-2)
+## Recovery key (W3-1, W3-2c)
 
 - `moonglass keys init --out FILE` generates one age X25519 identity and writes it to `FILE` with mode 0600, created exclusively. The file holds exactly one line: the identity, then `\n`. Stock `age -d -i FILE` reads it.
 - The command prints exactly three lines to stdout: the recipient (`age1…`) first; then where the key was written, that its mode is 0600 and to keep it offline; then the warning from ADR-0003 that losing every server and this key loses the secrets. stderr is empty on success. The identity is never printed, logged or put in an error.
 - It refuses to overwrite an existing file and creates nothing when the directory is missing.
 - The agent's recipient and identity are the age Bech32 encoding of the public and private halves of `agent-agree.key`. The file on disk is unchanged.
-- From W3-2, once the file is written and flushed to disk, it calls `keys.recovery.add` with the recipient. That succeeds only while the org has no recovery recipient and no environment key (ADR-0003 decision 12); the owner accepted the risk that someone holding an owner token could register a key first. On success it records the recipient in `pins.json` (below) and prints the three lines.
-- **When registration fails** (owner decision D23), the file is kept, nothing is printed to stdout, and the command exits 1 with an error on stderr that gives the recipient (`age1…`, a public key) and the retry command `moonglass keys recovery add <age1…>`. The file is never written after registering, so the org can never hold a registered recovery key that nobody has.
-- `keys init` is a local command (`registry.LocalCommands`) that calls one operation.
+- From W3-2c, `keys init` reads `MOONGLASS_URL` and `MOONGLASS_TOKEN` like the generated runner (`docs/specs/registry.md`, "Generation"). It checks both before it creates anything: either one empty, or a `MOONGLASS_URL` the runner would refuse, exits 2 with a message naming the variable, and no file is written. It also reads the pins file first, so a pins file it cannot parse exits 1 before the key file exists.
+- Once the file is written and flushed to disk, it calls `keys.recovery.add` with the recipient. That succeeds only while the org has no recovery recipient and no environment key (ADR-0003 decision 12); the owner accepted the risk that someone holding an owner token could register a key first. On success it sets the recovery pin for that control plane to exactly that recipient, replacing any recovery pin it held, and prints the three lines. Its environment pins are not touched.
+- **When registration fails** (owner decision D23), the file is kept, nothing is printed to stdout, and the command exits 1. stderr holds `moonglass: keys init: registering the recovery key failed: <detail>`, then the lines the generated runner would print for the call's `errors`, then `The key file <FILE> is kept. Retry with: moonglass keys recovery add --recipient <age1…>`. The recipient is a public key. The file is never written after registering, so the org can never hold a registered recovery key that nobody has.
+- **When the pin cannot be written** after registration succeeded, the command exits 1 with nothing on stdout and `moonglass: keys init: the recovery key is registered, but <pins path> could not be written: <error>. The next secrets set pins the recovery set it lists.` on stderr. The key file is kept.
+- `keys init` is a local command (`registry.LocalCommands`) that calls one operation. From W3-2c its `Touches` names the key file, `keys.recovery.add` and the pins file.
+
+## The pins file (W3-2c, W3-2)
+
+Owner decision of 2026-11-20, from ADR-0003 decision 9 and D22. The CLI keeps `$XDG_CONFIG_HOME/moonglass/pins.json`, or `~/.config/moonglass/pins.json` when `XDG_CONFIG_HOME` is empty. The owner edits it by hand to accept a changed key, so its layout is part of the CLI's interface:
+
+```json
+{
+  "v": 1,
+  "control_planes": {
+    "https://cp.example.com": {
+      "recovery": ["age1…"],
+      "environments": {"<environment id, 32 hex>": "age1…"}
+    }
+  }
+}
+```
+
+- **The key** of `control_planes` is `MOONGLASS_URL` normalised: the scheme and host lowercased, `:443` dropped for `https` and `:80` for `http`, and every trailing `/` removed from the path. A `MOONGLASS_URL` with user info, a query or a fragment exits 2 with a message naming the variable, before anything is read or sent.
+- **`recovery`** is absent until the first recovery pin, then the pinned recipients, sorted, without repeats. An empty list is a pin of no recipients and is never written by the CLI.
+- **`environments`** maps an environment id to the public key pinned for it.
+- `v` is 1. Any other value, an unknown or duplicated field, a field of the wrong type, or trailing data is an error that names the file and says to fix or delete it. A missing file reads as `{"v": 1, "control_planes": {}}`.
+- Writes replace the whole file: a temporary file in the same directory with mode 0600, synced, then renamed over it. The directory is created with mode 0700 when missing. The CLI reads the file, checks, and writes it within one command; two commands run at once may lose one pin, which the next run records again.
+- **Printing.** Recording a pin prints one line to stderr: `moonglass: pinned recovery recipient <age1…> for <key>` for each recipient of a new recovery pin, and `moonglass: pinned environment key <age1…> for <project>/<environment>` for a new environment pin. A pin that matches prints nothing.
+
+**Stop messages.** A mismatch exits 1, sends nothing more, writes nothing, and prints to stderr:
+
+- Environment key: `moonglass: <subcommand>: the control plane at <key> gives environment <project>/<environment> (<id>) the public key <new>, but this CLI pinned <old>. If you did not replace that key, stop: the control plane may be taken over. To accept the new key, remove control_planes["<key>"].environments["<id>"] from <pins path>.`
+- Recovery set: `moonglass: <subcommand>: the control plane at <key> lists the recovery recipients <new>, but this CLI pinned <old>. If you did not change them, stop: the control plane may be taken over. To accept the new set, remove control_planes["<key>"].recovery from <pins path>.` Each set is its recipients sorted and joined with `, `, or `none`.
 
 ## Setting a secret (W3-2)
 
-`moonglass secrets set --project P --env E [--registry] NAME` reads the value from stdin, never from an argument, so it is not in shell history.
+`moonglass secrets set --project P --env E [--registry] NAME` reads the value from stdin, never from an argument, so it is not in shell history. The value is the bytes read up to end of file; no newline is trimmed, so `printf %s "$VALUE" |` sets the value without one. A value over its kind's limit exits 1 with `moonglass: secrets set: the value is over <limit>`, where `<limit>` is `32 KiB` or `4 KiB`, and sends nothing. With `--registry` the value must be a JSON object with exactly the string fields `username` and `password`, or the command exits 1 with `moonglass: secrets set: a registry value must be {"username": "…", "password": "…"}`; the value is never quoted.
 
-1. The CLI fetches the environment with `environments.list`. If it has no key yet, it fetches the recovery recipients with `keys.recovery.list` and checks them against its pins (step 2). An empty list stops the command with a message to run `moonglass keys init` first (ADR-0003 decision 1). The CLI then generates an age X25519 key pair, wraps the key record to every recovery recipient on record, and calls `environments.key.create`. The private half never leaves the CLI process unwrapped.
-2. **Pinning** (ADR-0003 decision 9). The CLI keeps `$XDG_CONFIG_HOME/moonglass/pins.json` (default `~/.config/moonglass/pins.json`, mode 0600). Per control-plane URL it holds each environment id's public key and the set of recovery recipients.
-   - **Environment keys.** The first use records the key. A different key later stops the command and prints both keys; the owner removes the entry by hand to accept the new one.
-   - **Recovery recipients** (owner decision D22). `keys init` records the recipient it registered. A CLI with no recovery pin for that URL records the set `keys.recovery.list` returns and prints each recipient. A different set later stops the command and prints both sets; the owner removes the entry by hand to accept the new one. This stops a taken-over control plane from naming its own recipient and receiving the new environment key.
-3. The CLI encrypts the value with age to the environment public key and calls `secrets.set`. The control plane stores the ciphertext as it came.
+1. The CLI fetches the environment with `environments.list`. If it has no key yet, it fetches the recovery recipients with `keys.recovery.list` and checks them against its pins (step 2). An empty list with no recovery pin stops the command with `moonglass: secrets set: this org has no recovery key: run moonglass keys init --out FILE first` (ADR-0003 decision 1). The CLI then generates an age X25519 key pair, wraps the key record to every recovery recipient on record, and calls `environments.key.create`. The private half never leaves the CLI process unwrapped.
+2. **Pinning** (ADR-0003 decision 9), in the pins file above. Per control-plane URL it holds each environment id's public key and the set of recovery recipients.
+   - **Environment keys.** The first use records the key, whether the CLI created it or found it in `environments.list`. A different key later stops the command with the stop message above; the owner removes the entry by hand to accept the new one.
+   - **Recovery recipients** (owner decision D22). `keys init` records the recipient it registered. A CLI with no recovery pin for that URL records the set `keys.recovery.list` returns and prints each recipient. A different set later stops the command with the stop message above, including a pinned set the control plane now lists as empty; the owner removes the entry by hand to accept the new one. This stops a taken-over control plane from naming its own recipient and receiving the new environment key.
+3. The CLI encrypts the value with age to the environment public key and calls `secrets.set` with `kind` `env`, or `registry` with `--registry`. The control plane stores the ciphertext as it came.
 4. The control plane checks only that the ciphertext is an age file within the size limit for its kind. It cannot check the recipient, and does not try.
+5. **Output.** On success stdout holds exactly the `secrets.set` response body, as the generated runner prints it, and the command exits 0. Pin lines, and `moonglass: created the key of environment <project>/<environment>` when it created one, go to stderr. A refused call prints as the generated runner does and exits 1.
 
-`moonglass secrets list --project P --env E` prints kinds, names and times.
+`moonglass environments key create --project P --env E` runs step 1 and its pin checks alone, for an environment with no key yet: it fetches the environment, stops with `moonglass: environments key create: environment <project>/<environment> already has a key` when it has one, checks the recovery recipients against their pins, creates the key, wraps the record to each pinned recipient and records the environment pin. stdout holds exactly the `environments.key.create` response body. `secrets set` does the same work inline. The `wrapped` input is `docs/specs/registry.md` ("Secrets operations (W3-2b, W3-2d)").
+
+`moonglass secrets list --project P --env E` prints kinds, names and times. It is generated.
 
 ## Delivery (W4-8)
 

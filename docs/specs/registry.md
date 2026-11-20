@@ -36,11 +36,11 @@ Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry 
 | W2-5 | `rollback` | `POST /v1/rollbacks` | member | no | project, environment |
 | W2-5 | `releases.list` | `GET /v1/releases` | viewer | no | project, environment |
 | W3-8 | `servers.deploy-key` | `GET /v1/servers/deploy-key` | viewer | no | org |
-| W3-2 | `keys.recovery.add` | `POST /v1/keys/recovery` | owner | no | org |
-| W3-2 | `keys.recovery.list` | `GET /v1/keys/recovery` | viewer | no | org |
-| W3-2 | `environments.key.create` | `POST /v1/environments/key` | member | no | project, environment |
-| W3-2 | `secrets.set` | `PUT /v1/secrets` | member | no | project, environment |
-| W3-2 | `secrets.list` | `GET /v1/secrets` | viewer | no | project, environment |
+| W3-2b | `keys.recovery.add` | `POST /v1/keys/recovery` | owner | no | org |
+| W3-2b | `keys.recovery.list` | `GET /v1/keys/recovery` | viewer | no | org |
+| W3-2d | `environments.key.create` | `POST /v1/environments/key` | member | no | project, environment |
+| W3-2d | `secrets.set` | `PUT /v1/secrets` | member | no | project, environment |
+| W3-2d | `secrets.list` | `GET /v1/secrets` | viewer | no | project, environment |
 
 The six W2-11 operations take these inputs, each a required string:
 
@@ -58,7 +58,7 @@ A create returns the created row: a project and an environment are `id`, `name` 
 The three creates refuse a store error with fixed text built from the caller's inputs, never from the store's error text: `store.ErrInvalidName` is `ErrInvalidInput`, `<kind> name "<name>" must be 1 to 63 bytes of [a-z0-9-], starting and ending with a letter or digit`, where `<kind>` is `project`, `environment` or `service`; `store.ErrDuplicate` is `ErrConflict`, `project "<name>" already exists`, `environment "<name>" already exists in project "<project>"`, or `service "<name>" already exists in environment "<environment>" of project "<project>"`; `store.ErrNotFound` from `environments.create` is `ErrNotFound`, `project "<project>" not found`, and from `services.create` it is `ErrNotFound`, `server "<server>" not found`. Any other store error is a 500.
 
 - From W6-4b, `services.list` returns each service's `compose_hash`: the hash stored on its current release, or empty when it has none (`docs/specs/compose.md`).
-- `environments.list` returns each environment's `public_key` once it has one, which the CLI pins (`docs/specs/secrets.md`). From W4-2 it also returns `protected`.
+- From W3-2d, `environments.list` returns each environment's `public_key` (`age1…`), or `""` until it has one, which the CLI pins (`docs/specs/secrets.md`). From W4-2 it also returns `protected`.
 - **`deploy`** takes `project`, `environment`, `service`, exactly one of `image` (a reference) or `git` (`<owner>/<repo>@<40-hex commit>`, from W3-4), and optional `port`, `health_path`, `domain` (repeated), `pre_deploy` (repeated, the argv) and `pre_deploy_reversible`. The rules of `docs/specs/protocol.md` apply to each. It mints the release id, then:
   - **One deploy per service.** At most one release per service is `running` and at most one `queued`. A new request while one is queued marks the queued one `superseded` (its caller gets that status) and queues itself. Rollbacks are not queued behind deploys.
   - The server drives the steps: `BUILD` for a git source (W3-4), then `DEPLOY`, then `RUN_PRE_DEPLOY` when `pre_deploy` is set, then `SWITCH_RELEASE`. Each waits for its `CommandResult` (`docs/specs/connection.md`). A step that is not `SUCCEEDED` ends the release as `failed` or `rejected` with the agent's `detail`.
@@ -75,10 +75,31 @@ The three creates refuse a store error with fixed text built from the caller's i
 - **`rollback`** takes `project`, `environment`, `service`, sends `ROLLBACK`, and returns when its result arrives. Under the G2 conditions it finishes in under 5 seconds (`docs/specs/release.md`). It is audited like every call.
 - **`releases.list`** returns the service's releases, newest first, at most 50: id, status, `image_ref` or git source, `image_id`, `repo_digest`, `detail`, times, and which are current and previous. For a tag, `repo_digest` is the digest that actually ran.
 - **`servers.deploy-key`** takes `server` and returns its deploy public key (`docs/specs/build.md`), or a 404 that says the server has not reported one yet.
-- **`keys.recovery.add`** takes an age recipient. It succeeds only while the org has no recovery recipient and no environment key; otherwise it is refused with a message that adding another recovery key is a recipient change that needs step-up (ADR-0003 decision 12).
-- **`keys.recovery.list`** (owner decision D21) returns the org's recovery recipients: `id`, `recipient` (`age1…`) and `created_at`. They are public keys. The CLI checks them against its pins before it wraps an environment key (`docs/specs/secrets.md`).
-- **`environments.key.create`** takes the environment, its `public_key` and one wrapped copy per recovery recipient on record. It is refused when the environment already has a key, or when the wrapped copies do not name exactly the recovery recipients on record.
-- **`secrets.set`** takes `kind`, `name` and `ciphertext`, and replaces an existing value of that name. **`secrets.list`** returns kinds, names and times, never ciphertext. Values are never read back through the API (`docs/specs/secrets.md`).
+- **`keys.recovery.add`**, **`keys.recovery.list`**, **`environments.key.create`**, **`secrets.set`** and **`secrets.list`** are specified in "Secrets operations (W3-2b, W3-2d)" below.
+
+### Secrets operations (W3-2b, W3-2d)
+
+Owner decision of 2026-11-20, splitting W3-2. Every input follows "Inputs and errors": `project` and `environment` are required strings on the three environment-level operations and are not repeated in the tables below. The store methods are `docs/specs/storage.md` ("Recovery recipients, environment keys and secrets (W3-2a)").
+
+**Binary values.** A ciphertext travels as a JSON string holding the standard base64 encoding, with padding (RFC 4648 section 4), of the binary age file. Armor is not accepted. The value **is an age file** when it decodes as that encoding, and the decoded bytes start with the version line `age-encryption.org/v1` followed by `\n` and contain a line that starts with `--- `, the header's MAC line. The control plane checks nothing more: it cannot check the recipient (`docs/specs/secrets.md`). Sizes are of the decoded bytes.
+
+| Operation | Inputs | Output |
+|---|---|---|
+| `keys.recovery.add` | `recipient` | `id`, `recipient`, `created_at` |
+| `keys.recovery.list` | none | `recipients`: `id`, `recipient`, `created_at` each, oldest first |
+| `environments.key.create` | `public_key`; `wrapped` (list of strings) | `environment_id`, `public_key`, `created_at` |
+| `secrets.set` | `kind`, `name`, `ciphertext` | `kind`, `name`, `updated_at` |
+| `secrets.list` | none | `secrets`: `kind`, `name`, `updated_at` each, by kind then name |
+
+Every input is a required string except `wrapped`, a required list. A list output is `[]` rather than null when empty. No output holds a ciphertext.
+
+- **`keys.recovery.add`** (W3-2b) parses `recipient` with `keys.ParseRecipient` and stores the canonical text. A recipient that does not parse is `ErrInvalidInput`, `recipient must be an age X25519 recipient (age1…)`. `store.ErrDuplicate` is `ErrConflict`, `this org already has a recovery key or an environment key: adding a recovery key is a recipient change and needs step-up` (ADR-0003 decision 12). Its generated subcommand is `moonglass keys recovery add --recipient age1…`.
+- **`keys.recovery.list`** (W3-2b, owner decision D21) returns the org's recovery recipients. They are public keys. The CLI checks them against its pins before it wraps an environment key (`docs/specs/secrets.md`).
+- **`environments.key.create`** (W3-2d) takes the environment's `public_key`, parsed like `recipient` (`public_key must be an age X25519 recipient (age1…)`), and one `wrapped` element per recovery recipient on record, each `<recovery recipient id>:<ciphertext>`: the `id` from `keys.recovery.list`, a colon, and the wrapped key record in the binary form above. An X25519 age stanza does not name its recipient, so the copy is matched only by that id. An element without a colon, with an id that is not 32 lowercase hex characters, or with a ciphertext that is not an age file of at most 1 KiB is `ErrInvalidInput`, `wrapped copy <n> must be <recovery recipient id>:<base64 age file of at most 1 KiB>`, `<n>` counting from 1. Two elements with the same id are `ErrInvalidInput`, `wrapped copy <n> repeats recovery recipient <id>`. `store.ErrDuplicate` is `ErrConflict`, `environment "<environment>" of project "<project>" already has a key`, and `store.ErrRecipientsMismatch` is `ErrConflict`, `the wrapped copies must name exactly the org's recovery recipients: list them with moonglass keys recovery list`.
+- **`secrets.set`** (W3-2d) stores `ciphertext` under `kind` and `name`, replacing an existing value of that kind and name. `kind` other than `env` or `registry` is `ErrInvalidInput`, `kind must be env or registry`. The name rules are `docs/specs/secrets.md` ("Kinds of secret"): an `env` name that breaks them is `ErrInvalidInput`, `env secret name "<name>" must match [A-Z_][A-Z0-9_]*, be at most 128 bytes and not start with MOONGLASS_`; a `registry` name that breaks them is `ErrInvalidInput`, `registry secret name "<name>" must be a lowercase DNS name with an optional port`. A ciphertext that is not an age file is `ErrInvalidInput`, `ciphertext must be standard base64 of an age file`. The decoded ciphertext may be at most 33 KiB (33792 bytes) for `env` and 5 KiB (5120 bytes) for `registry`: the plaintext limit plus 1 KiB for age's header and tags. A larger one is `ErrInvalidInput`, `ciphertext for <kind> secret "<name>" is over <limit> bytes`. `store.ErrNoEnvironmentKey` is `ErrConflict`, `environment "<environment>" of project "<project>" has no key yet: create it with moonglass environments key create`. The messages never quote the ciphertext.
+- **`secrets.list`** (W3-2d) returns kinds, names and times, never ciphertext. Values are never read back through the API (`docs/specs/secrets.md`).
+- W3-2b and W3-2d regenerate the OpenAPI file and the CLI and add authz-matrix rows for their operations. W3-2d generates `environments key create` and `secrets set` subcommands; W3-2 moves both to `registry.LocalCommands`, so the generator then drops them ("Generated CLI").
+- Tests. W3-2b: `TestRecoveryAddStoresCanonicalRecipient`, `TestRecoveryAddRefusesInvalidRecipient`, `TestRecoveryAddRefusesSecondKey` (409 with the message above), `TestRecoveryListReturnsRecipients`. W3-2d: `TestEnvironmentKeyCreateRefusals` (one row per refusal above), `TestEnvironmentKeyCreateStoresCopies`, `TestEnvironmentsListReturnsPublicKey`, `TestSecretsSetChecksKindNameAndSize` (each limit at and one over), `TestSecretsSetRefusesNonAgeCiphertext`, `TestSecretsSetReplacesValue`, `TestSecretsListHasNoCiphertext`.
 
 ### Protected flag (W4-2)
 
@@ -226,7 +247,7 @@ Each operation's subcommand is its name with dots turned into spaces, followed o
 
 A command that needs work on the client, such as reading stdin, a file or a pin, encrypting, or calling more than one operation, is a local command: it is on `registry.LocalCommands` with what it touches (ADR-0006 decision 7). The generator writes no subcommand for an operation whose subcommand name is on that list. The local command calls the operation through the same request and output code as the generated runner, and names its flags for that operation's inputs by the rule above. `make generate` fails, naming the operation and the field, when an operation has an input of a kind with no flag and its subcommand is not a local command. So:
 
-- **W3-2** adds `secrets set` (reads stdin, encrypts, and may first call `environments.list`, `keys.recovery.list` and `environments.key.create`) and `environments key create` (makes the key pair and the wrapped copies) to `registry.LocalCommands`. `keys recovery add` stays generated: `moonglass keys recovery add --recipient age1…`, so `docs/specs/secrets.md` changes its retry line to that form.
+- **W3-2** adds `secrets set` (reads stdin, encrypts, and may first call `environments.list`, `keys.recovery.list` and `environments.key.create`) and `environments key create` (makes the key pair and the wrapped copies) to `registry.LocalCommands`. W3-2c changes the `keys init` entry's `Touches` to name `keys.recovery.add` and `pins.json`. `keys recovery add` stays generated: `moonglass keys recovery add --recipient age1…`, the retry line of `docs/specs/secrets.md`.
 - **W3-4** moves `deploy` to `registry.LocalCommands` when it adds `moonglass.toml`, which the command reads. Until then `deploy` is generated (W2-5).
 - **W6-1** adds `databases create` (makes a password, encrypts two secrets, calls `secrets.list`, `releases.list`, `services.create`, `secrets.set` and `deploy`; `docs/specs/managed-services.md`). It is not an operation: every step is an existing operation with its own authorisation.
 - **W6-4** adds `compose apply` (reads Compose files, encrypts secrets, asks for confirmation on stdin, and calls `services.list`, `secrets.list`, `services.create`, `secrets.set`, `deploy` and `services.delete`; `docs/specs/compose.md`). It is not an operation either.
