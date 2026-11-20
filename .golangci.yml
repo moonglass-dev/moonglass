@@ -35,6 +35,7 @@ linters:
             - filippo.io/age
             - github.com/moby/moby/client
             - github.com/moby/moby/api
+            - github.com/containerd/errdefs
         proxy-deps:
           # Caddy is imported only by internal/proxy (ADR-0011). cmd/ calls
           # proxy.Run. Every file outside internal/proxy is covered, so new
@@ -94,6 +95,16 @@ linters:
           deny:
             - pkg: github.com/moby/moby
               desc: only internal/deploy, internal/build, internal/agent/disk and the test/deploy suite may import the Docker client (ADR-0014)
+        errdefs-deps:
+          # containerd/errdefs is imported only by internal/deploy (ADR-0017).
+          # Every other file is covered, so new packages are too.
+          list-mode: lax
+          files:
+            - "$all"
+            - "!**/internal/deploy/**"
+          deny:
+            - pkg: github.com/containerd/errdefs
+              desc: only internal/deploy may import containerd/errdefs (ADR-0017)
         deploy-deps:
           # internal/deploy never imports internal/proxy, which links Caddy
           # (docs/specs/release.md "Proxy config", ADR-0011). The agent pushes

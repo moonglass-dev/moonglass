@@ -544,6 +544,9 @@ var ownerTestEdits = map[string]map[string]bool{
 		"internal/agent/connect_test.go":   true,
 		"cmd/moonglass/connect_test.go":    true,
 	},
+	"FR6-6": {
+		"internal/agent/state/stops_test.go": true,
+	},
 }
 
 func ownerAllowsTestEdit(id, path string) bool {
