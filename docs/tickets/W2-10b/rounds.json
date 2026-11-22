@@ -9,7 +9,7 @@
     "plan": 1,
     "tests": 1,
     "ticket": 2,
-    "worker": 2
+    "worker": 3
   },
   "claim": {
     "step": "build",
