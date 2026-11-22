@@ -10,15 +10,20 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"moonglass.dev/moonglass/internal/agent/state"
 	"moonglass.dev/moonglass/internal/deploy"
+	"moonglass.dev/moonglass/internal/policy"
 )
 
 func TestAgentConnectProxyFlagDefaults(t *testing.T) {
@@ -126,6 +131,44 @@ func TestAgentConnectRunsProxyPush(t *testing.T) {
 	if err := engine.Close(); err != nil {
 		t.Fatalf("engine.Close() error = %v, want nil", err)
 	}
+
+	// Executor.Run's start-up reconcile must leave another run's managed
+	// containers alone on a shared Engine (docs/specs/deploy-suite.md), so the
+	// command's Engine goes through a proxy that reports no containers.
+	host := os.Getenv("DOCKER_HOST")
+	if host == "" {
+		host = "unix:///var/run/docker.sock"
+	}
+	realSock, ok := strings.CutPrefix(host, "unix://")
+	if !ok {
+		t.Fatalf("DOCKER_HOST = %q, want a unix:// socket (ADR-0014)", host)
+	}
+	engineDir, err := os.MkdirTemp("", "mg")
+	if err != nil {
+		t.Fatalf("MkdirTemp error = %v, want nil", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(engineDir) })
+	engineSock := filepath.Join(engineDir, "engine.sock")
+	engineLn, err := net.Listen("unix", engineSock)
+	if err != nil {
+		t.Fatalf("listen on %q error = %v, want nil", engineSock, err)
+	}
+	reverse := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: "docker"})
+	reverse.Transport = &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, "unix", realSock)
+	}}
+	engineServer := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/containers/json") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, "[]")
+			return
+		}
+		reverse.ServeHTTP(w, r)
+	})}
+	go func() { _ = engineServer.Serve(engineLn) }()
+	t.Cleanup(func() { _ = engineServer.Close() })
+	t.Setenv("DOCKER_HOST", "unix://"+engineSock)
 
 	// Enrol a fresh data directory against a real control plane.
 	serverURL, serverFP, token := newTestServer(t)
@@ -281,6 +324,119 @@ func TestAgentConnectIssuerFollowsDeployCheck(t *testing.T) {
 			}
 			if got.proxy.Issuer != tt.issuer {
 				t.Errorf("proxy Issuer = %q, want %q", got.proxy.Issuer, tt.issuer)
+			}
+		})
+	}
+}
+
+func TestAgentConnectPolicyFlagDefault(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+		ok   bool
+	}{
+		{"no flag", []string{"--url", "https://x"}, "/etc/moonglass/agent.toml", true},
+		{"given file", []string{"--url", "https://x", "--policy", "/tmp/agent.toml"}, "/tmp/agent.toml", true},
+		{"empty file", []string{"--url", "https://x", "--policy", ""}, "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := parseAgentConnect(tt.args)
+			if ok != tt.ok {
+				t.Fatalf("parseAgentConnect(%q) ok = %v, want %v", tt.args, ok, tt.ok)
+			}
+			if !ok {
+				return
+			}
+			if got.policyFile != tt.want {
+				t.Errorf("policyFile = %q, want %q", got.policyFile, tt.want)
+			}
+		})
+	}
+}
+
+func TestAgentConnectRefusesPolicyThatDoesNotLoad(t *testing.T) {
+	engine, err := deploy.Connect(context.Background())
+	if err != nil {
+		if os.Getenv("CI") != "" {
+			t.Fatalf("deploy.Connect() error = %v, want a Docker Engine: CI must provide Docker", err)
+		}
+		t.Skipf("no Docker Engine: %v", err)
+	}
+	if err := engine.Close(); err != nil {
+		t.Fatalf("engine.Close() error = %v, want nil", err)
+	}
+
+	// A listener that counts every connection, so a dial is observable.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen for the control plane error = %v, want nil", err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	var accepts atomic.Int64
+	go func() {
+		for {
+			c, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			accepts.Add(1)
+			_ = c.Close()
+		}
+	}()
+	addr := listener.Addr().String()
+
+	files := []struct {
+		name string
+		body string
+		mode os.FileMode
+	}{
+		{"unsafe mode", "", 0o666},
+		{"invalid TOML", "[[[", 0o600},
+	}
+	for _, tt := range files {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(t.TempDir(), "agent.toml")
+			if err := os.WriteFile(file, []byte(tt.body), 0o600); err != nil {
+				t.Fatalf("write %s error = %v, want nil", file, err)
+			}
+			if err := os.Chmod(file, tt.mode); err != nil {
+				t.Fatalf("chmod %s error = %v, want nil", file, err)
+			}
+
+			wantErr := func() error {
+				_, err := policy.LoadFile(file, policy.Env{}, 0)
+				return err
+			}()
+			if wantErr == nil {
+				t.Fatalf("policy.LoadFile(%q) error = nil, want the error the command must print", file)
+			}
+
+			var stderr syncBuffer
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			code := agentConnect(ctx, []string{
+				"--data-dir", dir,
+				"--url", "https://" + addr,
+				"--policy", file,
+				"--proxy-socket", filepath.Join(t.TempDir(), "admin.sock"),
+				"--tls-issuer", "internal",
+			}, &stderr)
+
+			if code != 1 {
+				t.Errorf("exit status = %d, want 1 (stderr %q)", code, stderr.String())
+			}
+			if got, want := stderr.String(), "moonglass: "+wantErr.Error()+"\n"; got != want {
+				t.Errorf("stderr = %q, want %q", got, want)
+			}
+			dbPath := filepath.Join(dir, "agent.db")
+			if _, err := os.Stat(dbPath); !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("stat %q: expected it absent, got error %v: the policy is loaded before the database", dbPath, err)
+			}
+			if got := accepts.Load(); got != 0 {
+				t.Errorf("TCP connections to the control plane = %d, want 0", got)
 			}
 		})
 	}
