@@ -26,7 +26,7 @@ The agent sends a `Heartbeat` (with `agent_version`) as soon as it connects, the
 
 ## Bad frames
 
-The agent closes the connection, and reconnects through backoff, on a text message, an oversize message, an undecodable envelope, anything other than a `HeartbeatAck`, a `HeartbeatAck` for another request id, or no ack within 10 seconds. The server closes the connection on the same kinds of frame, and on any envelope that is not a `Heartbeat`.
+The agent reads frames for the whole connection. It closes the connection, and reconnects through backoff, on a text message, an oversize message, an undecodable envelope, a `HeartbeatAck` that is not for the waiting Heartbeat, or any type outside "Agent" below, and on no ack within 10 seconds. The server closes the connection on the same kinds of frame, and on any envelope that is not a `Heartbeat`.
 
 ## Reconnect backoff
 
@@ -48,10 +48,13 @@ Specified by the weeks 2–3 preflight (owner decision D7). The owner split the 
 - **Re-sending.** After the agent reconnects, the server re-sends every command that has no result yet, with its original request id. After the server itself restarts, the `deploy` and `rollback` operations re-send the step recorded in `releases.request_id` and `rollbacks.request_id` (W2-5, `docs/specs/storage.md`).
 - A `CommandResult` whose request id the server did not send, or already has a result for, closes the connection.
 
-### Agent (W2-10b)
+### Agent (built in W2-10b)
 
 - The agent accepts `HEARTBEAT_ACK`, the command types above and, from W4-4, `LOG_REQUEST`, and sends `HEARTBEAT`, `COMMAND_RESULT` and, from W4-4, `LOG_CHUNK` and `USAGE`. Anything else closes the connection, as before.
+- A request id that is queued or running is not queued or started again. A finished one is answered from its stored record (rule 2).
 - Commands for different apps run concurrently. Commands for one app run one at a time, in the order they arrived.
+- Commands run under the agent's lifetime, not the connection's, so a dropped connection never cancels a running command. `Connect` returns only after every command it started has returned.
+- `Connect` refuses a nil executor before it dials. An empty `--policy` prints the usage and exits 2.
 - From W5-3, every command first passes `agent.toml`'s command classes and sources, and a refused one is answered `REJECTED` (`docs/specs/local-policy.md`).
 - A `BUILD` that arrives while another build runs on this server is answered `REJECTED` with `another build is running on this server`, and nothing is done. A re-sent `BUILD` with the running build's request id is not a second build ("Each request id runs once").
 - At start, before connecting, the agent loads `agent.toml` with `policy.LoadFile` from `--policy FILE` (default `/etc/moonglass/agent.toml`, owner uid 0), with `policy.Env` from the Docker Engine (`DockerRootDir`, the default runtime, read through `internal/deploy`, because only it may import the Docker client: ADR-0014) and `ContainerProject` from the `dev.moonglass.project` label. A file that does not load stops the agent with the policy error. An absent file is the empty policy (`docs/specs/container-policy.md`).
@@ -65,7 +68,7 @@ Owner condition on D7: a command re-sent after a reconnect must never run twice.
 
 1. The agent records every executed command's request id in agent state (`commands`, `docs/specs/agent-state.md`, W2-10a), together with the `CommandResult` it produced. The record and the release-state change it made are written in one transaction, before the result is sent.
 2. A command whose request id has a stored record is not run again. The agent sends the stored `CommandResult` unchanged.
-3. A command whose request id is still running (re-sent after a reconnect, while the first run continues) is not started again. Its one result is sent on whichever connection is live when it finishes; with none live, the stored result is sent when the command is re-sent (rule 2). (W2-10b)
+3. A command whose request id is still running (re-sent after a reconnect, while the first run continues) is not started again. Its one result is sent on whichever connection is live when it finishes; with none live, the stored result is sent when the command is re-sent (rule 2). (built in W2-10b)
 4. Records are kept for 7 days, longer than any re-send can arrive.
 
 W2-10b must name a test that sends a `DEPLOY`, drops the connection after the agent has acted, reconnects, re-sends the same envelope, and asserts that the stored result comes back and that the Engine saw exactly one container create. `TestResentCommandReturnsStoredResult` is that test's name. It runs in `internal/agent` against a fake control plane in the test and a real Engine.
@@ -92,7 +95,7 @@ The messages are `docs/specs/protocol.md`. The SSE routes are `docs/specs/live.m
 
 ## Commands
 
-- `moonglass agent connect [--data-dir DIR] [--policy FILE] [--proxy-socket PATH] [--tls-issuer ISSUER] --url URL` — `URL` is `https://` or `wss://`; `http://` is refused. The path `/v1/agent` is joined to it. Connection errors go to stderr. `--proxy-socket` and `--tls-issuer` arrive with W2-4c, and `--policy` with W2-10b.
+- `moonglass agent connect [--data-dir DIR] [--policy FILE] [--proxy-socket PATH] [--tls-issuer ISSUER] --url URL` — `URL` is `https://` or `wss://`; `http://` is refused. The path `/v1/agent` is joined to it. Connection errors go to stderr. `--proxy-socket` and `--tls-issuer` arrive with W2-4c, and `--policy` with W2-10b; all are built.
   - `--proxy-socket PATH` is the proxy's agent-facing admin socket, default `/run/moonglass-proxy/admin.sock` (`docs/specs/proxy.md`). An empty value prints the usage and exits 2.
   - `--tls-issuer` is `acme` (the default, Let's Encrypt production), `acme-staging` (the fleet) or `internal` (tests and CI). Any other value prints the usage and exits 2, before anything is opened or dialled.
   - From W2-4c, the command opens the Docker Engine (ADR-0014) and the agent state database (`docs/specs/agent-state.md`) before it connects, and runs `deploy.Proxy.Run` (`docs/specs/release.md`, "Proxy config") until it exits. A proxy that is down does not stop the agent or its connection; the push is retried every second. An Engine or a database that does not open stops the command with that error and exit code 1.

@@ -15,6 +15,7 @@ import (
 	"moonglass.dev/moonglass/internal/agent/state"
 	"moonglass.dev/moonglass/internal/cli"
 	"moonglass.dev/moonglass/internal/deploy"
+	"moonglass.dev/moonglass/internal/policy"
 	"moonglass.dev/moonglass/internal/proxy"
 	"moonglass.dev/moonglass/internal/server"
 )
@@ -100,9 +101,10 @@ func runServer(args []string, stdout, stderr io.Writer) int {
 // agentConnectArgs is the parsed form of `moonglass agent connect`. Parsing
 // sets only the proxy socket and issuer; the run function sets OnError.
 type agentConnectArgs struct {
-	dataDir string
-	url     string
-	proxy   deploy.ProxyConfig
+	dataDir    string
+	url        string
+	policyFile string
+	proxy      deploy.ProxyConfig
 }
 
 // parseAgentConnect parses the flags of `moonglass agent connect` and checks
@@ -111,18 +113,20 @@ func parseAgentConnect(args []string) (agentConnectArgs, bool) {
 	fs := newFlags("agent connect")
 	dataDir := fs.String("data-dir", "/var/lib/moonglass/agent", "agent data directory")
 	url := fs.String("url", "", "control-plane URL")
+	policyFile := fs.String("policy", "/etc/moonglass/agent.toml", "local policy file (agent.toml)")
 	socket := fs.String("proxy-socket", proxy.DefaultAdminSocket, "the proxy's agent-facing admin socket")
 	issuer := fs.String("tls-issuer", "acme", "TLS issuer: acme, acme-staging or internal")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *url == "" || *socket == "" {
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *url == "" || *policyFile == "" || *socket == "" {
 		return agentConnectArgs{}, false
 	}
 	if err := deploy.CheckIssuer(*issuer); err != nil {
 		return agentConnectArgs{}, false
 	}
 	return agentConnectArgs{
-		dataDir: *dataDir,
-		url:     *url,
-		proxy:   deploy.ProxyConfig{Socket: *socket, Issuer: *issuer},
+		dataDir:    *dataDir,
+		url:        *url,
+		policyFile: *policyFile,
+		proxy:      deploy.ProxyConfig{Socket: *socket, Issuer: *issuer},
 	}, true
 }
 
@@ -144,9 +148,10 @@ func runAgentConnect(args []string, stderr io.Writer) int {
 	return agentConnect(ctx, args, stderr)
 }
 
-// agentConnect opens the Docker Engine and the agent state, then runs the proxy
-// push beside the connection for as long as the command runs
-// (docs/specs/connection.md, "Commands").
+// agentConnect loads agent.toml against the local Engine, opens the Engine and
+// the agent state, then runs the proxy push and the executor beside the
+// connection for as long as the command runs (docs/specs/connection.md,
+// "Commands").
 func agentConnect(ctx context.Context, args []string, stderr io.Writer) int {
 	a, ok := parseAgentConnect(args)
 	if !ok {
@@ -161,6 +166,18 @@ func agentConnect(ctx context.Context, args []string, stderr io.Writer) int {
 		report(err)
 		return 1
 	}
+	env, err := deploy.PolicyEnv(ctx, engine)
+	if err != nil {
+		_ = engine.Close()
+		report(err)
+		return 1
+	}
+	pol, err := policy.LoadFile(a.policyFile, env, 0)
+	if err != nil {
+		_ = engine.Close()
+		report(err)
+		return 1
+	}
 	db, err := state.Open(ctx, a.dataDir)
 	if err != nil {
 		_ = engine.Close()
@@ -171,16 +188,22 @@ func agentConnect(ctx context.Context, args []string, stderr io.Writer) int {
 	runCtx, cancel := context.WithCancel(ctx)
 	a.proxy.OnError = report
 	p := deploy.NewProxy(engine, db, a.proxy)
-	done := make(chan struct{})
+	x := deploy.New(engine, pol, db, p)
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
+		defer wg.Done()
 		_ = p.Run(runCtx)
-		close(done)
+	}()
+	go func() {
+		defer wg.Done()
+		x.Run(runCtx, report)
 	}()
 
-	opts := agent.ConnectOptions{AgentVersion: version, OnError: report}
+	opts := agent.ConnectOptions{AgentVersion: version, OnError: report, Executor: x}
 	connectErr := agent.Connect(runCtx, a.dataDir, a.url, opts)
 	cancel()
-	<-done
+	wg.Wait()
 	code := 0
 	if connectErr != nil {
 		report(connectErr)

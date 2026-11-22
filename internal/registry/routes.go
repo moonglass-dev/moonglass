@@ -29,6 +29,6 @@ var LocalCommands = []LocalCommand{
 	{"server", "server [--data-dir DIR] [--listen ADDR] [--agent-listen ADDR] [--print-enroll-token] [--print-owner-token NAME]", "Run the control plane", "the server data dir and its listeners"},
 	{"keys init", "keys init --out FILE", "Create the owner recovery key file and print its age recipient", "the new recovery key file named by --out"},
 	{"agent enroll", "agent enroll [--data-dir DIR] --url URL --server-fingerprint FP TOKEN", "Enrol this machine and print its fingerprint", "the agent data dir and the control-plane enrolment route"},
-	{"agent connect", "agent connect [--data-dir DIR] [--proxy-socket PATH] [--tls-issuer ISSUER] --url URL", "Connect to the control plane over WSS and send heartbeats", "the agent data dir and the control-plane agent listener"},
+	{"agent connect", "agent connect [--data-dir DIR] [--policy FILE] [--proxy-socket PATH] [--tls-issuer ISSUER] --url URL", "Connect to the control plane over WSS and send heartbeats", "the agent data dir and the control-plane agent listener"},
 	{"proxy", "proxy --data-dir DIR [--admin-socket PATH]", "Run the proxy (Caddy) with its guarded admin API on a Unix socket", "the proxy data dir and its admin socket"},
 }
