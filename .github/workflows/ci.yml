@@ -1,5 +1,7 @@
 name: ci
 
+# Re-register this workflow so it posts the required ci check.
+
 on:
   pull_request:
   push:
