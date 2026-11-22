@@ -357,6 +357,27 @@ func TestBlockedChildStopsOnlyItsTicketAndResumes(t *testing.T) {
 	r.expectStep("ticket")
 }
 
+func TestResumeMarksMergeFailureHandled(t *testing.T) {
+	r := newTestRepo(t)
+	r.mustRun("ticket-status", "start", "T-1")
+	// A merge failure whose repair round was spent, then the ticket stopped.
+	writeT(t, r.dir, ticketDir("T-1")+mergeFile, string(encodeJSON(mergeResult{Result: "ci-red", Commit: "abc", Detail: "flake"})))
+	mustGit(t, r.dir, "add", "-A")
+	mustGit(t, r.dir, "commit", "--quiet", "-m", "merge failed")
+	r.mustRun("ticket-status", "set", "T-1", "blocked", "--reason", "step repair already ran 1 times, the limit")
+
+	r.mustRun("ticket-status", "set", "T-1", "resume")
+	var m mergeResult
+	ok, err := readJSON(fsTree{r.dir}, ticketDir("T-1")+mergeFile, &m)
+	if err != nil || !ok {
+		t.Fatalf("read merge.json after resume: ok %v err %v, want the record kept", ok, err)
+	}
+	want := mergeResult{Result: "ci-red", Commit: "abc", Detail: "flake", Handled: true}
+	if m != want {
+		t.Errorf("merge.json after resume = %+v, want %+v", m, want)
+	}
+}
+
 func TestResumeTakesMainAndKeepsCounting(t *testing.T) {
 	r := newTestRepo(t)
 	r.mustRun("ticket-status", "start", "T-1")
