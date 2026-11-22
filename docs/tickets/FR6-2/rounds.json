@@ -1,10 +1,8 @@
 {
   "counts": {
+    "done:ticket": 1,
     "ticket": 2,
     "worker": 2
   },
-  "claim": {
-    "step": "ticket",
-    "round": 2
-  }
+  "claim": null
 }
