@@ -443,6 +443,7 @@ moonglass.dev/moonglass/tools/pipeline TestPlanVerdict
 moonglass.dev/moonglass/tools/pipeline TestRemovedTestLinesOwnerAllowance
 moonglass.dev/moonglass/tools/pipeline TestRepositoryPlanAndTicketsParse
 moonglass.dev/moonglass/tools/pipeline TestResultValidation
+moonglass.dev/moonglass/tools/pipeline TestResumeMarksMergeFailureHandled
 moonglass.dev/moonglass/tools/pipeline TestResumeTakesMainAndKeepsCounting
 moonglass.dev/moonglass/tools/pipeline TestSkipEligible
 moonglass.dev/moonglass/tools/pipeline TestStepAllows
