@@ -1,14 +1,12 @@
 {
   "counts": {
     "done:plan": 1,
+    "done:tests": 1,
     "done:ticket": 1,
     "plan": 1,
     "tests": 1,
     "ticket": 2,
     "worker": 2
   },
-  "claim": {
-    "step": "tests",
-    "round": 1
-  }
+  "claim": null
 }
