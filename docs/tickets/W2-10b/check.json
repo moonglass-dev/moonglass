@@ -1,6 +1,6 @@
 {
-  "commit": "08e6a7f22e0df3af714ef0a39c517b57a85bd28a",
-  "ok": false,
+  "commit": "bd92917e36883e8749089a9b6665d42c48ec7080",
+  "ok": true,
   "gates": [
     {
       "name": "clean",
@@ -41,12 +41,11 @@
     },
     {
       "name": "make-ci",
-      "ok": false,
-      "detail": "ok   proto-check\nok   fmt-check\nok   mod-check\nFAIL lint\ngolangci-lint run\nError: parallel golangci-lint is running\nThe command is terminated due to an error: parallel golangci-lint is running\nmake[1]: *** [lint] Error 3\nok   test\nok   check-test-list\nok   build-all\nmake: *** [ci] Error 1"
+      "ok": true
     }
   ],
   "diff_lines": 395,
-  "changed_line_coverage": null,
+  "changed_line_coverage": 0.8756476683937824,
   "skip_review_eligible": false,
-  "skip_review_reason": "verify check failed"
+  "skip_review_reason": "risk is high"
 }
