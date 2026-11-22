@@ -7,12 +7,13 @@
     "done:tests": 1,
     "done:ticket": 1,
     "plan": 1,
+    "review": 1,
     "tests": 1,
     "ticket": 2,
     "worker": 3
   },
   "claim": {
-    "step": "build",
+    "step": "review",
     "round": 1
   }
 }
