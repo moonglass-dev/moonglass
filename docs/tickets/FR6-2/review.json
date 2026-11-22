@@ -1,0 +1,10 @@
+{
+  "round": 1,
+  "verdict": "approve",
+  "skipped": false,
+  "reason": "",
+  "commit": "f883e9a59a53e7d7daf22ffe00344cf74a4c9f0e",
+  "blockers": [],
+  "majors": [],
+  "minors": []
+}

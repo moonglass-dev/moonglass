@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/client"
 
 	"moonglass.dev/moonglass/internal/agent/state"
@@ -223,7 +223,9 @@ func (e *Engine) removeImage(ctx context.Context, id string) error {
 }
 
 // isConflict reports whether the Engine refused a call because another object
-// still uses what it names, as image removal does for an image in use.
+// still uses what it names, as image removal does for an image in use. Only the
+// Docker client's typed HTTP 409 conflict error matches, wrapped or not; error
+// text is never matched (ADR-0017).
 func isConflict(err error) bool {
-	return strings.Contains(err.Error(), "conflict")
+	return errdefs.IsConflict(err)
 }
