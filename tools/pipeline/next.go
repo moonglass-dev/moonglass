@@ -407,6 +407,17 @@ func resume(e *env, dir, id string, t ticket) error {
 		_ = os.Remove(filepath.Join(dir, filepath.FromSlash(ticketDir(id)+planFile)))
 	}
 	_ = os.Remove(bpath)
+	// The owner settled any merge failure before resuming, so it no longer
+	// waits for a repair round; the record stays on the branch.
+	var m mergeResult
+	if ok, err := readJSON(fsTree{dir}, ticketDir(id)+mergeFile, &m); err != nil {
+		return fmt.Errorf("resume %s: %w; fix or delete the file and resume again", id, err)
+	} else if ok && !m.Handled {
+		m.Handled = true
+		if err := writeFile(dir, ticketDir(id)+mergeFile, encodeJSON(m)); err != nil {
+			return err
+		}
+	}
 	r, err := loadRounds(fsTree{dir}, id)
 	if err != nil {
 		return err
