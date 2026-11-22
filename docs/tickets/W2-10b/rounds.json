@@ -1,7 +1,7 @@
 {
   "counts": {
     "ticket": 1,
-    "worker": 1
+    "worker": 2
   },
   "claim": {
     "step": "ticket",
