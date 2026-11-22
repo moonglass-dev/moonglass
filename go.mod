@@ -9,6 +9,7 @@ require (
 	github.com/caddyserver/caddy/v2 v2.11.9
 	github.com/coder/websocket v1.8.15
 	github.com/compose-spec/compose-go/v2 v2.17.0
+	github.com/containerd/errdefs v1.0.0
 	github.com/danielgtaylor/huma/v2 v2.40.0
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/moby/moby/api v1.57.0
@@ -47,7 +48,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/cloudflare/circl v1.6.5 // indirect
-	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect

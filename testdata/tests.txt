@@ -114,6 +114,7 @@ moonglass.dev/moonglass/internal/deploy TestHealthGateFailsWhenContainerExitsOrR
 moonglass.dev/moonglass/internal/deploy TestHealthGateHTTPPath
 moonglass.dev/moonglass/internal/deploy TestHealthGateTCPConnect
 moonglass.dev/moonglass/internal/deploy TestHealthGateWithoutPort
+moonglass.dev/moonglass/internal/deploy TestIsConflictMatchesTypedErrorOnly
 moonglass.dev/moonglass/internal/deploy TestNewTakesTheAgentsProxy
 moonglass.dev/moonglass/internal/deploy TestPreDeploySpecDerivesFromCandidate
 moonglass.dev/moonglass/internal/deploy TestProxyPushBuildsCompleteConfig
@@ -127,6 +128,8 @@ moonglass.dev/moonglass/internal/deploy TestProxyRunPushesAgainWhenRunningConfig
 moonglass.dev/moonglass/internal/deploy TestReconcileCarriesOutDueStops
 moonglass.dev/moonglass/internal/deploy TestReconcileKeepsReferencedReleases
 moonglass.dev/moonglass/internal/deploy TestReconcileRemovesUnreferencedContainers
+moonglass.dev/moonglass/internal/deploy TestRemoveImageInUseIsNotAnError
+moonglass.dev/moonglass/internal/deploy TestRemoveImageReportsOtherFailures
 moonglass.dev/moonglass/internal/deploy TestResolveRefParsing
 moonglass.dev/moonglass/internal/deploy TestRetainRemovesImagesOutsideFive
 moonglass.dev/moonglass/internal/deploy TestRollbackLeavesCandidateUntouched
