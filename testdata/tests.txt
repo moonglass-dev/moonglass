@@ -422,6 +422,13 @@ moonglass.dev/moonglass/test/deploy TestLoadGeneratorCountsEveryNon2xx
 moonglass.dev/moonglass/test/deploy TestLoadGeneratorRetriesOnceACutBeforeAnswer
 moonglass.dev/moonglass/test/deploy TestRollbackUnderLoadIsUnderFiveSeconds
 moonglass.dev/moonglass/test/deploy TestTenDeploysUnderLoadDropNothing
+moonglass.dev/moonglass/tools/plan TestBuildPlanParses
+moonglass.dev/moonglass/tools/plan TestDrift
+moonglass.dev/moonglass/tools/plan TestMergedIDsFromSquashSubjects
+moonglass.dev/moonglass/tools/plan TestParsePlanReadsTicketLines
+moonglass.dev/moonglass/tools/plan TestParsePlanRejectsBadLines
+moonglass.dev/moonglass/tools/plan TestStatus
+moonglass.dev/moonglass/tools/plan TestTickMarksMergedTickets
 moonglass.dev/moonglass/ui TestCollectionListAndRow
 moonglass.dev/moonglass/ui TestContrastPairsMeetThresholds
 moonglass.dev/moonglass/ui TestFontUrlsLocalWOFF2

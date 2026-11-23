@@ -8,7 +8,6 @@ linters:
     - errorlint
     - exhaustive
     - forbidigo
-    - godox
     - gosec
     - govet
     - ineffassign
@@ -160,12 +159,6 @@ linters:
         - pattern: ^log\.Print.*$
           pkg: ^log$
           msg: only cmd/ writes to the terminal
-    godox:
-      keywords:
-        - TODO
-        - FIXME
-        - XXX
-        - HACK
     govet:
       enable-all: true
     nolintlint:

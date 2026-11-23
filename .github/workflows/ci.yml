@@ -1,28 +1,93 @@
 name: ci
 
-# Re-register this workflow so it posts the required ci check.
+# Pull requests run lint, test and build in parallel, with Go's build and test
+# caches restored from main. Pushes to main and the nightly run add the race
+# detector with coverage and the Docker Engine matrix. Pull requests run the
+# matrix only when they touch Docker-facing paths. The ci job at the end is the
+# one required check: it passes only when every job it needs succeeded, or the
+# matrix was skipped because a pull request does not touch those paths.
 
 on:
   pull_request:
   push:
     branches:
       - main
-      # Do not also run on p/*. A push to a ticket branch cannot read the
-      # pull request's Go build cache, so that second run compiles from
-      # scratch (about 12 minutes) and gh pr checks waits for it. A
-      # conflicting pull request has no pull_request run; ship merge merges
-      # main in first, and this workflow then runs on the updated pull request.
+  schedule:
+    - cron: "23 5 * * *"
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  ci:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.paths.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          # On a pull request HEAD is the merge commit and HEAD^1 the base.
+          deploy=true
+          if [ "$EVENT" = pull_request ] && ! git diff --name-only HEAD^1 HEAD \
+            | grep -Eq '^(internal/deploy/|internal/build/|internal/agent/disk/|test/deploy/|go\.mod$|go\.sum$|Makefile$|\.github/workflows/ci\.yml$)'; then
+            deploy=false
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.cache/golangci-lint
+            ~/.cache/moonglass
+          key: lint-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            lint-${{ hashFiles('go.sum') }}-
+            lint-
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          install-only: true
+      - run: make fmt-check mod-check words-check proto-check lint
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.cache/golangci-lint
+            ~/.cache/moonglass
+          key: lint-${{ hashFiles('go.sum') }}-${{ github.sha }}
+
+  test:
+    name: test (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ${{ fromJSON(github.event_name == 'pull_request' && '["cached"]' || '["cached", "race"]') }}
     services:
       postgres:
         image: postgres:18
@@ -44,15 +109,71 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+          cache: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          version: v2.15.0
-          install-only: true
-      - run: sudo apt-get update && sudo apt-get install -y age
-      - run: make ci
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: test-${{ matrix.mode }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            test-${{ matrix.mode }}-${{ hashFiles('go.sum') }}-
+            test-${{ matrix.mode }}-
+      - name: Install age
+        env:
+          AGE_VERSION: v1.3.2
+          AGE_SHA256: cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          curl -fsSL -o "$tmp/age.tar.gz" "https://github.com/FiloSottile/age/releases/download/$AGE_VERSION/age-$AGE_VERSION-linux-amd64.tar.gz"
+          echo "$AGE_SHA256  $tmp/age.tar.gz" | sha256sum -c -
+          tar -xzf "$tmp/age.tar.gz" -C "$tmp"
+          sudo install -m 0755 "$tmp/age/age" "$tmp/age/age-keygen" /usr/local/bin/
+      - if: matrix.mode == 'cached'
+        run: make test check-test-list
+      - if: matrix.mode == 'race'
+        run: make test-race
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: test-${{ matrix.mode }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: build-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ hashFiles('go.sum') }}-
+            build-
+      - run: make build-all
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: build-${{ hashFiles('go.sum') }}-${{ github.sha }}
 
   deploy-suite:
     name: deploy suite (Docker Engine ${{ matrix.engine.major }})
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     strategy:
@@ -120,3 +241,15 @@ jobs:
         with:
           go-version-file: go.mod
       - run: make test-deploy
+
+  ci:
+    if: always()
+    needs: [changes, lint, test, build, deploy-suite]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$RESULTS" | jq -e 'to_entries | all(.value.result == "success" or (.key == "deploy-suite" and .value.result == "skipped"))' >/dev/null
