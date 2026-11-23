@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "The six named tests are in the named packages and each test-behaviour criterion fails if that behaviour is wrong. Listen is checked on Push and PushRouted before any admin request or commit; ScopeReconcile is proved against a real Engine with two unreferenced managed containers; the suite runs Executor.Run with its own proxy, 127.0.0.1:0 port, temp dirs and project label, skips without an Engine or an unreachable container IP, and fails when CI is set. Ordering bans an older id only after the first new-id response and only until the next operation is called, which is the in-flight window and the reason a rollback may bring r09 back. The load-generator test covers non-2xx and one dropped connection; a timeout is the same client-error path and is not a separate case."
-}

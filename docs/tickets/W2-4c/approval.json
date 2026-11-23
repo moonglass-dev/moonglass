@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "All four named tests are in package main (cmd/moonglass) and package registry_test, and the diff only adds cmd/moonglass/connect_test.go and internal/registry/routes_test.go. TestAgentConnectProxyFlagDefaults reads Socket and Issuer through parseAgentConnect for neither flag (/run/moonglass-proxy/admin.sock, acme), both flags, and acme-staging, with no dial. TestAgentConnectRejectsBadProxyFlags runs an empty --proxy-socket and --tls-issuer letsencrypt through run, expecting exit 2, usage on stderr, empty stdout, and no agent.db. TestAgentConnectRunsProxyPush skips without a Docker Engine unless CI, enrols a temp dir, uses a refusing 127.0.0.1:0 URL and a short-path unix httptest admin socket, requires one complete POST /load (admin, storage, apps.http, apps.tls) within 5s, still running after 1.5s, exit 0 on cancel, and a closed database (absent WAL plus state.Open). TestAgentConnectSynopsisNamesProxyFlags requires the exact LocalCommands synopsis. No existing test line changed. The tests do not compile yet (parseAgentConnect and agentConnect are new), and testdata/tests.txt is unchanged, which the tests step leaves for later."
-}

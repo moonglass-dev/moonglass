@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "The previous revise is fixed: duplicates binds the other org id from seedOrg and passes that string to CreateProject. The four named tests are in package store_test; the diff only adds internal/store/projects_conformance_test.go and internal/store/names_test.go. Create-and-list, cross-org parents (lists stay unchanged, including under the other org's parent ids), duplicates, resolve target, second-org isolation, the name table with unchanged row counts, and RLS (no rows when app.org_id is unset, empty, or unknown; only A's rows; SQLSTATE 42501 using the other org's real parent ids; rowsecurity true) match the acceptance criteria. Postgres skips only inside newPGEnv when MOONGLASS_TEST_POSTGRES is empty and CI is unset."
-}

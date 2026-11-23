@@ -1,6 +1,0 @@
-{
-  "round": 2,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "Round 1's blocker is fixed: TestVerifyRejectsMalformedEncoding now builds END line missing as the BEGIN line plus the base64 body and no END line, over the message that signature covers, so a verifier that does not require END accepts it and the subtest fails. The other named tests still cover either pinned key in either order, armor at 70 columns and on one line with and without a trailing newline, unpinned and application-mismatch keys, envelope fields signed over their own values with the error naming the field, exact flags, post-sign tampering, the remaining malformed inputs, and the pinned-form parser cases. FuzzParseSignature is seeded with a valid signature and those inputs and accepts only nil or an error wrapping ErrBadSignature. No existing test line changes, and the file is inside internal/update."
-}

@@ -1,7 +1,0 @@
-Rejected plan round 1.
-
-Problems:
-- plan.md was not written
-
-Changed files (discarded):
-- 

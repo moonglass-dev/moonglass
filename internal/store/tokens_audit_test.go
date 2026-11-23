@@ -23,9 +23,11 @@ func TestTokensAndAuditSQLite(t *testing.T) {
 	if err := s.AddMembership(ctx, orgID, userID, store.RoleAdmin); err != nil {
 		t.Fatalf("AddMembership error = %v, want nil", err)
 	}
-	tok := store.Token{ID: "t1", OrgID: orgID, UserID: userID, Name: "ci", Last4: "abcd",
+	tok := store.Token{
+		ID: "t1", OrgID: orgID, UserID: userID, Name: "ci", Last4: "abcd",
 		ExpiresAt: time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
-		Scopes:    []store.Scope{{Project: "*", Environment: "*", Operation: "*"}}}
+		Scopes:    []store.Scope{{Project: "*", Environment: "*", Operation: "*"}},
+	}
 	if err := s.AddToken(ctx, orgID, tok, store.HashToken("mg_x")); err != nil {
 		t.Fatalf("AddToken error = %v, want nil", err)
 	}
