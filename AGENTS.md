@@ -6,12 +6,12 @@ One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and th
 
 ## How work happens
 
-One line starts it, in a T3 Code thread run by Opus with `.agents/dispatcher-prompt.md`:
+One line starts it, in a T3 Code thread run by Grok 4.6 (cursor provider; antigravity / gemini-3.8-flash fallback) with `.agents/dispatcher-prompt.md`:
 
 - `continue the build plan`: work through `docs/plan/build-plan.md`.
 - `Request: <description>`: any feature, bug or behaviour change in plain words (`.agents/skills/request/SKILL.md`).
 
-Per ticket: Opus plans it and writes a brief → a worker model writes the tests and code in its own worktree on `p/<ID>`, runs `make ci` and opens the PR → Opus reviews the diff → squash auto-merge when `ci` is green. Status comes from the plan and GitHub (`scripts/plan`); nothing about a ticket's progress is committed. The skills in `.agents/skills/` (mirrored at `.claude/skills/`) say who does what: `dispatch`, `request`, `implement`, `review`, `drift`.
+Per ticket: the dispatcher (Grok 4.6, Gemini fallback) picks the work and routes it. It delegates planning to Opus, which writes a brief → a worker model writes the tests and code in its own worktree on `p/<ID>`, runs `make ci` and opens the PR → the dispatcher delegates review of the diff to Opus, then squash auto-merges when `ci` is green. Status comes from the plan and GitHub (`scripts/plan`); nothing about a ticket's progress is committed. The skills in `.agents/skills/` (mirrored at `.claude/skills/`) say who does what: `dispatch`, `request`, `implement`, `review`, `drift`.
 
 ## Docs map: the sources of truth
 
@@ -20,7 +20,7 @@ Per ticket: Opus plans it and writes a brief → a worker model writes the tests
 | Why the product exists, who it is for, what it is not | `docs/plan/vision.md` |
 | Architecture and stack decisions (S§) | `docs/plan/stack.md` |
 | Milestones and weekly demos (M§) | `docs/plan/milestones.md` |
-| The ticket list, gates, change control, owner checklist (B§) | `docs/plan/build-plan.md` |
+| The ticket list, gates, change control, owner checklist and GitHub settings (B§) | `docs/plan/build-plan.md` |
 | Market and competitor research | `docs/plan/research.md` |
 | Behaviour, one spec per area | `docs/specs/` |
 | Decisions, one ADR each, and the index | `docs/adr/` |
@@ -63,12 +63,12 @@ When code and a spec disagree, the spec wins until a change updates both in the 
 
 ## Rules for every agent
 
-- **Never ask questions.** Decide from the brief and the docs map, and write each default you chose under "Decisions" in the PR body. Only three things wait for the owner: a new dependency, an unsettled security decision, and a change to a contract or an ADR.
+- **Never ask questions.** Owner-level decisions are Opus's, recorded under "Decisions" in the PR body. Workers follow the brief and the docs map. Only three things wait for the owner: a new dependency, an unsettled security decision, and a change to a contract or an ADR.
 - **Stay in scope.** Change what the brief names. Widen it only when the ticket cannot pass otherwise, and say why in the PR body.
 - **Contracts** (`.proto` files, registry operations, the `agent.toml` schema, the storage schema) and ADRs change only after the owner approves the change on a `needs-owner` PR.
 - **Identity.** Every commit is authored and committed as `Moonglass Team <team@moonglass.dev>`, with no `Co-authored-by` trailers. No personal names or usernames in anything committed. `gh` runs with `GH_CONFIG_DIR=~/.config/gh-moonglass-bot` and touches only `moonglass-dev/moonglass`.
 - **Banned words** outside docs: TODO, FIXME, XXX, HACK, fallback, legacy (`make words-check`).
-- Workers never push to `main`, merge, or turn on auto-merge. Opus does, after review.
+- Workers never push to `main`, merge, or turn on auto-merge. The dispatcher does, after Opus review.
 
 ## Definition of done
 
