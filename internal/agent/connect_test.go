@@ -32,6 +32,34 @@ import (
 
 const testVersion = "v-test"
 
+// idleExecutor is the fake Executor of the tests that send no command. Each
+// method answers a valid result, but nothing ever calls one here.
+type idleExecutor struct{}
+
+func (idleExecutor) Deploy(context.Context, string, *agentv1.Deploy) *agentv1.CommandResult {
+	return idleResult()
+}
+
+func (idleExecutor) SwitchRelease(context.Context, string, *agentv1.SwitchRelease) *agentv1.CommandResult {
+	return idleResult()
+}
+
+func (idleExecutor) Rollback(context.Context, string, *agentv1.Rollback) *agentv1.CommandResult {
+	return idleResult()
+}
+
+func (idleExecutor) RunPreDeploy(context.Context, string, *agentv1.RunPreDeploy) *agentv1.CommandResult {
+	return idleResult()
+}
+
+func idleResult() *agentv1.CommandResult {
+	return &agentv1.CommandResult{
+		Outcome: agentv1.CommandOutcome_FAILED,
+		Detail:  "idle executor",
+		App:     &agentv1.AppState{Phase: agentv1.ReleasePhase_NONE},
+	}
+}
+
 type beat struct{ id, version string }
 
 // fakeCP is a pinned test control plane speaking the WSS protocol.
@@ -316,7 +344,7 @@ func TestConnectDialsOutboundWSS(t *testing.T) {
 	for _, scheme := range []string{"https://", "wss://"} {
 		t.Run(scheme, func(t *testing.T) {
 			before := len(cp.beatsSeen())
-			_, stop := runConnect(t, dir, scheme+cp.addr, ConnectOptions{AgentVersion: testVersion, HeartbeatInterval: 20 * time.Millisecond, Sleep: fastSleep})
+			_, stop := runConnect(t, dir, scheme+cp.addr, ConnectOptions{Executor: idleExecutor{}, AgentVersion: testVersion, HeartbeatInterval: 20 * time.Millisecond, Sleep: fastSleep})
 			waitFor(t, "two heartbeats on a TLS 1.3 connection", func() bool { return len(cp.beatsSeen()) >= before+2 })
 			_ = stop()
 
@@ -348,7 +376,7 @@ func TestHeartbeatSentOnInterval(t *testing.T) {
 	cp := newFakeCP(t, cpOpts{priv: pinPriv, agent: agentPub})
 
 	start := time.Now()
-	_, stop := runConnect(t, dir, "https://"+cp.addr, ConnectOptions{AgentVersion: testVersion, HeartbeatInterval: 20 * time.Millisecond, Sleep: fastSleep})
+	_, stop := runConnect(t, dir, "https://"+cp.addr, ConnectOptions{Executor: idleExecutor{}, AgentVersion: testVersion, HeartbeatInterval: 20 * time.Millisecond, Sleep: fastSleep})
 	waitFor(t, "three heartbeats", func() bool { return len(cp.beatsSeen()) >= 3 })
 	_ = stop()
 
@@ -436,7 +464,7 @@ func TestReconnectBackoffWithJitter(t *testing.T) {
 			}
 			return ctx.Err()
 		}
-		_ = Connect(ctx, dir, "https://"+addr, ConnectOptions{AgentVersion: testVersion, Rand: seeded(7), Sleep: sleep})
+		_ = Connect(ctx, dir, "https://"+addr, ConnectOptions{Executor: idleExecutor{}, AgentVersion: testVersion, Rand: seeded(7), Sleep: sleep})
 
 		if len(got) != 6 {
 			t.Fatalf("sleeps: expected 6, got %d (%v)", len(got), got)
@@ -464,7 +492,7 @@ func TestReconnectBackoffWithJitter(t *testing.T) {
 			}
 			return ctx.Err()
 		}
-		_ = Connect(ctx, dir, "https://"+cp.addr, ConnectOptions{AgentVersion: testVersion, Rand: seeded(9), Sleep: sleep})
+		_ = Connect(ctx, dir, "https://"+cp.addr, ConnectOptions{Executor: idleExecutor{}, AgentVersion: testVersion, Rand: seeded(9), Sleep: sleep})
 
 		if len(got) != 4 {
 			t.Fatalf("sleeps: expected 4, got %d (%v)", len(got), got)
@@ -534,7 +562,8 @@ func TestServerOfflineThenRecovers(t *testing.T) {
 
 	addr, writes1, stop1 := serve("127.0.0.1:0")
 	_, stop := runConnect(t, agentDir, "https://"+addr, ConnectOptions{
-		AgentVersion: testVersion, HeartbeatInterval: 20 * time.Millisecond, Sleep: fastSleep,
+		Executor: idleExecutor{}, AgentVersion: testVersion,
+		HeartbeatInterval: 20 * time.Millisecond, Sleep: fastSleep,
 	})
 	// One write is the 101 upgrade; each further write is an acked heartbeat.
 	waitFor(t, "the first heartbeat ack", func() bool { return writes1.Load() >= 2 })
@@ -610,7 +639,7 @@ func runOnce(t *testing.T, dir, url string) {
 	}
 	done := make(chan error, 1)
 	go func() {
-		done <- Connect(ctx, dir, url, ConnectOptions{AgentVersion: testVersion, Sleep: sleep})
+		done <- Connect(ctx, dir, url, ConnectOptions{Executor: idleExecutor{}, AgentVersion: testVersion, Sleep: sleep})
 	}()
 	select {
 	case err := <-done:
@@ -679,7 +708,7 @@ func TestAgentClosesOnBadFrame(t *testing.T) {
 			}
 			cp := newFakeCP(t, cpOpts{priv: pinPriv, agent: agentPub, handle: handle})
 
-			_, stop := runConnect(t, dir, "https://"+cp.addr, ConnectOptions{AgentVersion: testVersion, HeartbeatInterval: time.Hour, Sleep: fastSleep})
+			_, stop := runConnect(t, dir, "https://"+cp.addr, ConnectOptions{Executor: idleExecutor{}, AgentVersion: testVersion, HeartbeatInterval: time.Hour, Sleep: fastSleep})
 			waitFor(t, "a second connection after the bad frame", func() bool { return cp.count(&cp.wsConns) >= 2 })
 			_ = stop()
 
@@ -776,7 +805,7 @@ func TestAgentNoticesDropBetweenHeartbeats(t *testing.T) {
 	cp := newFakeCP(t, cpOpts{priv: pinPriv, agent: agentPub, handle: dropAfterFirstAck})
 
 	start := time.Now()
-	_, stop := runConnect(t, dir, "https://"+cp.addr, ConnectOptions{AgentVersion: testVersion, HeartbeatInterval: time.Hour, Sleep: fastSleep})
+	_, stop := runConnect(t, dir, "https://"+cp.addr, ConnectOptions{Executor: idleExecutor{}, AgentVersion: testVersion, HeartbeatInterval: time.Hour, Sleep: fastSleep})
 	waitFor(t, "a second connection", func() bool { return cp.count(&cp.wsConns) >= 2 })
 	_ = stop()
 	if elapsed := time.Since(start); elapsed > 2*time.Second {

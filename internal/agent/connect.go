@@ -39,6 +39,8 @@ type ConnectOptions struct {
 	Sleep func(ctx context.Context, d time.Duration) error
 	// OnError is told why each connection ended; nil ignores them.
 	OnError func(error)
+	// Executor runs each accepted command; it is required.
+	Executor Executor
 	// AgentVersion is sent in every Heartbeat.
 	AgentVersion string
 	// HeartbeatInterval is the time between Heartbeats; zero means 30 seconds.
@@ -50,6 +52,9 @@ type ConnectOptions struct {
 // exponential backoff and full jitter until ctx is cancelled. It reads the
 // data dir and never writes it.
 func Connect(ctx context.Context, dataDir, rawURL string, opts ConnectOptions) error {
+	if opts.Executor == nil {
+		return errors.New("connect: ConnectOptions.Executor is nil: pass the executor that runs the deploy commands")
+	}
 	priv, err := keys.LoadAgentSigningKey(dataDir)
 	if err != nil {
 		return connectKeyErr(err, dataDir)
@@ -88,9 +93,13 @@ func Connect(ctx context.Context, dataDir, rawURL string, opts ConnectOptions) e
 	client := &http.Client{Transport: pinnedHost{base: transport, host: u.Host}}
 	defer client.CloseIdleConnections()
 
+	// The dispatcher outlives every session, so a command survives a drop.
+	d := newDispatcher(ctx, opts.OnError)
+	defer d.wait()
+
 	attempt := 0
 	for {
-		acked, serr := session(ctx, client, endpoint, opts)
+		acked, serr := session(ctx, client, endpoint, opts, d)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -130,9 +139,11 @@ type frame struct {
 	typ  websocket.MessageType
 }
 
-// session runs one connection. acked reports whether at least one Heartbeat
-// was acknowledged, which resets the backoff.
-func session(ctx context.Context, client *http.Client, endpoint string, opts ConnectOptions) (acked bool, err error) {
+// session runs one connection: it sends Heartbeats, reads every frame for the
+// connection's life and hands accepted commands to the dispatcher. acked
+// reports whether at least one Heartbeat was acknowledged, which resets the
+// backoff.
+func session(ctx context.Context, client *http.Client, endpoint string, opts ConnectOptions, d *dispatcher) (acked bool, err error) {
 	dialCtx, cancelDial := context.WithTimeout(ctx, dialTimeout)
 	c, _, err := websocket.Dial(dialCtx, endpoint, &websocket.DialOptions{HTTPClient: client})
 	cancelDial()
@@ -160,32 +171,71 @@ func session(ctx context.Context, client *http.Client, endpoint string, opts Con
 		}
 	}()
 
+	// Results are written here until the session ends; a failed write ends it
+	// through failed.
+	failed := make(chan error, 1)
+	d.attach(c, failed)
+	defer d.detach(c)
+
+	// waiting is the unacknowledged Heartbeat's request id. The timer means
+	// "send the next Heartbeat" while it is empty and "the ack deadline"
+	// otherwise.
 	timer := time.NewTimer(0)
 	defer timer.Stop()
-	for n := 1; ; n++ {
+	waiting := ""
+	for n := 1; ; {
 		select {
 		case <-ctx.Done():
 			_ = c.Close(websocket.StatusNormalClosure, "shutting down")
 			return acked, ctx.Err()
+		case ferr := <-failed:
+			return acked, ferr
 		case f := <-frames:
 			if f.err != nil {
 				return acked, fmt.Errorf("connect: connection lost: %w", f.err)
 			}
-			_ = c.Close(websocket.StatusPolicyViolation, "unexpected message")
-			return acked, errors.New("connect: control plane sent a frame outside a heartbeat: closing the connection")
+			if f.typ != websocket.MessageBinary {
+				_ = c.Close(websocket.StatusUnsupportedData, "binary frames only")
+				return acked, errors.New("connect: control plane sent a text frame: closing the connection")
+			}
+			env, err := protocol.Unmarshal(f.data)
+			if err != nil {
+				_ = c.Close(websocket.StatusPolicyViolation, "bad envelope")
+				return acked, fmt.Errorf("connect: control plane sent a bad envelope: %w", err)
+			}
+			if env.GetType() == agentv1.MessageType_HEARTBEAT_ACK {
+				if waiting == "" || env.GetRequestId() != waiting {
+					_ = c.Close(websocket.StatusPolicyViolation, "unexpected message")
+					return acked, fmt.Errorf("connect: expected HEARTBEAT_ACK for request %q, got one for %q", waiting, env.GetRequestId())
+				}
+				waiting = ""
+				acked = true
+				timer.Reset(opts.HeartbeatInterval)
+				continue
+			}
+			cmd, err := openCommand(env, opts.Executor)
+			if err != nil {
+				_ = c.Close(websocket.StatusPolicyViolation, "unexpected message")
+				return acked, err
+			}
+			d.submit(cmd)
 		case <-timer.C:
+			if waiting != "" {
+				return acked, fmt.Errorf("connect: wait for heartbeat ack: %w", context.DeadlineExceeded)
+			}
+			id := strconv.Itoa(n)
+			if err := sendHeartbeat(ctx, c, id, opts.AgentVersion); err != nil {
+				return acked, err
+			}
+			waiting = id
+			n++
+			timer.Reset(ackTimeout)
 		}
-		if err = heartbeat(ctx, c, frames, strconv.Itoa(n), opts.AgentVersion); err != nil {
-			return acked, err
-		}
-		acked = true
-		timer.Reset(opts.HeartbeatInterval)
 	}
 }
 
-// heartbeat sends one Heartbeat and waits for the HeartbeatAck with the same
-// request id. Any other frame closes the connection.
-func heartbeat(ctx context.Context, c *websocket.Conn, frames <-chan frame, id, version string) error {
+// sendHeartbeat writes one Heartbeat with request id id.
+func sendHeartbeat(ctx context.Context, c *websocket.Conn, id, version string) error {
 	env, err := protocol.Wrap(agentv1.MessageType_HEARTBEAT, id, &agentv1.Heartbeat{AgentVersion: version})
 	if err != nil {
 		return fmt.Errorf("connect: build heartbeat: %w", err)
@@ -194,32 +244,10 @@ func heartbeat(ctx context.Context, c *websocket.Conn, frames <-chan frame, id, 
 	if err != nil {
 		return fmt.Errorf("connect: encode heartbeat: %w", err)
 	}
-	waitCtx, cancel := context.WithTimeout(ctx, ackTimeout)
+	writeCtx, cancel := context.WithTimeout(ctx, ackTimeout)
 	defer cancel()
-	if err = c.Write(waitCtx, websocket.MessageBinary, payload); err != nil {
+	if err := c.Write(writeCtx, websocket.MessageBinary, payload); err != nil {
 		return fmt.Errorf("connect: send heartbeat: %w", err)
-	}
-	var f frame
-	select {
-	case f = <-frames:
-	case <-waitCtx.Done():
-		return fmt.Errorf("connect: wait for heartbeat ack: %w", waitCtx.Err())
-	}
-	if f.err != nil {
-		return fmt.Errorf("connect: wait for heartbeat ack: %w", f.err)
-	}
-	if f.typ != websocket.MessageBinary {
-		_ = c.Close(websocket.StatusUnsupportedData, "binary frames only")
-		return errors.New("connect: control plane sent a text frame: closing the connection")
-	}
-	reply, err := protocol.Unmarshal(f.data)
-	if err != nil {
-		_ = c.Close(websocket.StatusPolicyViolation, "bad envelope")
-		return fmt.Errorf("connect: control plane sent a bad envelope: %w", err)
-	}
-	if reply.GetType() != agentv1.MessageType_HEARTBEAT_ACK || reply.GetRequestId() != id {
-		_ = c.Close(websocket.StatusPolicyViolation, "unexpected message")
-		return fmt.Errorf("connect: expected HEARTBEAT_ACK for request %q, got %v for %q", id, reply.GetType(), reply.GetRequestId())
 	}
 	return nil
 }

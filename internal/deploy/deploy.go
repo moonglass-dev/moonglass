@@ -106,6 +106,7 @@ func (x *Executor) Deploy(ctx context.Context, requestID string, d *agentv1.Depl
 // deploy is Deploy's body; written reports whether its result is committed.
 func (x *Executor) deploy(ctx context.Context, cmd state.Command, d *agentv1.Deploy) (*agentv1.CommandResult, bool) {
 	appID := d.GetAppId()
+	defer x.lockApp(appID)()
 	stored, st, known, err := x.db.App(ctx, appID)
 	if err != nil {
 		return result(agentv1.CommandOutcome_FAILED, fmt.Sprintf("read app %s: %v", appID, err), release.State{}), false

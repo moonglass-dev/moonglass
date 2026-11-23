@@ -1,5 +1,7 @@
 moonglass.dev/moonglass/cmd/moonglass TestAgentConnectIssuerFollowsDeployCheck
+moonglass.dev/moonglass/cmd/moonglass TestAgentConnectPolicyFlagDefault
 moonglass.dev/moonglass/cmd/moonglass TestAgentConnectProxyFlagDefaults
+moonglass.dev/moonglass/cmd/moonglass TestAgentConnectRefusesPolicyThatDoesNotLoad
 moonglass.dev/moonglass/cmd/moonglass TestAgentConnectRejectsBadProxyFlags
 moonglass.dev/moonglass/cmd/moonglass TestAgentConnectRunsProxyPush
 moonglass.dev/moonglass/cmd/moonglass TestAgentEnrollFailures
@@ -15,11 +17,15 @@ moonglass.dev/moonglass/cmd/moonglass TestUsageOnMissingOrUnknownCommand
 moonglass.dev/moonglass/cmd/moonglass TestVersionPrintsVersionCommitAndDate
 moonglass.dev/moonglass/cmd/moonglass TestVersionReportsFailedWrite
 moonglass.dev/moonglass/internal/agent TestAgentClosesOnBadFrame
+moonglass.dev/moonglass/internal/agent TestAgentClosesOnMessageItDoesNotAccept
 moonglass.dev/moonglass/internal/agent TestAgentNoticesDropBetweenHeartbeats
 moonglass.dev/moonglass/internal/agent TestAgentPackageHoldsNoKeyFileIO
 moonglass.dev/moonglass/internal/agent TestAgentRefusesRedirect
 moonglass.dev/moonglass/internal/agent TestAgentRejectsTLS12Server
+moonglass.dev/moonglass/internal/agent TestCommandsForDifferentAppsRunConcurrently
+moonglass.dev/moonglass/internal/agent TestCommandsForOneAppRunInArrivalOrder
 moonglass.dev/moonglass/internal/agent TestConnectDialsOutboundWSS
+moonglass.dev/moonglass/internal/agent TestConnectRefusesNilExecutor
 moonglass.dev/moonglass/internal/agent TestDialTimesOutOnSilentServer
 moonglass.dev/moonglass/internal/agent TestEnrollAcceptsAndPins
 moonglass.dev/moonglass/internal/agent TestEnrollDoesNotConsumeTokenOnMalformedKeys
@@ -30,8 +36,12 @@ moonglass.dev/moonglass/internal/agent TestEnrollRejectsResponseKeyOtherThanTLSK
 moonglass.dev/moonglass/internal/agent TestEnrollReplayFails
 moonglass.dev/moonglass/internal/agent TestEnrollUnwritableDataDirDoesNotConsumeToken
 moonglass.dev/moonglass/internal/agent TestHeartbeatSentOnInterval
+moonglass.dev/moonglass/internal/agent TestHeartbeatsContinueWhileCommandRuns
 moonglass.dev/moonglass/internal/agent TestReconnectBackoffWithJitter
 moonglass.dev/moonglass/internal/agent TestRejectsControlPlanePinMismatch
+moonglass.dev/moonglass/internal/agent TestResendCrossingItsResultIsNotAnsweredTwice
+moonglass.dev/moonglass/internal/agent TestResentCommandReturnsStoredResult
+moonglass.dev/moonglass/internal/agent TestRunningRequestIDIsNotStartedTwice
 moonglass.dev/moonglass/internal/agent TestServerOfflineThenRecovers
 moonglass.dev/moonglass/internal/agent/state TestCommandResultReturnsStoredResult
 moonglass.dev/moonglass/internal/agent/state TestCommandsResultIsNotNull
@@ -116,6 +126,7 @@ moonglass.dev/moonglass/internal/deploy TestHealthGateTCPConnect
 moonglass.dev/moonglass/internal/deploy TestHealthGateWithoutPort
 moonglass.dev/moonglass/internal/deploy TestIsConflictMatchesTypedErrorOnly
 moonglass.dev/moonglass/internal/deploy TestNewTakesTheAgentsProxy
+moonglass.dev/moonglass/internal/deploy TestPolicyEnvReadsEngine
 moonglass.dev/moonglass/internal/deploy TestPreDeploySpecDerivesFromCandidate
 moonglass.dev/moonglass/internal/deploy TestProxyPushBuildsCompleteConfig
 moonglass.dev/moonglass/internal/deploy TestProxyPushFailuresPushNothing
@@ -128,6 +139,7 @@ moonglass.dev/moonglass/internal/deploy TestProxyRunPushesAgainWhenRunningConfig
 moonglass.dev/moonglass/internal/deploy TestReconcileCarriesOutDueStops
 moonglass.dev/moonglass/internal/deploy TestReconcileKeepsReferencedReleases
 moonglass.dev/moonglass/internal/deploy TestReconcileRemovesUnreferencedContainers
+moonglass.dev/moonglass/internal/deploy TestReconcileWaitsForTheAppLock
 moonglass.dev/moonglass/internal/deploy TestRemoveImageInUseIsNotAnError
 moonglass.dev/moonglass/internal/deploy TestRemoveImageReportsOtherFailures
 moonglass.dev/moonglass/internal/deploy TestResolveRefParsing
@@ -307,6 +319,7 @@ moonglass.dev/moonglass/internal/proxy TestNoTCPAdminPort
 moonglass.dev/moonglass/internal/proxy TestOneHTTPSRouteInternalIssuer
 moonglass.dev/moonglass/internal/proxy TestProxyAndAgentIdleUnderBudget
 moonglass.dev/moonglass/internal/proxy TestPushedConfigCannotOpenTCPAdmin
+moonglass.dev/moonglass/internal/registry TestAgentConnectSynopsisNamesPolicyFlag
 moonglass.dev/moonglass/internal/registry TestAgentConnectSynopsisNamesProxyFlags
 moonglass.dev/moonglass/internal/registry TestAppendAuditIsCalledOnlyByTheRegistry
 moonglass.dev/moonglass/internal/registry TestAuditEventsAreHashChained
