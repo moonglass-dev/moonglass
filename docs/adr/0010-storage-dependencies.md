@@ -4,6 +4,7 @@
 - Date: 2026-11-16
 - Amended: 2026-11-17, agent state (owner decision D2, weeks 2–3 preflight)
 - Amended: 2026-11-18, which packages import each driver (owner decision, FR1-10)
+- Amended: 2026-11-22, pgx withdrawn: SQLite only (ADR-0002 as amended; the plan audit, `docs/review/plan-audit.md`). FA1-1 removes pgx from `go.mod`, its depguard rule `pgx-deps`, the CI `postgres:18` service and `MOONGLASS_TEST_POSTGRES`. Until FA1-1 merges, the code still matches the pgx text below; nothing new may use pgx.
 
 ## Context
 
@@ -13,7 +14,7 @@ W1-2 adds `internal/store`, the one storage interface of ADR-0002 with a Postgre
 
 Pin these two modules. Each is imported by exactly one backend package: pgx only by `internal/store/pg`, and `modernc.org/sqlite` only by `internal/store/sqlite` (and `internal/agent/state`, by the amendment below). The rule covers every Go file, tests included: no other package and no test file outside those directories imports either module or any of its subpackages.
 
-- `github.com/jackc/pgx/v5 v5.13.0` — the Postgres driver. Its `stdlib` package gives `database/sql`, so one migration runner and one query layer serve both backends.
+- _Withdrawn 2026-11-22:_ `github.com/jackc/pgx/v5 v5.13.0` — the Postgres driver.
 - `modernc.org/sqlite v1.62.0` — a pure-Go SQLite driver, so `CGO_ENABLED=0` holds.
 
 Both versions are recorded in `go.mod` and in the depguard allow list in `.golangci.yml`. No ORM and no migration library are added: migrations are numbered plain SQL applied by a small runner in `internal/store` (`docs/specs/storage.md`).

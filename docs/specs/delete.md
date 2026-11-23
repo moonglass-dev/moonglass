@@ -2,6 +2,8 @@
 
 **Status: Approved** by the owner on 2026-11-18 (week 5 preflight). The registry operations, the protocol messages, the tables and the agent-state change below are contracts (ADR-0006 decision 9, ADR-0002, `docs/specs/protocol.md`). The owner decisions are listed at the end.
 
+**At launch** (the plan audit, `docs/review/plan-audit.md`, 2026-11-22): service delete, restore and purge (W5-5b to W5-5e, and W5-7 in the UI) are built. Environment and project deletion (W5-8a, W5-8 and the sections marked W5-8) is v1.
+
 A deleted thing can be brought back for 7 days, then it is purged. Nobody, a coding agent included, removes data in one step: deleting needs admin and, for an agent, a person's approval (W5-2); purging early needs a person with step-up and is never an agent's. Sources: V§4 ("soft delete" is free everywhere), M§3 week 5, R§3 (Railway's 48-hour soft delete after an agent deleted a production volume).
 
 ## Which ticket builds what

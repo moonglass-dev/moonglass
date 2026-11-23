@@ -13,7 +13,7 @@ Builds on the server from a GitHub repository and commit, using the server's own
 | W3-4 | `moonglass deploy --git <owner>/<repo>@<commit>`, the build on the server, the per-server build queue, `moonglass.toml`, and the build-in-CI template |
 | W4-10 | The GitHub App: created from a manifest in a signed-in session, a push webhook that deploys, and adding the deploy key to the repository. It depends on W4-1 because creating an App from a manifest is a browser redirect that needs a signed-in session |
 
-Until W4-10, `git push` goes live only through the build-in-CI template (G3), and the owner adds the deploy key to the repository by hand.
+W4-10 is v1 (the plan audit, `docs/review/plan-audit.md`, 2026-11-22). At launch, `git push` goes live only through the build-in-CI template (G3), and the owner adds the deploy key to the repository by hand.
 
 ## Deploy key (W3-8)
 

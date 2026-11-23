@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
-- **Amended:** 2026-11-17, decisions 2 and 5 and new decisions 11 to 13 (owner decisions D6, D13, D14 and D15, weeks 2–3 preflight); decision 9 (owner decision D22, week 3 planning)
+- **Amended:** 2026-11-17, decisions 2 and 5 and new decisions 11 to 13 (owner decisions D6, D13, D14 and D15, weeks 2–3 preflight); decision 9 (owner decision D22, week 3 planning); 2026-11-22, decisions 5, 6 and 8 and the closing sentence (the plan audit, `docs/review/plan-audit.md`; the owner approves on its PR): the owner's CLI grants every server at launch, while `RewrapEnvKey`, rotation, reveal, browser entry and protected environments are v1
 
 ## Context
 
@@ -23,11 +23,11 @@ The control plane must never hold a readable secret (V§1). A new or replacement
 3. **Wrapping.** Each value is encrypted to the environment public key. The environment private key exists only as wrapped copies, one per authorised agent and one per recovery key. The control plane holds only ciphertext and wrapped copies.
 4. **Backups and exports** are encrypted to the environment public key. Exports carry ciphertext plus wrapped keys and are readable with stock `age` once the owner unwraps the environment key. **Bucket credentials are an environment secret**, encrypted to the environment key like any other, so a restore onto a new server needs only the recovery key (S§3.9, M§3 week 6).
 5. **Grant.** Every grant is a recipient change: owner-only, with step-up (ADR-0006).
-   - *First server:* granted by the owner's CLI after it checks the server's fingerprint, with step-up (W4-8); no `RewrapEnvKey`.
-   - *Unprotected environment:* after the owner confirms the enrolment in the UI, the control plane asks an online agent there to re-wrap the key to the new agent (`RewrapEnvKey`).
-   - *Protected environment:* agents refuse `RewrapEnvKey`. The owner runs `moonglass secrets grant --env <name> --server <name>`; the CLI unwraps with the recovery key and shows the new server's fingerprint; the owner checks it against the one `moonglass agent enroll` printed; only then does the CLI wrap the key.
+   - *At launch, every server* is granted by the owner's CLI after it checks the server's fingerprint, with step-up (W4-8; amended 2026-11-22). The CLI unwraps with the recovery key. There is no `RewrapEnvKey` and no protected environment at launch; the two cases below are v1 (W3-3, W4-2).
+   - *Unprotected environment (v1):* after the owner confirms the enrolment in the UI, the control plane asks an online agent there to re-wrap the key to the new agent (`RewrapEnvKey`).
+   - *Protected environment (v1):* agents refuse `RewrapEnvKey`. The owner runs `moonglass secrets grant --env <name> --server <name>`; the CLI unwraps with the recovery key and shows the new server's fingerprint; the owner checks it against the one `moonglass agent enroll` printed; only then does the CLI wrap the key.
    - *How an agent knows an environment is protected* (amended 2026-11-17). The plaintext of every wrapped copy is a key record, not a bare key: the environment ID, a `protected` flag and the environment's age identity (`docs/specs/secrets.md`). The agent decides from the record it unwrapped itself, never from a flag in the request. The control plane cannot change a record without the key, because the age payload is authenticated. Turning protection off is safe. Turning it on takes effect only through `secrets rotate`, which writes new records; until then the old copies say unprotected.
-6. **Rotate:** `moonglass secrets rotate --env <name>` creates a new environment key, re-encrypts every value and re-wraps, with one executor per case. It is a recipient change: owner-only, with step-up.
+6. **Rotate (v1, W3-3):** `moonglass secrets rotate --env <name>` creates a new environment key, re-encrypts every value and re-wraps, with one executor per case. It is a recipient change: owner-only, with step-up.
 
    | Case | Executor | Rule |
    |---|---|---|
@@ -37,14 +37,14 @@ The control plane must never hold a readable secret (V§1). A new or replacement
 
    Rotation deletes the agent-wrapped copies of the old environment key and keeps its recovery-wrapped copy, so old backups stay readable through the recovery key. Rotation does not un-leak, so the UI lists the values to rotate at their source.
 7. **Agent key rotation** is on demand at launch: the agent makes a new key and re-wraps the environment keys it holds to itself.
-8. **One reveal path:** `moonglass secrets reveal` has the agent re-encrypt the value to a one-time CLI key; the control plane relays only ciphertext. It is owner-only, requires step-up, and is refused for any token owned by an agent identity, whatever its scope. Every reveal is audited. The recovery key is never used for everyday reads. Values are write-only in the web UI.
+8. **One reveal path (v1, W4-9):** `moonglass secrets reveal` has the agent re-encrypt the value to a one-time CLI key; the control plane relays only ciphertext. It is owner-only, requires step-up, and is refused for any token owned by an agent identity, whatever its scope. Every reveal is audited. The recovery key is never used for everyday reads. Values are write-only in the web UI; at launch the web UI does not set them at all, and the CLI is the only way to (browser entry is v1, W4-5).
 9. **The CLI pins each environment's public key** on first use and warns if it changes. **It also pins the org's recovery recipients** (amended 2026-11-17, D22): `keys init` records the recipient it registers, and a CLI with no pin records the set it first fetches and prints it. A different set later stops the command. Otherwise a taken-over control plane could name its own recipient as the recovery key and receive every new environment key.
 10. **Git access** uses a deploy key generated on the server; the control plane holds no repository credentials after setup.
 11. **Step-up is not replaced by holding a key** (2026-11-17). Grant, rotate, reveal and every other recipient change need the sign-in fresher than ten minutes of ADR-0005 decision 3, even when the owner's CLI also holds the recovery key. Holding the recovery key is not proof that a human is present: on a machine where an AI agent works, that agent can read the key file or type into the terminal. The week 5 agent-safety story depends on this rule. These operations therefore wait for the step-up primitive (W4-1).
 12. **The first recovery recipient** (2026-11-17). `moonglass keys init` uploads the recovery key's public half. While the org has no recovery recipient and no environment key exists, registering one needs the owner role and no step-up, and it is audited. Adding a second recovery recipient or replacing one is a recipient change, with step-up. Known risk, accepted by the owner: someone holding an owner token could register their own recovery key before the real owner does.
 13. **Kinds of secret** (2026-11-17). Every environment variable is a secret: its name is visible and its value is write-only. There are no plain environment variables. Registry credentials are a separate kind, keyed by registry host. The agent uses them only to pull from that host and never passes them into a container's environment. Both kinds are encrypted to the environment key in the same way (`docs/specs/secrets.md`).
 
-**What browser-side encryption does and does not protect** is the table in `docs/threat-model.md` §5, taken from S§3.11. In one sentence: our database never holds a readable secret; if our running service were taken over, protected environments stay sealed and unprotected ones do not.
+**What browser-side encryption does and does not protect** is the table in `docs/threat-model.md` §5, taken from S§3.11. In one sentence: our database never holds a readable secret; if the running control plane were taken over, it could deploy its own image and receive that environment's secrets, which protected environments (v1) prevent.
 
 ## Consequences
 

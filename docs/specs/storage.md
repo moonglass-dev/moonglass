@@ -2,6 +2,8 @@
 
 W1-2 implements ADR-0002: one storage interface, two backends, one conformance suite. This spec is the behaviour the ticket builds. It does not change the ADR.
 
+**SQLite only** (ADR-0002 as amended by the plan audit, `docs/review/plan-audit.md`, 2026-11-22). FA1-1 deletes the Postgres backend and, in the same change, every Postgres, RLS, role and `app.org_id` rule below, with the Postgres test names. Until it merges, those rules describe code that is being deleted. No new ticket adds Postgres migrations, policies or tests.
+
 ## Backends
 
 - **Postgres** (hosted, CI): `store/pg`, driver `github.com/jackc/pgx/v5` at the version pinned in ADR-0010. CI runs `postgres:18` as a service (ADR-0002 decision 13). Tests that need Postgres read the URL from `MOONGLASS_TEST_POSTGRES`. When that variable is empty they skip, except when `CI` is set, in which case they fail: CI must provide the service.

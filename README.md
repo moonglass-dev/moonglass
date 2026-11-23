@@ -2,7 +2,7 @@
 
 Calm deploys on your own servers.
 
-Moonglass is an open-source deploy platform for your own servers. It is being built so that deploys don't drop requests, restores are one click, there is nothing to SSH into, and it runs in under 100 MB.
+Moonglass is an open-source deploy platform for your own servers. It is being built so that deploys don't drop requests, restores are one click, the control plane never SSHes into your servers, and it runs in under 100 MB.
 
 **Status: pre-alpha, not usable yet.** This repository holds the plan and the first plumbing. Nothing above works today.
 

@@ -12,10 +12,12 @@ How secrets are kept, set, delivered and revealed, per ADR-0003 as amended on 20
 | W3-2c | `keys init` registering the first recovery recipient, and the pins file with its recovery pins | no |
 | W3-2d | `environments.key.create`, `secrets.set`, `secrets.list` and the environment's `public_key` | no |
 | W3-2 | The `secrets set` and `environments key create` local commands: environment-key pins, the recovery check, creating an environment key wrapped to the pinned recovery recipients only, and encrypting each value | no |
-| W4-8 | Granting the first server (the first agent-wrapped copy) and delivering secrets at deploy | yes |
-| W4-9 | `secrets reveal` | yes |
-| W3-3 | `RewrapEnvKey`, `secrets grant` and `secrets rotate` | yes |
-| W4-5 | Browser-side encryption | no (setting a value) |
+| W4-8 | `secrets grant` for any server of an environment, and delivering secrets at deploy | yes |
+| W4-9 (v1) | `secrets reveal` | yes |
+| W3-3 (v1) | `RewrapEnvKey` and `secrets rotate` | yes |
+| W4-5 (v1) | Browser-side encryption | no (setting a value) |
+
+W4-9, W3-3 and W4-5 are v1 (the plan audit, `docs/review/plan-audit.md`, 2026-11-22). At launch the CLI is the only way to set a value, the owner's CLI grants every server, and no value is read back.
 
 **Step-up is never replaced by holding a key** (ADR-0003 decision 11). Holding the recovery key is not proof that a human is present: on a machine where an AI agent works, that agent can read the key file or type into the terminal. The week 5 agent-safety story depends on this rule. So every grant, rotation, reveal and recipient change waits for W4-1. Until W4-8 merges, no agent holds an environment key, and deployed containers get no secrets.
 
@@ -30,7 +32,7 @@ The plaintext of every wrapped environment key, to an agent or to a recovery rec
 - `v` is 1. Any other value, an unknown field, a missing field, a duplicated field or trailing data after the object is an error.
 - An agent decides whether an environment is protected from the record it unwrapped itself, never from a field in a request. The control plane holds only ciphertext and cannot change a record, because age authenticates its payload.
 - A record whose `environment_id` differs from the environment it was delivered for is refused.
-- From W4-2, each new record the CLI creates copies the environment's current flag. An existing record changes only when `secrets rotate` (W3-3) writes a new one. Until that write, the copy an agent already holds is unchanged, and the UI and the CLI say so.
+- From W4-2 (v1), each new record the CLI creates copies the environment's current flag. Until then every record says `"protected": false`. An existing record changes only when `secrets rotate` (W3-3) writes a new one. Until that write, the copy an agent already holds is unchanged, and the UI and the CLI say so.
 
 ## Kinds of secret
 
@@ -41,7 +43,7 @@ Owner decision D15. There are no plain environment variables: every one is a sec
 | `env` | `[A-Z_][A-Z0-9_]*`, at most 128 bytes, not starting with `MOONGLASS_` | Any bytes, at most 32 KiB | As the container's environment variable of that name, in the app and its pre-deploy step |
 | `registry` | A registry host, such as `ghcr.io` or `registry.example.com:5000`: a lowercase DNS name with an optional port | JSON `{"username": "…", "password": "…"}`, at most 4 KiB | Only to authenticate a pull from that host. **Never passed into a container's environment** |
 
-Names are visible everywhere. Values are write-only: no operation returns a value or its ciphertext, and only `secrets reveal` (W4-9) recovers one. No value appears in a log line, an error, a `CommandResult`, an audit record or a stream (ADR-0004 decision 12).
+Names are visible everywhere. Values are write-only: no operation returns a value or its ciphertext, and only `secrets reveal` (W4-9, v1) recovers one. No value appears in a log line, an error, a `CommandResult`, an audit record or a stream (ADR-0004 decision 12).
 
 ## Recovery key (W3-1, W3-2c)
 
@@ -101,7 +103,7 @@ Owner decision of 2026-11-20, from ADR-0003 decision 9 and D22. The CLI keeps `$
 
 ## Delivery (W4-8)
 
-- **First server.** `moonglass secrets grant --env E --server S` for the first server: the owner's CLI unwraps the record with the recovery key, shows the server's fingerprint for the owner to compare with the one `agent enroll` printed, wraps the record to the agent's recipient, and uploads it. It is a recipient change, with step-up.
+- **Each server.** `moonglass secrets grant --env E --server S` for any server of the environment, the first or a later one: the owner's CLI unwraps the record with the recovery key, shows the server's fingerprint for the owner to compare with the one `agent enroll` printed, wraps the record to the agent's recipient, and uploads it. It is a recipient change, with step-up.
 - **At deploy,** `Deploy` gains `env_key` (this agent's wrapped record) and `secrets` (repeated `kind`, `name`, `ciphertext`). Together they must fit the 1 MiB envelope. The agent unwraps the record in memory, decrypts each value, puts `env` values into `policy.Spec.Env` for the app and its pre-deploy step, and keeps `registry` values for the pull only.
 - Plaintext, unwrapped keys and records are never written to disk, to agent state, or to a log. A value that does not decrypt fails the step with `secret <name> could not be decrypted`.
 
@@ -115,10 +117,10 @@ Owner decision of 2026-11-19 (week 6). `moonglass databases create` and `moongla
 
 The delivery fields are `Deploy.env_key` = 11 and `Deploy.secrets` = 12 (`docs/specs/protocol.md`).
 
-## Reveal (W4-9)
+## Reveal (W4-9, v1)
 
 Unchanged from ADR-0003 decision 8: the CLI sends a one-time X25519 recipient; an online agent in the environment re-encrypts the value to it; the control plane relays only ciphertext. Owner-only, step-up, refused for any token owned by an agent identity, audited.
 
-## Grant and rotate (W3-3)
+## `RewrapEnvKey` and rotate (W3-3, v1)
 
-ADR-0003 decisions 5 and 6, with step-up. An agent refuses `RewrapEnvKey` when its own record says `protected: true`. An unprotected rotation by an agent wraps only to recipients already stored for that environment.
+ADR-0003 decisions 5 and 6, with step-up. The CLI grant above stays the way to add a server. An agent refuses `RewrapEnvKey` when its own record says `protected: true`. An unprotected rotation by an agent wraps only to recipients already stored for that environment.

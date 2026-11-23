@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
+- **Amended:** 2026-11-22, decision 3 (the plan audit, `docs/review/plan-audit.md`; the owner approves on its PR): there is no hosted fleet at launch, so the staged rollout waits for managed control planes (v1). Every control plane offers releases the way decision 5 describes.
 
 ## Context
 
@@ -15,13 +16,13 @@ The agent has root-equivalent access to users' servers and updates itself. A bad
    - **The install script (W1-6)** verifies each artifact it downloads with `ssh-keygen -Y verify` (OpenSSH 8.2 or later) against the pinned `allowed_signers`, before anything runs or is installed. A failure installs nothing and exits with an error that says why.
    - **The agent (W7-6)** verifies the same format before it installs anything, with a verifier on the Go standard library only. It checks the `SSHSIG` preamble, version 1, a pinned key, the namespace and `sha512`, then the Ed25519 signature over the application hash, flags, counter and message hash, and requires the user-presence (0x01) and user-verification (0x04) flags. No new dependency.
 2. **Two channels.** `canary` gets every release first: the test fleet, plus alpha users who opt in through `agent.toml`. `stable` gets a release after at least 72 hours on canary with no regressions in the permanent suites or the fleet.
-3. **Staged rollout on hosted.** Stable agent updates go to 10% of connected servers, then 50% after 24 hours, then 100% after another 24. The rollout halts when, among agents updated in the current stage, at least 2 agents and at least 1% have either reverted, not reconnected within 10 minutes, or reported a failed self-check in their first hour. A halted rollout stays halted until the owner resumes it or withdraws the release. The same criteria on canary block promotion to stable.
+3. **Staged rollout on a managed fleet (v1).** Stable agent updates go to 10% of connected servers, then 50% after 24 hours, then 100% after another 24. The rollout halts when, among agents updated in the current stage, at least 2 agents and at least 1% have either reverted, not reconnected within 10 minutes, or reported a failed self-check in their first hour. A halted rollout stays halted until the owner resumes it or withdraws the release. The same criteria on canary block promotion to stable.
 4. **Automatic revert.** The agent keeps the previous binary. If the new one has not passed its self-check within five minutes, systemd starts the old one again. The self-check passes only when all hold:
    - the new agent process is running and has not restarted;
    - its enrolled connection to the control plane is back, with the pinned control-plane key;
    - the SHA-256 of the running executable equals the file whose `.sig` verified against a pinned release key;
    - when the release did not change the proxy, the proxy process has not restarted and its admin socket returns the config the agent last pushed. When it did, the drained proxy upgrade has completed and the same check passes.
-5. **Self-hosted** agents download the same signed artifacts as hosted, for the channel in `agent.toml`, with no percentage rollout; verification and revert are the same. The operator updates `moonglass server` and the CLI by running the signed install. The control plane never replaces itself.
+5. **Self-hosted** agents, which are every agent at launch, download the same signed artifacts for the channel in `agent.toml`, with no percentage rollout; verification and revert are the same. The operator updates `moonglass server` and the CLI by running the signed install. The control plane never replaces itself.
 6. **The proxy updates separately,** only when Caddy or our counter module changes (S§3.3, ADR-0001). There is one binary on disk, so a release that changes the Caddy config shape or the counter module includes the drained proxy upgrade in the same step; the agent and the running proxy never differ in either. There is no agent-to-proxy compatibility rule.
 7. **One compatibility window, after launch only.** Because agents update in stages, the control plane speaks the current and the previous agent protocol version, and nothing older. This is the only compatibility code the product ever carries, and it is deleted one release later (B§8).
 8. **Before launch there is no compatibility code at all.** There are no users to stay compatible with (B§8).

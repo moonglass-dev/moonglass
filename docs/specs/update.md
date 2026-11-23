@@ -34,7 +34,7 @@ Its maximum size is 1 KiB. Any other content, order, line, field or duplicate is
 - **The control plane** (hosted and self-hosted) fetches and verifies both pointers at start and then every 10 minutes, with the W7-6a verifier. A pointer that does not verify is ignored: the control plane offers nothing for that channel until a later poll succeeds.
 - It learns each agent's channel from a new `Heartbeat` field, `update_channel`, which W7-6d added and validates and W7-6e sets from `update.channel` in `agent.toml` (`docs/specs/container-policy.md`; ADR-0004). The agent maps the file's lower-case value to the upper-case wire value: `update.channel = "stable"` reports `STABLE`, `update.channel = "canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE`. The field is empty only from an agent built before W7-6e, and an agent that reports empty is never sent an `UpdateOffer`. Any other non-empty value is rejected. The field carries no `UNSPECIFIED` value; the zero value is empty. The control plane cannot change that file (ADR-0004 d5).
 - It sends an `UpdateOffer` only to an agent whose `agent_version` is older than its channel pointer's version, at most one offer per server per version per hour, and none for a version after that server reports `PASSED` or `REVERTED` for it. An offer's only field is `version` (§6), so it can name no URL, path, channel or older version.
-- **Hosted** (the server is started with `--release-org ORG_ID`, §8): offers follow the rollout state of §8.
+- **A managed fleet (v1)** (the server is started with `--release-org ORG_ID`, §8): offers follow the rollout state of §8. W7-6f builds only the self-hosted path below; §8 waits for managed control planes (the plan audit, `docs/review/plan-audit.md`, 2026-11-22).
 - **Self-hosted** (no `--release-org`): every connected agent on the channel is offered the pointer's version at once, with no percentage rollout, no rollout rows and no halt of ADR-0007 d3 (ADR-0007 d5). The criteria of §8 do not apply.
 - **The control plane never replaces itself** (ADR-0007 d5, TM §8). The operator updates `moonglass server` and the CLI by running the signed install (`docs/specs/install.md`).
 
@@ -294,6 +294,8 @@ The agent and the running proxy are never on different config shapes, because no
 This is the short, announced, drained restart of `docs/specs/proxy.md`. ADR-0001 open question 1 stays open, there is no second proxy process, and no socket activation is built.
 
 ## 8. Rollout state on the control plane
+
+_Deferred to v1, with managed control planes (the plan audit, `docs/review/plan-audit.md`, 2026-11-22)._
 
 This section is hosted only: it runs when `moonglass server` is started with `--release-org ORG_ID`. Every row carries `org_id` set to that org, under RLS (ADR-0002 d1; TM B2), so no lookup table is added. Without `--release-org` the server runs the self-hosted behaviour of §1 and stores no rollout rows.
 

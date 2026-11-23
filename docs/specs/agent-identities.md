@@ -2,6 +2,8 @@
 
 **Status: Approved** by the owner on 2026-11-18 (week 5 preflight). The registry operations, the `Spec` fields, the tables and the audit hash below are contracts (ADR-0006 decision 9, ADR-0002). The owner decisions are listed at the end.
 
+**At launch** (the plan audit, `docs/review/plan-audit.md`, 2026-11-22): W5-1a, W5-1b, W5-1c and W5-1 are built, as the way a token gets scopes and as the authz-matrix suite. Approvals (W5-2) and MCP (W5-4) are v1. Until W5-2, a destructive call by an agent identity gets `ErrPendingApproval`, and nothing can approve it, so it never runs.
+
 What W5-1a, W5-1b, W5-1c and W5-1 build, per ADR-0005 decision 8 and ADR-0006 decision 3 as amended by this preflight. It builds on `docs/specs/auth.md` (W4-1: sessions, `StepUp`, the `step_up_required` answer), which is why W5-1a depends on W4-1.
 
 ## Which ticket builds what

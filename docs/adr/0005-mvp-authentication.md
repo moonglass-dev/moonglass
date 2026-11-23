@@ -1,7 +1,7 @@
 # ADR-0005: MVP authentication
 
 - **Status:** Accepted
-- **Date:** 2026-11-16, amended 2026-11-18 (decisions 1, 3, 4, 5 and 6: GitHub and Google on hosted, no email in the MVP, step-up approves one request; `docs/specs/auth.md`)
+- **Date:** 2026-11-16, amended 2026-11-18 (decisions 1, 3, 4, 5 and 6: GitHub and Google on hosted, no email in the MVP, step-up approves one request; `docs/specs/auth.md`), amended 2026-11-22 (decisions 1, 2 and 3, open question 2: there is no hosted service at launch, so sign-in is GitHub on the self-hosted box, the login link is for the first sign-in and emergencies, and Google is v1; the plan audit, `docs/review/plan-audit.md`; the owner approves on its PR)
 
 ## Context
 
@@ -9,13 +9,13 @@ The eight weeks were too full, so passkeys and TOTP moved to v1 (S revision 3, M
 
 ## Decision
 
-1. **Hosted: GitHub and Google sign-in** (amended 2026-11-18). No passwords and no email links in the MVP.
-2. **Self-hosted: a bootstrap token, then login links.**
-   - The first admin is created with a one-time bootstrap token printed in the terminal. There is never an open registration window.
-   - Day-to-day sign-in uses `moonglass server login-link`, which prints a one-time link on the box. Access to the server is the credential.
-   - GitHub sign-in reuses the GitHub App created for git sources.
-   - There is no email or Google sign-in on self-hosted in the MVP, so there is no SMTP and no Google client to configure.
-3. **Step-up.** Three separate things each require a sign-in fresher than ten minutes, checked on the server at the moment of approval: approving a protected deploy, approving a destructive operation, and changing secret recipients (ADR-0006 decision 4). `secrets reveal` requires it too (ADR-0003). On hosted, the fresh sign-in is a new GitHub or Google round trip. On self-hosted it is a fresh `moonglass server login-link`: access to the server stays the credential, and GitHub is never required for an approval.
+1. **GitHub sign-in** (amended 2026-11-22). No passwords and no email links in the MVP. There is no hosted service at launch; Google sign-in arrives with managed control planes (v1, W4-1b).
+2. **The control plane runs on the user's box: a bootstrap token, then GitHub** (amended 2026-11-22).
+   - The first admin is created with a one-time bootstrap token printed in the terminal, and `moonglass server --print-owner-link` links their first identity. There is never an open registration window.
+   - Day-to-day sign-in is GitHub, through a GitHub OAuth App the operator configures with the `MOONGLASS_GITHUB_*` variables (`docs/specs/auth.md`). It is not the GitHub App of W4-10.
+   - `moonglass server login-link` prints a one-time link on the box for emergencies: GitHub is down, or the OAuth App is not set up yet. Access to the server is the credential.
+   - There is no email or Google sign-in in the MVP, so there is no SMTP and no Google client to configure.
+3. **Step-up.** Separate things each require a sign-in fresher than ten minutes, checked on the server at the moment of approval: changing secret recipients, minting a token, a purge, and from v1 approving a protected deploy or a destructive operation (ADR-0006 decision 4). `secrets reveal` requires it too when it ships (ADR-0003). The fresh sign-in is a new GitHub round trip, or a fresh `moonglass server login-link`, so GitHub is never required for a step-up.
    - **A step-up approves one request** (amended 2026-11-18). It is a fresh round trip, then an Approve press on a page that shows the request. It is single use and lasts ten minutes. It is bound to the user, the credential that asked, the operation, its target and a digest of its inputs. A fresh sign-in alone never unlocks other calls. Neither provider can force a password to be typed again, so the Approve press on a page that states the request is what shows a person is present (`docs/specs/auth.md`).
 4. **Lifetimes.** All one-time tokens fail on replay.
 
@@ -43,17 +43,18 @@ The eight weeks were too full, so passkeys and TOTP moved to v1 (S revision 3, M
 ## Consequences
 
 - A GitHub sign-in is usually two-factor, because GitHub requires 2FA for most active developer accounts. A Google sign-in is two-factor when the account has 2-Step Verification on. MFA depends on the provider until v1 (S§2).
-- Hosted sign-in needs a GitHub or Google account. That fits people who deploy from git.
+- Everyday sign-in needs a GitHub account and an OAuth App on the operator's side. That fits people who deploy from git.
 - A step-up page in the person's browser is out of band from the coding agent, which is the point of step-up (S§3.10).
-- Self-hosted needs no SMTP and no OAuth app to reach a first sign-in.
-- `internal/auth` is trusted core (B§3). W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build hosted sign-in and the step-up primitive; W7-1 builds the self-hosted path.
+- Reaching the first sign-in needs no SMTP and no OAuth app: the owner link and the login link are printed on the box.
+- `internal/auth` is trusted core (B§3). W4-1a, W4-1d, W4-1e, W4-1f, W4-1c and W4-1 build GitHub sign-in and the step-up primitive; W7-1 builds the bootstrap token and the login link; W4-1b (Google) is v1.
 
 ## Alternatives rejected
 
 - **Passwords:** none anywhere (S§3.10).
 - **An open first-admin registration window on self-hosted:** the takeover described in the context.
 - **Passkeys and TOTP in the MVP:** moved to v1 to fit eight weeks (S revision 3).
-- **GitHub as the self-hosted step-up:** it would make the GitHub App a requirement for approvals.
+- **GitHub as the only self-hosted step-up:** it would make GitHub a requirement for approvals, so a fresh login link also completes a step-up.
+- **The login link as the everyday self-hosted sign-in** (the 2026-11-16 decision, withdrawn 2026-11-22): every sign-in and every step-up would need a shell on the box, which contradicts the claim that day-to-day work needs no SSH (V§1).
 - **Linking accounts by matching email:** whoever controls an inbox would take over a GitHub user.
 - **Capability tokens with offline verification:** elegant, but they add a policy language users must learn (S§3.10).
 - **A slow password hash for tokens:** no benefit at 256 bits of entropy.
@@ -62,7 +63,7 @@ The eight weeks were too full, so passkeys and TOTP moved to v1 (S revision 3, M
 ## Open questions
 
 1. ~~Which email provider sends hosted mail.~~ Closed 2026-11-18: the MVP sends no email (decision 5).
-2. **Sign-up on hosted.** W4-1 refuses an identity that is not linked to a user. Whether a first sign-in creates a user and an org on hosted is decided with W7-1's hosted and self-hosted modes, before the alpha opens at G5.
+2. ~~Sign-up on hosted.~~ Closed 2026-11-22: there is no hosted service at launch, and no open sign-up anywhere. W4-1 refuses an identity that is not linked to a user; members are added through the commercial module (V§5.1).
 
 ## Links
 

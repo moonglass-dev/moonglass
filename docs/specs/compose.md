@@ -2,6 +2,8 @@
 
 This is the behaviour spec for Compose import and reconcile (W6-4, built as W6-4a, W6-4b, W6-4c and W6-4). It turns the supported field subset, change detection, the pre-confirm list and apply order into behaviour those tickets can name acceptance tests against. The owner approved the first version on 2026-11-18 and the decisions below on 2026-11-19 (week 6).
 
+**Deferred to v1** (the plan audit, `docs/review/plan-audit.md`, 2026-11-22). Before W6-4a is built, change three rules so real Compose files can pass: a changed service with a named volume stops and then starts, with the UI listing it before you confirm, instead of being refused; a `networks` key that only names the project's own networks is accepted and mapped onto the project network; and the bind-mount refusal names the `agent.toml` block that would allow the mount. Survey 30 popular files (W6-5) against the result before building.
+
 ## Which ticket builds what
 
 | Ticket | Builds |

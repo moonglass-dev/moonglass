@@ -2,6 +2,8 @@
 
 What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005 as amended on 2026-11-18. The owner approved this spec on 2026-11-18, including the registry operations, the tables and the step-up rules below, which are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1.
 
+**At launch** (ADR-0005 as amended by the plan audit, `docs/review/plan-audit.md`, 2026-11-22): sign-in is GitHub on the user's own box, with `server login-link` for the first sign-in and emergencies. Google (W4-1b) is v1. Until it lands, every place below that names Google shows or accepts GitHub only, and the Google variables are not read.
+
 ## Which ticket builds what
 
 | Ticket | Builds |
@@ -16,8 +18,8 @@ What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005 as am
 
 ## Decisions in short
 
-- **Hosted sign-in is GitHub or Google.** There are no passwords and no email links in the MVP, so there is no email provider (ADR-0005 decisions 1 and 5).
-- **No sign-up in W4-1.** An identity that is not linked to a user is refused. A user gets their first identity from `moonglass server --print-owner-link` on the box, or from `identities.link`. Open sign-up on hosted is decided with W7-1's hosted and self-hosted modes.
+- **Sign-in is GitHub** (Google in v1). There are no passwords and no email links in the MVP, so there is no email provider (ADR-0005 decisions 1 and 5).
+- **No sign-up in W4-1.** An identity that is not linked to a user is refused. A user gets their first identity from `moonglass server --print-owner-link` on the box, or from `identities.link`. There is no open sign-up (ADR-0005 open question 2, closed 2026-11-22); members are added through the commercial module.
 - **A step-up approves one exact request.** It is not a "recently signed in" flag on the user. The person does a fresh provider round trip, then presses Approve on a page that shows the request. The approval is single use, lasts 10 minutes, and is bound to one user, one credential, one operation, one target and one digest of the inputs.
 - **The control plane keeps no provider token.** The provider's access token is used once to learn the subject and then dropped.
 - **Standard library only.** OAuth 2.0 with PKCE over `net/http`, and `http.CrossOriginProtection` for cross-site requests. Nothing here needs a new module.

@@ -2,6 +2,8 @@
 
 _W0-2 · Revised 2026-11-19 · Sources: `docs/plan/stack.md` (S§), `vision.md` (V§), `milestones.md` (M§), `build-plan.md` (B§). Working spec for routes, layout, keyboard model, tokens, components, motion, live-data split and budgets. The owner accepted the routes, keyboard model, live-data split and budgets on 2026-11-16, and on 2026-11-19 adopted the 2-pane inset canvas, the motion cut, contrast-checked tokens and a distinct "Waiting for approval" treatment. Open product choices are in §13._
 
+**At launch** (the plan audit, `docs/review/plan-audit.md`, 2026-11-22): approvals (W5-2), the audit page (W5-5), protected environments (W4-2) and browser secret entry (W4-5) are v1. Their routes, navigation items, components and states stay in this spec and are not built before then. Secrets show names only. A database's service screen has a Restore button (W6-3).
+
 The stack is fixed by S§3.16: Svelte 5, SvelteKit in static mode, Tailwind and Bits UI, compiled to static files and embedded in the Go binary. The UI is calm, tight, fast and quiet (V§1.2). It borrows Linear's discipline — a recessed sidebar framing an inset rounded canvas, flat hairlines, generous whitespace on resource pages, and keyboard-first flow — while keeping Moonglass's own palette, glass orb mark, typography and deploy workflows.
 
 ## 1. Principles
@@ -20,12 +22,12 @@ The hierarchy is organisation → projects → environments → services → dep
 
 | Route | Shows |
 |---|---|
-| `/sign-in` | GitHub and Google on hosted; GitHub and the login-link instruction on self-hosted (ADR-0005, `docs/specs/auth.md`) |
+| `/sign-in` | GitHub, and the login-link instruction for emergencies (ADR-0005, `docs/specs/auth.md`); Google in v1 |
 | `/{org}` | Redirects to `/{org}/projects` |
 | `/{org}/projects` | Project list |
 | `/{org}/projects/{project}` | A project: its environments and services |
 | `/{org}/projects/{project}/{env}` | An environment: services, what is live, protected flag, secrets (names only), deleted services (W5-7, `docs/specs/delete.md`) |
-| `/{org}/projects/{project}/{env}/{service}` | A service: current release, deploy history, logs, current usage, settings |
+| `/{org}/projects/{project}/{env}/{service}` | A service: current release, deploy history, logs, current usage, settings; for a database, its backups and Restore (W6-3) |
 | `/{org}/projects/{project}/{env}/{service}/deploys/{deploy}` | One deploy: steps, logs, diff, rollback |
 | `/{org}/servers` and `/{org}/servers/{server}` | Servers: online state, key fingerprint, disk, what runs there |
 | `/{org}/approvals` and `/{org}/approvals/{approval}` | Pending and past approvals, each with its diff |
@@ -261,8 +263,8 @@ Every interactive component has default, hover, active, focus, disabled and load
 - A sanitizer rejection names the field and shows the `agent.toml` lines that would allow it (S§3.2).
 - After a server is removed, the UI lists the values to rotate at their source (S§3.11).
 - Once a quarter the UI asks for a recovery-key check, and it states the cost of losing the key in plain words (S§3.11).
-- A new server's enrolment into an unprotected environment is confirmed with step-up (S§3.11).
-- Creating an environment shows the `moonglass` CLI command that creates it; the UI cannot make its keys (ADR-0003). An org's first environment shows as protected from the start (ADR-0006).
+- A new server receives an environment's key only from the owner's CLI (`secrets grant`, with step-up); confirming an enrolment in the UI for `RewrapEnvKey` is v1 (S§3.11).
+- Creating an environment shows the `moonglass` CLI command that creates it; the UI cannot make its keys (ADR-0003). Environments start unprotected; protecting one is v1 (ADR-0006).
 
 ## 7. Motion
 

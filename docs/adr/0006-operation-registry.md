@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
-- **Amended:** 2026-11-18, decision 3 (week 5 preflight, owner decisions D28 to D31, `docs/specs/agent-identities.md`)
+- **Amended:** 2026-11-18, decision 3 (week 5 preflight, owner decisions D28 to D31, `docs/specs/agent-identities.md`); 2026-11-22, decisions 4 and 8 (the plan audit, `docs/review/plan-audit.md`; the owner approves on its PR): approvals and protected environments are v1, and MCP is v1
 
 ## Context
 
@@ -18,13 +18,13 @@ Moonglass offers the same operations to people, scripts and coding agents. If RE
    - **Gates.** The three gates below pass.
    - **Agent identities** (2026-11-18). Every operation also declares its target level (org, project or environment) and whether an agent identity may call it at all, with no default for either. An operation that manages credentials, sign-in, approvals, key material or the protected flag, and every step-up operation, is not callable by agents. An agent identity's token acts with its owning human's current role, capped at admin, so owner-only operations are never an agent's.
 4. **Three separate gates,** none a substitute for another. Each needs a sign-in fresher than ten minutes, checked on the server at the moment of approval (S§3.10, ADR-0005):
-   - **`destructive`:** the operation deletes, irreversibly replaces or stops a service, a release, a volume or stored data. Deploy and rollback are not destructive. Called by an agent identity, it returns "pending approval" with a link; a human approves in the UI or with `moonglass approve` (S§3.12).
-   - **Protected-environment deploy:** any deploy or source change in a protected environment needs a human approval, whoever asks. No role skips it. An org's first environment starts protected and uses the plan's allowance (one on Free, V§5.3); later environments start unprotected until someone switches them on. The first-deploy wizard (W7-7) asks the same question and never overrides a flag already set.
+   - **`destructive`:** the operation deletes, irreversibly replaces or stops a service, a release, a volume or stored data. Deploy and rollback are not destructive. Called by an agent identity, it returns "pending approval" with a link; from v1 a human approves in the UI or with `moonglass approve` (W5-2, S§3.12). Until then nothing can approve it, so the call does not run.
+   - **Protected-environment deploy (v1, W4-2 and W5-2, part of Team, V§5.1):** any deploy or source change in a protected environment needs a human approval, whoever asks. No role skips it. Environments start unprotected until someone switches them on; there is no plan allowance. At launch no environment is protected.
    - **Secret-recipient change:** granting, rotating or removing a server from an environment key is owner-only.
 5. **Audit events are written by the registry, never by handlers.** They are hash-chained and record which human or agent identity acted (B W2-1, S§3.10).
 6. **Routes that are not operations** (the Moonglass agent's WebSocket, the sign-in callback, the identity-link, step-up and login-link pages, server-sent event streams, the static UI) are one short fixed list in one file beside the registry. Each entry states its path, method and authorisation. A test asserts every mounted route is an operation or on that list, and that each entry's authorisation holds.
 7. **Local-only CLI commands** (`version`, `keys init`, `agent enroll`, `server login-link`) are one list beside the registry, each stating what it touches. They are not in REST, MCP or the palette. A test asserts every subcommand is generated or on that list.
-8. **The registry lands in week 2 (W2-1),** so the API is never written twice. Week 5 adds MCP and scoped agent tokens to it (B§6, M§3 week 2). The ⌘K palette lists its operations (S§3.16, B W2-S).
+8. **The registry lands in week 2 (W2-1),** so the API is never written twice. Week 5 adds scoped agent tokens to it; MCP is v1 (W5-4; B§3, B§7). The ⌘K palette lists its operations (S§3.16, B W2-S).
 9. **Registry operations are a contract.** Changing one needs an approved amendment and one ticket that updates every user (B§8).
 
 ## Consequences
