@@ -76,7 +76,7 @@ A fix brief says `fix: existing branch p/<ID>` and lists each finding as `file:l
 
 ## Needs owner
 
-When the planner or reviewer says only the owner can decide, take their proposal (the ADR amendment, spec text or `go.mod` line) with the options and recommendation, put them in the PR body, and open it with `scripts/plan pr <ID> --body-file <file> --needs-owner`. That parks it as a draft labelled `needs-owner` that holds no slot. Carry on with other tickets. When the owner removes the label, read their comments on the PR and continue the ticket on that branch, starting again with an Opus plan.
+When the planner or reviewer says only the owner can decide, take their proposal (the ADR change, spec text or `go.mod` line) with the options and recommendation, put them in the PR body, and open it with `scripts/plan pr <ID> --body-file <file> --needs-owner`. That parks it as a draft labelled `needs-owner` that holds no slot. Carry on with other tickets. When the owner removes the label, read their comments on the PR and continue the ticket on that branch, starting again with an Opus plan.
 
 ## Old pipeline branches
 

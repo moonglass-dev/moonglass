@@ -37,7 +37,7 @@ The server side is authoritative for runtime: routing and certificates must keep
 
 ## Open questions
 
-Left open on purpose. SPIKE-1 closes all three in this ADR (B§6, M§2.2); nothing else decides them.
+Left open on purpose. SPIKE-1 closes all three in this ADR (B§3, M§2.2); nothing else decides them.
 
 1. **Proxy upgrade mechanism:** systemd socket activation or `SO_REUSEPORT`. Whether Caddy 2.11.9 accepts inherited listeners cleanly is unverified (S§3.3). The spike picks exactly one and the other is never built. If neither upgrades under load with zero failed requests, a proxy upgrade is a short, announced, drained restart, and the docs say so.
 2. **Measured memory** of each process, replacing the estimates above.
@@ -47,5 +47,5 @@ Left open on purpose. SPIKE-1 closes all three in this ADR (B§6, M§2.2); nothi
 
 - S rules 1 and 2, S§1, S§3.3, S§3.4, S§3.6, S§6, S§9
 - M§2.2 experiment 2, M§3 week 1
-- B§6: SPIKE-1, W1-5, W1-6
+- B§3: SPIKE-1, W1-5, W1-6
 - `docs/threat-model.md` §3, boundary B4

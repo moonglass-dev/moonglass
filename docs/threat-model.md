@@ -139,7 +139,7 @@ How exceptions are scoped:
 
 ## 7. Trusted core
 
-From `AGENTS.md`. Changes here get line-by-line review by the owner, and only one such ticket is in review at a time (B§3).
+From `AGENTS.md`. Changes here get line-by-line review by the owner, and only one such ticket is in review at a time (B§1).
 
 - `internal/protocol`
 - `internal/policy`
@@ -147,6 +147,8 @@ From `AGENTS.md`. Changes here get line-by-line review by the owner, and only on
 - `internal/auth`
 - `internal/store`
 - `internal/registry`
+- `internal/update`
+- `ui/src/lib/keys`, the dashboard's key module (ADR-0018)
 - `scripts/install`
 - `deploy/systemd`
 - release signing and self-update
@@ -163,10 +165,10 @@ From `AGENTS.md`. Changes here get line-by-line review by the owner, and only on
 
 ## 9. Reviewer checklist
 
-Ask every question of every diff. Report a finding with file:line, what breaks and a concrete failing scenario (B§7, T4).
+Ask every question of every diff. Report a finding with file:line, what breaks and a concrete failing scenario (`.agents/skills/review/SKILL.md`).
 
 **1. New protocol fields or messages**
-- Does the diff add or change anything in a `.proto` file? Was the contract change approved first (B§8)?
+- Does the diff add or change anything in a `.proto` file? Was the contract change approved first (B§4)?
 - Can any field carry a shell string, a host command line, a host path, or text the agent hands to a host program?
 - Does the agent check size, order and type before acting? Is there a protocol-abuse test, and a fuzz target for each new parser?
 - Could the message return plaintext or an unwrapped key to the control plane? Do agents still refuse `RewrapEnvKey` for protected environments, deciding from the key record they unwrapped themselves (`docs/specs/secrets.md`)?

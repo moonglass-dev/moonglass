@@ -80,5 +80,5 @@ bind_mounts = ["/proc:/host/proc:ro", "/sys:/host/sys:ro"]
 ## Links
 
 - S§2, S§3.1, S§3.2, S§3.5, S§3.13, S§4, S§7, S§9; V§1; M§6
-- B§6: W1-1, W2-3, W2-6, W3-4, W5-3a, W5-3, W6-1b, W6-4a, W6-4
+- B§3: W1-1, W2-3, W2-6, W3-4, W5-3a, W5-3, W6-1b, W6-4a, W6-4
 - `docs/threat-model.md` §6 and checklist item 2

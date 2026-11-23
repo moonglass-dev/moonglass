@@ -33,4 +33,4 @@ None.
 
 - `docs/plan/stack.md` §2, §3.11; ADR-0003
 - `docs/specs/secrets.md`
-- B§6: W3-1
+- B§3: W3-1

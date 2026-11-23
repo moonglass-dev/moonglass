@@ -1,6 +1,6 @@
 # Proxy process
 
-W1-5 embeds Caddy 2.11.9 as the Moonglass proxy process (`moonglass proxy`), per ADR-0001. SPIKE-1 is deferred; the ADR is used as written and the defaults below answer the still-open spike questions without deciding them. The Caddy dependency is ADR-0011.
+W1-5 embeds Caddy 2.11.9 as the Moonglass proxy process (`moonglass proxy`), per ADR-0001. SPIKE-1 decides the open questions of ADR-0001; the defaults below answer them without deciding them, and the ADR is used as written. The Caddy dependency is ADR-0011.
 
 ## Process and binary
 

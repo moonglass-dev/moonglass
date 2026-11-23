@@ -36,4 +36,4 @@ None. SPIKE-1's questions live in ADR-0001.
 - `docs/specs/proxy.md`
 - `docs/adr/0001-two-process-proxy.md`
 - `docs/threat-model.md` boundary B4
-- B§6: W1-5
+- B§3: W1-5

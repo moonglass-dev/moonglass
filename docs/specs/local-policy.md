@@ -20,7 +20,7 @@ W5-3 needs the command dispatcher (W2-10) and `BUILD` (W3-4), so it depends on b
 | Class | Rule | Command types |
 |---|---|---|
 | `delete` | The type is sent by a registry operation that is `Destructive: Yes` (ADR-0006 decision 4) | `STOP_APP` and `REMOVE_APP` (W5-5a, `docs/specs/delete.md`). Later: a database restore that replaces data (W6-3) and any volume removal |
-| `exec` | Runs a process in an existing container | None. Container exec is v1 (threat model §8) |
+| `exec` | Runs a process in an existing container | None until the container terminal (V1-10) adds its command type (threat model §8) |
 | none | Anything else | `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `BUILD`, `LOG_REQUEST` (W4-4); later `UPDATE_OFFER` (W7-6d) and the secret messages of W4-8, W3-3 and W4-9 |
 
 - Deploy, rollback and pre-deploy steps are not destructive (ADR-0006), so they are not `delete`, even though a pre-deploy step can run an irreversible migration.
@@ -119,14 +119,14 @@ func (p *Policy) CheckRepositorySource(repo string) error
 
 ## Not in W5-3
 
-Reporting the local policy to the control plane, so the UI can explain a refusal before it happens. Base-image checks. Exec, which is v1.
+Reporting the local policy to the control plane, so the UI can explain a refusal before it happens. Base-image checks. Exec, which the container terminal adds (V1-10).
 
 ## Decisions
 
 Each line is a choice no ADR or spec fixed.
 
 - **D43** A command type is `delete` when a destructive registry operation sends it; `STOP_APP` and `REMOVE_APP` are `delete`, and no other current type is. So `forbid = ["delete"]` refuses soft delete as well as purge (`docs/specs/delete.md`).
-- **D44** Forbidding `exec` is valid and does nothing until exec exists (v1); no stand-in type is added.
+- **D44** Forbidding `exec` is valid and does nothing until the container terminal exists (V1-10); no stand-in type is added.
 - **D45** A forbidden command is answered `REJECTED` with the fixed detail above, checked before anything else.
 - **D46** `registries` matches the normalised repository without tag or digest, with `docker.io` and `library/` filled in, `localhost` as a host and `index.docker.io` folded. The allow blocks share the normaliser, so `localhost/x` there means `localhost/x`.
 - **D47** Patterns must be in the normal form with a literal host, or the agent does not start; a pattern that silently matches nothing is worse than a refusal to start.

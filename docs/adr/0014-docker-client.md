@@ -39,4 +39,4 @@ None.
 - `docs/plan/stack.md` §1, §2, §3.2; `docs/plan/milestones.md` §7
 - `docs/specs/release.md` (executor), `docs/specs/build.md`, `docs/specs/disk.md`
 - `docs/threat-model.md` boundary B5
-- B§6: W2-3, W3-4, W3-6
+- B§3: W2-3, W3-4, W3-6

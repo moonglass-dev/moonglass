@@ -41,7 +41,7 @@ The agent has root-equivalent access to users' servers and updates itself. A bad
 The plan lists no rejected alternatives for releases. These follow from what it does say:
 
 - **One channel with no canary:** a bad release would reach every server at once (M§7).
-- **A wider compatibility window:** the plan allows exactly one (B§8).
+- **A wider compatibility window:** the plan allows exactly one (B§4).
 - **Agents that install without verifying a signature:** S§3.14 requires the check before anything is installed.
 - **Unsigned builds until W7-6:** M§2.1 requires the first agent binary to be signed.
 - **minisign:** cannot sign from a hardware token.

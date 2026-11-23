@@ -33,4 +33,4 @@ None.
 
 - ADR-0014
 - Drift review R-6, finding 2 (in git history)
-- B§6: FR6-2
+- B§3: FR6-2

@@ -39,4 +39,4 @@ None.
 - `docs/specs/container-policy.md`
 - `docs/adr/0004-container-spec-policy.md`
 - `docs/plan/stack.md` §2, §3.1, §3.2
-- B§6: W1-1; G1 in `docs/plan/build-plan.md`
+- B§3: W1-1; G1 in `docs/plan/build-plan.md`

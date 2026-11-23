@@ -55,7 +55,7 @@ Push-to-deploy from GitHub · Dockerfile, Railpack and Compose · PR previews ·
 
 ## Pricing
 
-**Free means free. Cloud costs less than a coffee.**
+**Free means every feature. Cloud starts at $4.**
 
 | | Free | Cloud | Business |
 |---|---|---|---|
@@ -94,4 +94,4 @@ Yes, in both directions, with `moonglass export` or the Export button. Your serv
 Moonglass never SSHes into your servers, never drops a request on deploy, keeps secrets encrypted end to end, and lets a person approve what a coding agent proposes. The comparison page credits what they do well.
 
 **What happens if I stop paying?**
-Your apps keep running and you can always export. A lapsed plan only stops new servers and members from being added.
+Your apps keep running and you can always export. A lapsed plan only stops new servers, projects and members from being added.

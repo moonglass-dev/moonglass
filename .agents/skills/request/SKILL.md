@@ -23,7 +23,7 @@ Read only the parts that apply, through the docs map in `AGENTS.md`: `docs/plan/
 - **Changes a decision written in a spec, the plan or the vision:** go on, and change that text in the same PR. Say what changed and why under `## Decisions`.
 - **Needs the owner** (a new dependency, a security decision, or a change to a contract or an ADR): write the proposed change with the options and your recommendation, and park it (`dispatch`, "Needs owner").
 - **Already covered** by an open build-plan ticket: run that ticket instead, and widen its brief if needed.
-- **Too big for one PR:** the first PR adds `FQ-<n>` ticket lines to `docs/plan/build-plan.md` §6 (low risk, reviewed and auto-merged like any PR). Then those tickets run through the normal loop.
+- **Too big for one PR:** the first PR adds `FQ-<n>` ticket lines to the end of the "Fixes and requests" list in `docs/plan/build-plan.md` §3 (low risk, reviewed and auto-merged like any PR). Then those tickets run through the normal loop.
 
 ## 3. Write the brief
 

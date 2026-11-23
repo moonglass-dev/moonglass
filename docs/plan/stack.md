@@ -18,7 +18,7 @@ Priorities, in order: security, performance, footprint, UX. One constraint shape
 
 - **The proxy is Go either way.** With Caddy serving every request, a Rust core buys no performance on the hot path.
 - **Go keeps a single executable.** Caddy is designed to be embedded in Go programs. The proxy role embeds it, and the agent role does not load it.
-- **Most of the domain is Go libraries:** Docker's client, Compose's parser, Caddy and its certificate engine, the reference implementation of age, the official MCP SDK. Rule 4 is usually "import it". The exception is Railpack (v1), which has no stable public Go API. We drive it through its CLI and BuildKit frontend.
+- **Most of the domain is Go libraries:** Docker's client, Compose's parser, Caddy and its certificate engine, the reference implementation of age, the official MCP SDK. Rule 4 is usually "import it". The exception is Railpack (LN-12), which has no stable public Go API. We drive it through its CLI and BuildKit frontend.
 - **You can read it.** With agents writing the code, a language you can skim and debug matters more than one with a stricter compiler.
 - **Cost:** a garbage-collected runtime, now paid twice (two processes, roughly 8 MB of baseline each), and no "written in Rust" badge. Komodo and Temps already hold that badge (R§3).
 

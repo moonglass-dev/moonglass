@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Ticket is one line of docs/plan/build-plan.md §3 or §6.
+// Ticket is one ticket line of docs/plan/build-plan.md §3.
 type Ticket struct {
 	ID     string
 	Title  string

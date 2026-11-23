@@ -59,4 +59,4 @@ None.
 ## Links
 
 - `docs/plan/stack.md` §3.16; `docs/specs/ui.md` §10, §11
-- B§6: W2-Sb, W2-Sc, W2-Sa, W2-S, W4-5, W4-6, W7-7
+- B§3: W2-Sb, W2-Sc, W2-Sa, W2-S, W4-5, W4-6, W7-7
