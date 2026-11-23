@@ -26,7 +26,7 @@ The hierarchy is organisation → projects → environments → services → dep
 | `/sign-in` | GitHub, Google, OpenID Connect and passkey buttons for the methods the operator set up, and the login-link instruction for emergencies (ADR-0005, `docs/specs/auth.md`) | W4-1f, W4-1b, V1-6, V1-7 |
 | `/first-run` | The first-run flow (§2.1) | W7-7, AL-2 |
 | `/{org}` | Redirects to `/{org}/inbox` once the Inbox exists, else `/{org}/projects` | W2-S, AL-1 |
-| `/{org}/inbox` | What needs this person: pending approvals with their diff inline, failed deploys, rollbacks and shadow-mode reports, servers offline, disk low, backups failed, billing notices | AL-1, LN-2, LN-7, W4-7 |
+| `/{org}/inbox` | What needs this person: pending approvals with their diff inline, failed deploys, rollbacks and shadow-mode reports, servers offline, disk low, backups failed, billing notices (trial ending, lapse, idle-pause warning, resume after idle pause) | AL-1, LN-2, LN-7, W4-7, W7-4 |
 | `/{org}/activity` | The audit trail: every operation, by person or coding agent, newest first | LN-8 |
 | `/{org}/servers` and `/{org}/servers/{server}` | Servers: online state, fingerprint, disk, usage, what runs there; Add server | W2-S, AL-3 |
 | `/{org}/agents` and `/{org}/agents/{agent}` | Coding agents: identities, their tokens and scopes, their deploys and approvals; the MCP address | LN-6 |
@@ -51,7 +51,7 @@ Every capability and the flow that does it. Each flow is driven from the keyboar
 | **Deploy and roll back** | Deployments tab, ⌘K | Deploy a commit or image; watch Pull, Health check, Switch traffic, Drain; Roll back to any kept release | AL-4 |
 | **Variables** | Variables tab | Set, replace and delete values, encrypted in the browser; Reveal with step-up; names only otherwise | W4-5, LN-11 |
 | **Environments and keys** | Project → New environment; Settings → Keys | Create an environment and its key in the browser, wrapped to the recovery key and the servers picked; rotate an environment key; rotate the recovery key; the quarterly recovery-key check | AL-2, LN-11 |
-| **Servers** | Servers → Add server | Show the enrolment token and install command (and, on Cloud, the new monthly price first), then the fingerprint once it enrols; grant it to environments by fingerprint or with the recovery key file; after removal, the values to rotate at their source | AL-3, LN-11 |
+| **Servers** | Servers → Add server | Show the enrolment token and install command (and, on Cloud, the new monthly price first: free for the first server, then $5 per extra), then the fingerprint once it enrols; grant it to environments by fingerprint or with the recovery key file; after removal, the values to rotate at their source | AL-3, LN-11, W7-4 |
 | **Approvals** | Inbox, Deployments tab | Read the diff inline; Approve with step-up, or Decline; protect an environment in its Settings tab; approver rules | LN-7, V1-8 |
 | **Coding agents** | Agents | Create an identity, mint a scoped token (shown once), revoke; copy the MCP address and a deploy-hook command | LN-6 |
 | **Members** | Settings → Members | Invite with a role, copy the link, change a role, remove; switch and create organisations | LN-4 |
@@ -67,7 +67,7 @@ Every capability and the flow that does it. Each flow is driven from the keyboar
 | **Upgrade** | Settings → About | See a newer release on the channel; Update; see the revert if the self-check fails | AL-5 |
 | **Import and export** | Settings → Organisation | Import from Coolify; export the control plane | W7-3, W7-2 |
 | **Container terminal** | A service's screen | A terminal into a running container, with step-up | V1-10 |
-| **Billing** | Settings → Billing (Cloud and Business only) | The plan, the servers counted, the next invoice, the card and invoices (`docs/specs/billing.md`) | W7-4 |
+| **Billing** | Settings → Billing (Cloud and Business only) | The plan, the founding term if any, the servers counted (one free, then $5 each extra), the next invoice, the card, invoices, idle-pause state if it applies, and the change and cancel buttons (`docs/specs/billing.md`) | W7-4 |
 
 ## 3. Layout
 
@@ -325,7 +325,8 @@ Every interactive component has default, hover, active, focus, disabled and load
 - Once a quarter the dashboard asks for a recovery-key check, and it states the cost of losing the key in plain words (S§3.11).
 - Granting a server an environment shows its fingerprint next to the one its enrolment printed, before the step-up (ADR-0003 decision 5).
 - Wherever a key or a secret is handled, one line states the limit of browser-side encryption and links the CLI command that does the same (§11).
-- On Cloud, adding a server states the new monthly price before the install command (`docs/specs/pricing.md`).
+- On Cloud, adding a server states the new monthly price before the install command (`docs/specs/pricing.md`). The first server is free ("This is your free server: $0.00 a month"). A later server names the new total ("This makes 3 servers: $10.00 a month from today").
+- On a free Cloud account, an Inbox item three days before an idle pause warns that the control plane will pause, and that signing in keeps it running. After a pause, the next login resumes the control plane; the Inbox records the resume (`docs/specs/billing.md`, "Idle pause"). A paused control plane cannot enrol a server or deploy until that login.
 
 ## 7. Motion
 
@@ -353,7 +354,7 @@ Live updates arrive over server-sent events (S§3.16, B W4-4).
 | The log stream | Settings, members, tokens, sessions |
 | Server online and offline, disk and usage | Variable names |
 | The runtime panel's numbers: requests, latency, error rate, CPU, memory | Deployment history older than the current deployment |
-| The Inbox: pending approvals, failures, offline servers, and the unread count | Chart history beyond the last hour (LN-19) |
+| The Inbox: pending approvals, failures, offline servers, billing notices, and the unread count | Chart history beyond the last hour (LN-19) |
 | Rollback and shadow-mode events | |
 
 Streams are authorised like any other read. When a stream reconnects, the dashboard fetches the current state again and does not assume it missed nothing.
