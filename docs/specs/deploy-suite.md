@@ -41,6 +41,6 @@ Owner decision of 2026-11-20 (the W2-7 blocker): the proxy runs on the host, as 
 
 - A CI job per Engine major, 25 to 29, on `ubuntu-22.04`. Docker 25 is published only for Ubuntu 22.04 (`jammy`), not 24.04 (`noble`), at download.docker.com (checked 2026-11-17).
 - Each job installs `docker-ce`, `docker-ce-cli`, `containerd.io` and `docker-buildx-plugin` at an exact version from Docker's apt repository, pinned in `ci.yml` (the newest patch of that major when W2-7 is built), then runs `make test-deploy`.
-- The main `ci` job keeps running `make ci` on `ubuntu-latest` with its own Docker.
-- **Owner action after W2-7 merges:** add the matrix job for Engine 29 as a required check in branch protection. The pipeline cannot change branch protection.
+- The matrix runs on every push to `main`, nightly, and on a pull request that changes `internal/deploy/`, `internal/build/`, `internal/agent/disk/`, `test/deploy/`, `go.mod`, `go.sum`, the `Makefile` or `ci.yml`. Every other pull request still runs this suite once, in `make test` on `ubuntu-latest` with the runner's Docker.
+- The required `ci` check needs the matrix: it fails when any Engine job fails, and passes a skipped matrix only on a pull request that does not touch those paths. No matrix job is a required check of its own.
 - When GitHub retires `ubuntu-22.04` runners, the Engine 25 job needs a new home. That is a plan decision, not a quiet removal.

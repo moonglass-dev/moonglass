@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "The seven named tests are in the right packages and would fail if the given socket path, mode 0660, effective gid, private inner socket, --admin-socket default, unit ownership, or the guarded groupadd were wrong. Existing-test edits stay inside the owner-allowed internal/proxy/proxy_test.go and memory_test.go and only move the socket to a short unique /tmp path and require mode 0660. TestAdminSocketModeAndGroup sets the setgid parent only when the process has another group, so a host with no extra group could still pass without Chown. The lifecycle_test.go hunk in the three-dot diff is the unrebased owner-allowance commit already on origin/main, not the test round."
-}

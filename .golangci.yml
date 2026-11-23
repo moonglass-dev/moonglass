@@ -8,7 +8,6 @@ linters:
     - errorlint
     - exhaustive
     - forbidigo
-    - godox
     - gosec
     - govet
     - ineffassign
@@ -160,12 +159,6 @@ linters:
         - pattern: ^log\.Print.*$
           pkg: ^log$
           msg: only cmd/ writes to the terminal
-    godox:
-      keywords:
-        - TODO
-        - FIXME
-        - XXX
-        - HACK
     govet:
       enable-all: true
     nolintlint:
@@ -191,22 +184,7 @@ linters:
         linters:
           - errcheck
         text: "rows.Close"
-      # Waiting on a done channel of errors in a locked W1-4 test.
-      - path: (internal/agent/connect_test|internal/server/agent_test)\.go
-        linters:
-          - errcheck
-        text: "Error return value is not checked"
-      # The pipeline tool runs fixed tools (git, gh, go, make, golangci-lint)
-      # without a shell and reads files inside its own checkout.
-      - path: ^tools/pipeline/
-        linters:
-          - gosec
-        text: "G204|G304|G702|G703"
-      - path: ^tools/pipeline/
-        linters:
-          - govet
-        text: "fieldalignment:"
-      # Exhaustive switch on protobuf MessageType in locked W2-10b tests.
+      # These tests switch on a subset of the protobuf MessageType values.
       - path: internal/agent/(dispatch|resend)_test\.go
         linters:
           - exhaustive
@@ -220,13 +198,6 @@ formatters:
   enable:
     - gofumpt
     - goimports
-  exclusions:
-    paths:
-      - internal/policy/compose_test.go
-      - internal/agent/connect_test.go
-      # Locked W2-1 tests that gofumpt would reformat.
-      - internal/cli/cli_test.go
-      - internal/store/tokens_audit_test.go
   settings:
     goimports:
       local-prefixes:

@@ -4,21 +4,44 @@ Moonglass is an open-source deploy platform for your own servers: zero-downtime 
 
 One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and the CLI. Config lives at `/etc/moonglass/agent.toml`, data at `/var/lib/moonglass`. Environment variables are `MOONGLASS_*`. The Go module is `moonglass.dev/moonglass`; the code is at `github.com/moonglass-dev/moonglass`. The product was renamed: never reintroduce the old working name.
 
+## How work happens
+
+One line starts it, in a T3 Code thread run by Opus with `.agents/dispatcher-prompt.md`:
+
+- `continue the build plan`: work through `docs/plan/build-plan.md`.
+- `Request: <description>`: any feature, bug or behaviour change in plain words (`.agents/skills/request/SKILL.md`).
+
+Per ticket: Opus plans it and writes a brief → a worker model writes the tests and code in its own worktree on `p/<ID>`, runs `make ci` and opens the PR → Opus reviews the diff → squash auto-merge when `ci` is green. Status comes from the plan and GitHub (`scripts/plan`); nothing about a ticket's progress is committed. The skills in `.agents/skills/` (mirrored at `.claude/skills/`) say who does what: `dispatch`, `request`, `implement`, `review`, `drift`.
+
+## Docs map: the sources of truth
+
+| What | Where |
+|---|---|
+| Why the product exists, who it is for, what it is not | `docs/plan/vision.md` |
+| Architecture and stack decisions (S§) | `docs/plan/stack.md` |
+| Milestones and weekly demos (M§) | `docs/plan/milestones.md` |
+| The ticket list, gates, change control, owner checklist (B§) | `docs/plan/build-plan.md` |
+| Market and competitor research | `docs/plan/research.md` |
+| Behaviour, one spec per area | `docs/specs/` |
+| Decisions, one ADR each, and the index | `docs/adr/` |
+| What every change is reviewed against | `docs/threat-model.md` |
+| UI routes, layout and tokens | `docs/specs/ui.md`, `docs/specs/ui-tokens.css` |
+
+When code and a spec disagree, the spec wins until a change updates both in the same PR. A decision that changes a contract or an ADR needs the owner first.
+
 ## Repo map
 
 | Path | What |
 |---|---|
 | `cmd/moonglass/` | The binary's entry point and role wiring |
-| `internal/<package>/` | Product code, one package per area: `agent`, `api`, `cli`, `deploy`, `keys`, `policy`, `protocol`, `proxy`, `registry`, `release`, `server`, `store`, `update`, and `installtest` (tests for `scripts/install`) and `releasetest` (tests for `.github/workflows/release.yml`) |
+| `internal/<package>/` | Product code, one package per area: `agent`, `api`, `cli`, `deploy`, `keys`, `policy`, `protocol`, `proxy`, `registry`, `release`, `server`, `store`, `update`; and `installtest` (tests for `scripts/install`) and `releasetest` (tests for `.github/workflows/release.yml` and the action pins in `ci.yml`) |
+| `test/deploy/` | The deploy-correctness suite against a real Docker Engine (`docs/specs/deploy-suite.md`) |
+| `ui/` | The SvelteKit UI (`docs/specs/ui.md`) |
 | `proto/` | Protocol `.proto` sources; generated Go is in `internal/protocol/agentv1/` |
-| `scripts/` | `install`, `measure-memory`, `fleet/`, and the pipeline wrappers `ticket-status`, `verify`, `ship` |
-| `tools/pipeline/` | The pipeline's deterministic logic, behind those wrappers |
+| `scripts/` | `install`, `measure-memory`, `fleet/`, and `plan` (workflow status and PR steps; logic in `tools/plan/`) |
 | `deploy/systemd/` | Hardened units |
 | `testdata/` | `tests.txt` (the list of every test) and shared fixtures |
-| `docs/plan/` | Research, vision, stack, milestones and `build-plan.md`, the ticket list |
-| `docs/specs/`, `docs/adr/`, `docs/threat-model.md` | Behaviour, decisions, and what every change is reviewed against |
-| `docs/tickets/` | One file per ticket (front matter holds its status) and `<ID>/` with its result files |
-| `docs/pipeline/` | How the ticket pipeline runs, and every agent prompt |
+| `.agents/` | The dispatcher prompt and the workflow skills |
 
 ## Commands
 
@@ -26,29 +49,31 @@ One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and th
 
 | Command | Does |
 |---|---|
-| `make ci` | The one gate: `fmt-check`, `mod-check`, `lint`, `proto-check`, `test`, `check-test-list`, `build-all` |
-| `make test` | Every test, uncached, shuffled, with the race detector; writes `coverage.out` |
+| `make ci` | The one gate: `fmt-check`, `mod-check`, `words-check`, `proto-check`, `lint`, `test`, `check-test-list`, `build-all` |
+| `make test` | Every test, with Go's test cache |
+| `make test-race` | Every test, uncached, shuffled, with the race detector; writes `coverage.out`. CI runs it on every push to `main` and nightly |
 | `make test-one PKG=./cmd/moonglass NAME=TestName` | One test |
 | `make fmt` | Apply gofumpt and goimports |
-| `make test-list` | Rewrite `testdata/tests.txt`. Run it after adding tests |
+| `make test-list` | Rewrite `testdata/tests.txt`. Run it after adding, renaming or removing tests |
 | `make generate` | Rewrite the generated REST and CLI from the registry |
 | `make proto` | Regenerate protocol Go from `proto/` |
 | `make build` / `make build-all` | Static binaries in `bin/` |
 | `make memory-budget` | The idle-memory test alone |
+| `scripts/plan` | Ticket status: done, open PRs, needs owner, ready, start next. `scripts/plan help` for the rest |
 
 ## Rules for every agent
 
-- **Never ask questions.** Decide from the files you were given. If you cannot finish, write `docs/tickets/<ID>/BLOCKED.md` with the reason on its first line, and stop.
-- **Allowed paths.** Change only the paths in your ticket's `allowed_paths`, plus the ticket's own docs and `testdata/tests.txt`. A directory entry covers everything under it.
-- **Protected paths** change only through a ticket whose `allowed_paths` names them at or below their own root: `.github/`, `.claude/`, `docs/adr/`, `docs/pipeline/`, `docs/plan/`, `tools/pipeline/`, `scripts/`, `proto/`, `*.proto`, `*.pb.go`, `Makefile`, `.golangci.yml`, `.gitignore`, `AGENTS.md`, `CLAUDE.md`, `docs/threat-model.md`, `go.mod`, `go.sum`.
-- **Banned words** in added lines outside docs: TODO, FIXME, XXX, HACK, fallback, legacy.
-- **Contracts** (`.proto` files, registry operations, the `agent.toml` schema, the storage schema) and ADRs change only after the owner approves. The plan step stops such a ticket as needs-human.
-- Only the pipeline scripts change a ticket's `status`, commit result files, push, open PRs or merge.
+- **Never ask questions.** Decide from the brief and the docs map, and write each default you chose under "Decisions" in the PR body. Only three things wait for the owner: a new dependency, an unsettled security decision, and a change to a contract or an ADR.
+- **Stay in scope.** Change what the brief names. Widen it only when the ticket cannot pass otherwise, and say why in the PR body.
+- **Contracts** (`.proto` files, registry operations, the `agent.toml` schema, the storage schema) and ADRs change only after the owner approves the change on a `needs-owner` PR.
+- **Identity.** Every commit is authored and committed as `Moonglass Team <team@moonglass.dev>`, with no `Co-authored-by` trailers. No personal names or usernames in anything committed. `gh` runs with `GH_CONFIG_DIR=~/.config/gh-moonglass-bot` and touches only `moonglass-dev/moonglass`.
+- **Banned words** outside docs: TODO, FIXME, XXX, HACK, fallback, legacy (`make words-check`).
+- Workers never push to `main`, merge, or turn on auto-merge. Opus does, after review.
 
 ## Definition of done
 
-- Every test named in the ticket exists, passes and is not skipped.
-- `make ci` is green, and `scripts/verify check <ID>` passes every gate.
+- Every acceptance test in the brief exists, passes and is not skipped.
+- `make ci` is green, and `ci` is green on the PR.
 - The spec is updated when behaviour changed.
 - No placeholders, no code for later tickets.
 
@@ -67,7 +92,7 @@ One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and th
 
 - Write the failing test first.
 - Table-driven tests, with failure messages that show the expected and actual values.
-- Never delete, skip, weaken or hard-code a test to get green. If an unrelated test fails, fix it properly or block.
+- Never delete, skip, weaken or hard-code a test to get green. If an unrelated test fails, fix it properly or report it.
 - Integration tests use a real Docker Engine, not mocks of its API. With no Engine they skip, except under `CI`, where they fail. Images are imported, not pulled (`docs/specs/deploy-suite.md`).
 - Tests are safe to run in two worktrees at once: ports from `:0`, temp directories, Docker resources labelled per run and removed afterwards.
 
@@ -82,7 +107,7 @@ One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and th
 
 ## Trusted core
 
-These paths are `risk: high`: named tests locked before code, Opus review always, and the owner reads every line.
+These paths are `risk: high`: exact acceptance tests in the brief, Opus writes or closely checks the subtle parts and always reviews, at most one in flight, and the owner reads every line after merge.
 
 `internal/protocol`, `internal/policy`, `internal/keys`, `internal/auth`, `internal/store`, `internal/registry`, `internal/update`, `scripts/install`, `deploy/systemd`, and release signing and self-update.
 

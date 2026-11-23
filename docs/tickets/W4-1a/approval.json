@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "All five named tests are in package store_test in internal/store/sessions_conformance_test.go; the diff adds only that file. SQLite and Postgres share runSessionsConformance and runAuditSessionColumnsConformance, with Postgres through the application role. The session suite asserts a 32-hex ID, UTC RFC3339 expiry, lookup before expiry, ErrNotFound for unknown/at/after expiry, foreign and unknown revoke, live-then-revoked plus a nil second revoke, ErrDuplicate on a repeated hash, and independent sessions. Audit columns round-trip set and empty SessionID/StepUpID and keep seq 1 with an empty PrevHash chained to later hashes. TestSessionStoredHashedOnly follows TestEnrolmentTokenStoredHashedOnly: hex SHA-256 stored, no plaintext or mg_ cell, other bearer ErrNotFound. They fail to compile because Session, AddSession, SessionByHash, RevokeSession, and AuditEvent.SessionID/StepUpID are not in the tree. Existing tests are untouched; Postgres skips only inside newPGEnv."
-}

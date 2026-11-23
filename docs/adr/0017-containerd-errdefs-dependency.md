@@ -32,5 +32,5 @@ None.
 ## Links
 
 - ADR-0014
-- `docs/reviews/R-6.md`, finding 2
+- Drift review R-6, finding 2 (in git history)
 - B§6: FR6-2

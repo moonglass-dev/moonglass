@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "All six named tests exist in the packages the ticket lists. They cover identity round-trip including 0600 modes, replacement, and leftover temp files; absent-dir saved==false with a still-empty directory; table-driven malformed identity plus LoadAgentSigningKey length and fs.ErrNotExist; pin round-trip, rejected 31- and 33-byte writes leaving the file unchanged, wrong-length load, and missing-file ErrNotExist; fingerprint content plus a missing-directory error that names the file; and a non-recursive scan of internal/agent that lists every leftover filename string. No existing test line changed. They do not compile yet, because WriteAgentIdentity, LoadAgentIdentity, LoadAgentSigningKey, WriteControlPlanePin, LoadControlPlanePin and WriteFingerprint are not in the tree."
-}

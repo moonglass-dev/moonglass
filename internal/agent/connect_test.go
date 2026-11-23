@@ -401,9 +401,15 @@ func TestReconnectBackoffWithJitter(t *testing.T) {
 			attempt int
 			max     time.Duration
 		}{
-			{0, 1 * time.Second}, {1, 2 * time.Second}, {2, 4 * time.Second},
-			{3, 8 * time.Second}, {4, 16 * time.Second}, {5, 30 * time.Second},
-			{6, 30 * time.Second}, {8, 30 * time.Second}, {40, 30 * time.Second},
+			{0, 1 * time.Second},
+			{1, 2 * time.Second},
+			{2, 4 * time.Second},
+			{3, 8 * time.Second},
+			{4, 16 * time.Second},
+			{5, 30 * time.Second},
+			{6, 30 * time.Second},
+			{8, 30 * time.Second},
+			{40, 30 * time.Second},
 		}
 		for _, tt := range tests {
 			r := seeded(1)
@@ -636,7 +642,10 @@ func runOnce(t *testing.T, dir, url string) {
 		done <- Connect(ctx, dir, url, ConnectOptions{Executor: idleExecutor{}, AgentVersion: testVersion, Sleep: sleep})
 	}()
 	select {
-	case <-done:
+	case err := <-done:
+		if err != nil {
+			t.Errorf("Connect: expected it to return nil after the first backoff sleep cancelled it, got %v", err)
+		}
 	case <-time.After(10 * time.Second):
 		t.Fatalf("Connect: expected one failed attempt and a return, still running after 10s")
 	}

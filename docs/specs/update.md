@@ -469,7 +469,7 @@ Every choice below is one no ADR or existing spec already fixes. One line each, 
 23. The publish job verifying with `scripts/install` and the upload order.
 24. The release origin behind `moonglass.dev/releases/` and its upload credential: decided 2026-11-18, the R2 bucket, the `aws s3 cp` upload and the secret pair of §9 "Release origin".
 25. Attestations on a private repository need GitHub Enterprise Cloud, or a public repository, before W7-6c can run: decided 2026-11-18, the repository is made public before the first release tag is pushed (§9 "Release origin").
-26. W7-6e's `allowed_paths` need `cmd/moonglass/`, `internal/registry/` (`LocalCommands` gains `agent update-gate` and `agent revert-check`) and `internal/proxy/`.
+26. W7-6e's paths need `cmd/moonglass/`, `internal/registry/` (`LocalCommands` gains `agent update-gate` and `agent revert-check`) and `internal/proxy/`.
 27. The offer checks run in the order of §1, so an older version is `NOT_NEWER` and another channel's version is `NOT_ON_CHANNEL`.
 28. `trial` is one JSON file with `"format": 1`, deleted at the first hour or on the next offer, and a re-sent offer is answered from it rather than from agent state.
 29. `NOT_CONNECTED` is recorded by the new agent when the pinned connection is still missing at the deadline; `DEADLINE` is the gate's reason when the new agent could not record one.

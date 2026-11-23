@@ -298,6 +298,8 @@ func parseStepsAt(t *testing.T, path, text, job string) []step {
 				s.uses = k.value
 			case "run":
 				s.run = k.value
+			case "if":
+				// A condition changes when a step runs, not what it pins.
 			case "with", "env":
 				m := s.with
 				if k.key == "env" {
@@ -313,7 +315,7 @@ func parseStepsAt(t *testing.T, path, text, job string) []step {
 					m[e.key] = e.value
 				}
 			default:
-				t.Fatalf("%s:%d: unknown step key %q, want one of name, uses, run, with, env", path, k.line, k.key)
+				t.Fatalf("%s:%d: unknown step key %q, want one of name, uses, run, if, with, env", path, k.line, k.key)
 			}
 		}
 		if s.uses == "" && s.run == "" {
@@ -896,7 +898,7 @@ func TestReleaseWorkflowUploadsToDraftRelease(t *testing.T) {
 func TestReleaseWorkflowPinsEveryAction(t *testing.T) {
 	text := workflowText(t)
 	root := parseWorkflow(t, workflowPath, text)
-	ciSteps := parseStepsAt(t, ciPath, readRepoFile(t, ciPath), "ci")
+	ciSteps := parseStepsAt(t, ciPath, readRepoFile(t, ciPath), "build")
 
 	usesNodes := findNodes(root, "uses")
 	if len(usesNodes) == 0 {
