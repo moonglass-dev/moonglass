@@ -21,7 +21,7 @@ Each ticket carries one risk label. It decides how much testing and review the w
 | **standard** | Deploy, agent runtime, proxy, server, API handlers, CLI, backups, import, UI with CSP | Named acceptance tests in the brief; Opus review | The test diff first, then error paths and anything touching Docker, the filesystem or the network |
 | **low** | Docs, UI screens, scripts, fixtures, benchmark, site | Tests when behaviour changes; Opus review | Skim |
 
-Tests and `make dev` must be safe to run in two worktrees at once: ports from `:0`, temp data directories, and Docker resources labelled per test run and cleaned up afterwards. Up to three tickets run at once, each in its own worktree.
+Tests must be safe to run in two worktrees at once: ports from `:0`, temp data directories, and Docker resources labelled per test run and cleaned up afterwards. Up to three tickets run at once, each in its own worktree, and at most one of them is high.
 
 ---
 

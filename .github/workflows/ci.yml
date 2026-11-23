@@ -130,6 +130,20 @@ jobs:
           echo "$AGE_SHA256  $tmp/age.tar.gz" | sha256sum -c -
           tar -xzf "$tmp/age.tar.gz" -C "$tmp"
           sudo install -m 0755 "$tmp/age/age" "$tmp/age/age-keygen" /usr/local/bin/
+      - name: Give each file an mtime derived from its content
+        if: matrix.mode == 'cached'
+        # Go's test cache checks the mtime of every file a test opens, and a
+        # fresh checkout makes every mtime new. A time taken from the blob hash
+        # is the same for the same content and changes when the content does.
+        run: |
+          python3 - <<'EOF'
+          import os, subprocess
+          out = subprocess.run(["git", "ls-files", "-s", "-z"], capture_output=True, check=True).stdout
+          for rec in filter(None, out.split(b"\0")):
+              meta, path = rec.split(b"\t", 1)
+              t = 946684800 + int(meta.split()[1][:7], 16)
+              os.utime(path, (t, t), follow_symlinks=False)
+          EOF
       - if: matrix.mode == 'cached'
         run: make test check-test-list
       - if: matrix.mode == 'race'

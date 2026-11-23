@@ -44,7 +44,7 @@ LIST_TESTS := set -o pipefail; go test -list . ./... | awk '\
 	/^(Test|Fuzz|Example)/ { names[n++] = $$1; next } \
 	$$1 == "ok" { for (i = 0; i < n; i++) print $$2, names[i]; n = 0 }' | LC_ALL=C sort
 
-.PHONY: build build-all fmt fmt-check lint test test-race test-one test-integration memory-budget test-list check-test-list words-check test-deploy generate proto proto-tools proto-check mod-check ci
+.PHONY: build build-all fmt fmt-check lint test test-race test-one memory-budget test-list check-test-list words-check test-deploy generate proto proto-tools proto-check mod-check ci
 .NOTPARALLEL:
 
 build:
@@ -88,11 +88,6 @@ test-one:
 # it too, as part of ./...
 test-deploy:
 	CGO_ENABLED=1 go test -race -count=1 ./test/deploy
-
-test-integration:
-	@test -n '$(PKG)' || { echo 'usage: make test-integration PKG=./internal/deploy' >&2; exit 2; }
-	@printf '%s' '$(PKG)' | grep -Eq '^\./[A-Za-z0-9_./-]*$$' || { echo 'PKG must be a relative package path starting with ./' >&2; exit 2; }
-	go test -count=1 -tags integration '$(PKG)'
 
 # Fails when idle agent + proxy RSS is above the 100 MiB ceiling (docs/specs/memory.md).
 # make test runs the same test; this target runs it alone.

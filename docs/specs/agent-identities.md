@@ -18,7 +18,7 @@ What W5-1a, W5-1b, W5-1c and W5-1 build, per ADR-0005 decision 8 and ADR-0006 de
 - **An agent identity belongs to one person**, who creates it. Its tokens act with that person's current role, never above admin.
 - **Some operations are never for agents.** Each operation declares `AgentCallable`. Credentials, sign-in, approvals, key and protection changes, and every step-up operation are `No`.
 - **Scope rows are checked when a token is minted.** A row that could never match, or that names an operation the identity may not call, is refused then, not discovered later.
-- **The authz matrix is a hand-written file of expected outcomes.** It is a test file, so it is locked before code, and a test fails when an operation has no rows.
+- **The authz matrix is a hand-written file of expected outcomes.** It is a test file, written before the code it checks, and a test fails when an operation has no rows.
 
 ## Agent identities
 
