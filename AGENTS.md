@@ -20,7 +20,7 @@ Per ticket: the dispatcher (Grok 4.6, Gemini fallback) picks the work and routes
 | Why the product exists, who it is for, what it is not | `docs/plan/vision.md` |
 | Architecture and stack decisions (S§) | `docs/plan/stack.md` |
 | Milestones and weekly demos (M§) | `docs/plan/milestones.md` |
-| The ticket list, gates, change control, owner checklist (B§) | `docs/plan/build-plan.md` |
+| The ticket list, gates, change control, owner checklist and GitHub settings (B§) | `docs/plan/build-plan.md` |
 | Market and competitor research | `docs/plan/research.md` |
 | Behaviour, one spec per area | `docs/specs/` |
 | Decisions, one ADR each, and the index | `docs/adr/` |

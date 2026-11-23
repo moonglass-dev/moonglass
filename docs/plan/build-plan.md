@@ -259,6 +259,26 @@ Things only you can do.
 - [ ] Decide W1-1 open questions 6 and 7: `pid` and `ipc` set to `container:` across projects, and a `service:` network mode inheriting host networking. Both stay denied until you decide.
 - [ ] Decide ADR-0002 open question 1: the managed Postgres provider and region. CI stays on `postgres:18`.
 
+### GitHub settings
+
+What this repo's workflow needs on `github.com/moonglass-dev/moonglass`. Confirm or change them at the pages below.
+
+**Settings → General → Pull Requests**
+- Allow auto-merge (on). The dispatcher turns it on for a PR after Opus approves, with `scripts/plan merge`.
+- Allow squash merging only (turn off merge commits and rebase merging).
+- Automatically delete head branches.
+
+**Settings → Rules / Branches** (ruleset or classic protection for `main`)
+- Require a pull request before merging.
+- Required approving reviews: 0. The bot is not an admin, so a required review would block every merge; Opus review is a PR comment, then the dispatcher squash-merges.
+- Required status checks: only the aggregate check named `ci`. Do not require `lint`, `test`, `build`, or any Engine job on its own.
+- Require branches to be up to date before merging: currently on. A PR that is behind `main` cannot merge until `main` is merged or rebased in.
+- Block force pushes and deletions of `main`.
+
+**Settings → Actions → General**
+- Workflow permissions: read-only default `GITHUB_TOKEN`. Writes to GitHub go through `GH_CONFIG_DIR=~/.config/gh-moonglass-bot`.
+- Require approval for GitHub Actions from first-time outside-collaborator fork pull requests.
+
 ---
 
 ## 6. Fix tickets
