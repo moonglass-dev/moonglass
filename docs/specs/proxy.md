@@ -1,10 +1,10 @@
 # Proxy process
 
-W1-5 embeds Caddy 2.11.9 as the Moonglass proxy process (`moonglass proxy`), per ADR-0001. SPIKE-1 is deferred; this ticket uses the ADR as written and the defaults below for the still-open spike questions. It does not amend those open questions as decided. The Caddy dependency is ADR-0011.
+W1-5 embeds Caddy 2.11.9 as the Moonglass proxy process (`moonglass proxy`), per ADR-0001. SPIKE-1 decides the open questions of ADR-0001; the defaults below answer them without deciding them, and the ADR is used as written. The Caddy dependency is ADR-0011.
 
 ## Process and binary
 
-`moonglass proxy --data-dir <dir> [--admin-socket <path>]` is a subcommand of the same static binary. It runs until SIGINT or SIGTERM, then stops Caddy. A missing or empty `--data-dir`, or an empty `--admin-socket`, prints the usage and exits 2. The code is `internal/proxy`; `cmd/moonglass` calls `proxy.Run` and does not import Caddy. depguard denies Caddy from `cmd/`, `internal/agent`, `internal/keys`, `internal/protocol` and `internal/policy`. CGO stays disabled. We do not fork or patch Caddy.
+`moonglass proxy --data-dir <dir> [--admin-socket <path>]` is a subcommand of the same static binary. It runs until SIGINT or SIGTERM, then stops Caddy. A missing or empty `--data-dir`, or an empty `--admin-socket`, prints the usage and exits 2. The code is `internal/proxy`; `cmd/moonglass` calls `proxy.Run` and does not import Caddy. depguard denies Caddy from `cmd/`, `internal/agent`, `internal/keys`, `internal/protocol` and `internal/policy`. CGO is disabled. We do not fork or patch Caddy.
 
 The proxy links only the Caddy packages it serves with: the http app with `reverse_proxy`, the tls and pki apps, file-system storage and logging. It never touches Docker.
 
@@ -46,7 +46,7 @@ The upstream for that test route is a localhost test handler; tests pull no Dock
 
 ## Defaults for ADR-0001 open questions (do not close the ADR)
 
-- **Upgrade mechanism:** out of scope. No systemd socket activation and no `SO_REUSEPORT`. Until SPIKE-1 picks one, a proxy upgrade is a short, announced, drained restart (the fallback the ADR already names), as ADR-0011 records.
+- **Upgrade mechanism:** out of scope. No systemd socket activation and no `SO_REUSEPORT`. Until SPIKE-1 picks one, a proxy upgrade is a short, announced, drained restart, as ADR-0011 records.
 - **Measured memory:** out of scope (W1-7). No long-running memory jobs and no new CI images.
 - **Two processes during handover vs the 100 MB ceiling:** not applicable until a handover is implemented.
 

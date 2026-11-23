@@ -1,6 +1,6 @@
 # Moonglass
 
-Moonglass is an open-source deploy platform for your own servers: zero-downtime deploys, one-click restores, nothing to SSH into, in under 100 MB. A control plane coordinates; a small agent and proxy on each server do the work and keep running without it.
+Moonglass is an open-source deploy platform for your own servers: zero-downtime deploys, one-click restores, a control plane that never SSHes into your servers, in under 100 MB. A control plane coordinates; a small agent and proxy on each server do the work and keep running without it.
 
 One static binary, `moonglass`, with the roles `server`, `agent`, `proxy` and the CLI. Config lives at `/etc/moonglass/agent.toml`, data at `/var/lib/moonglass`. Environment variables are `MOONGLASS_*`. The Go module is `moonglass.dev/moonglass`; the code is at `github.com/moonglass-dev/moonglass`. The product was renamed: never reintroduce the old working name.
 
@@ -19,13 +19,15 @@ Per ticket: the dispatcher (Grok 4.6, Gemini fallback) picks the work and routes
 |---|---|
 | Why the product exists, who it is for, what it is not | `docs/plan/vision.md` |
 | Architecture and stack decisions (S§) | `docs/plan/stack.md` |
-| Milestones and weekly demos (M§) | `docs/plan/milestones.md` |
-| The ticket list, gates, change control, owner checklist and GitHub settings (B§) | `docs/plan/build-plan.md` |
+| Milestones (alpha, launch, v1) and their demos (M§) | `docs/plan/milestones.md` |
+| The ticket list in build order, gates, change control, owner checklist and GitHub settings (B§) | `docs/plan/build-plan.md` |
+| Plans, prices and billing | `docs/specs/pricing.md`, `docs/specs/billing.md` |
+| The public copy for moonglass.dev | `docs/plan/landing.md` |
 | Market and competitor research | `docs/plan/research.md` |
 | Behaviour, one spec per area | `docs/specs/` |
 | Decisions, one ADR each, and the index | `docs/adr/` |
 | What every change is reviewed against | `docs/threat-model.md` |
-| UI routes, layout and tokens | `docs/specs/ui.md`, `docs/specs/ui-tokens.css` |
+| Dashboard routes, flows, layout and tokens | `docs/specs/ui.md`, `docs/specs/ui-tokens.css` |
 
 When code and a spec disagree, the spec wins until a change updates both in the same PR. A decision that changes a contract or an ADR needs the owner first.
 
@@ -75,6 +77,7 @@ When code and a spec disagree, the spec wins until a change updates both in the 
 - Every acceptance test in the brief exists, passes and is not skipped.
 - `make ci` is green, and `ci` is green on the PR.
 - The spec is updated when behaviour changed.
+- A capability is done only when its dashboard flow ships (`docs/specs/ui.md` §2.1); a ticket without its flow names the ticket that ships it. Nothing is CLI-only.
 - No placeholders, no code for later tickets.
 
 ## Engineering rules
@@ -109,7 +112,7 @@ When code and a spec disagree, the spec wins until a change updates both in the 
 
 These paths are `risk: high`: exact acceptance tests in the brief, Opus writes or closely checks the subtle parts and always reviews, at most one in flight, and the owner reads every line after merge.
 
-`internal/protocol`, `internal/policy`, `internal/keys`, `internal/auth`, `internal/store`, `internal/registry`, `internal/update`, `scripts/install`, `deploy/systemd`, and release signing and self-update.
+`internal/protocol`, `internal/policy`, `internal/keys`, `internal/auth`, `internal/store`, `internal/registry`, `internal/update`, `ui/src/lib/keys` (the dashboard's key handling), `scripts/install`, `deploy/systemd`, and release signing and self-update.
 
 ## Gotchas
 

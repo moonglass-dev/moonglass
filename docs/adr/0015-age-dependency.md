@@ -2,7 +2,6 @@
 
 - Status: accepted
 - Date: 2026-11-17
-- Amended: 2026-11-17, decision 5 (owner decision D24, week 3 planning)
 
 ## Context
 
@@ -34,4 +33,4 @@ None.
 
 - `docs/plan/stack.md` §2, §3.11; ADR-0003
 - `docs/specs/secrets.md`
-- B§6: W3-1
+- B§3: W3-1

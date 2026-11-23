@@ -87,7 +87,7 @@
 
   --sidebar-width: 220px;
   --sidebar-rail: 48px;
-  --inspector-width: 280px;
+  --runtime-panel-width: 280px;
   --canvas-margin: 8px;
   --canvas-radius: var(--radius-lg);
 }

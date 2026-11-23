@@ -1,6 +1,6 @@
 # Live logs and current usage
 
-The owner approved these messages on 2026-11-17. W4-4 builds them. The fields are `docs/specs/protocol.md`. What each side sends and accepts on the agent connection is `docs/specs/connection.md`.
+W4-4 builds these messages. The fields are `docs/specs/protocol.md`. What each side sends and accepts on the agent connection is `docs/specs/connection.md`.
 
 ## Messages
 

@@ -258,7 +258,7 @@ Sources: section 1 and 2 links, plus [Forge pricing](https://benjamincrozat.com/
 3. **"$49/org."** Unsupported by any comparable. Either the paid tier is a visibly different product, or the number comes down, or the meter changes.
 4. **"Nothing excluded" contradicts your own paid list.** The brief puts audit logs, SSO/SAML and unlimited users under Paid. Pick one story. My view: safety features (audit log, MFA, scoped tokens, approvals for one environment) free everywhere; coordination-at-scale features paid. Paywalling audit logs right after a year of control-plane breaches would read badly.
 5. **"Compute, builds, logs and backups run on the user's servers, so the free tier is cheap."** Cheaper, yes. The expensive parts of a free tier are abuse, support and being a breach target, and none of those move to the user's server.
-6. **Indie reputation first, then team revenue.** Agreed on order. But the indie pitch (tiny, safe, correct deploys) and the team pitch (agent guardrails, approvals) are different products in the buyer's head. The MVP has to pick the indie one and make sure the architecture does not block the team one.
+6. **Indie reputation first, then team revenue.** Agreed on order. But the indie pitch (tiny, safe, correct deploys) and the team pitch (agent guardrails, approvals) are different products in the buyer's head. The first release has to pick the indie one and make sure the architecture does not block the team one.
 7. **The must-have list.** Around 45 items, several of which Coolify took years to stabilise (backups, restores, Compose semantics). That is a phase 4 fight; flagging it now so it is not a surprise.
 
 ---

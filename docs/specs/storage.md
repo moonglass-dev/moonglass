@@ -1,68 +1,65 @@
 # Control-plane storage foundation
 
-W1-2 implements ADR-0002: one storage interface, two backends, one conformance suite. This spec is the behaviour the ticket builds. It does not change the ADR.
+W1-2 implements ADR-0002: one storage interface, one SQLite backend, one conformance suite. This spec is the behaviour the ticket builds. It does not change the ADR.
 
-## Backends
+**SQLite is the only backend** (ADR-0002). The control plane stores its data in one SQLite database, through `store/sqlite` and the pure-Go driver `modernc.org/sqlite`.
 
-- **Postgres** (hosted, CI): `store/pg`, driver `github.com/jackc/pgx/v5` at the version pinned in ADR-0010. CI runs `postgres:18` as a service (ADR-0002 decision 13). Tests that need Postgres read the URL from `MOONGLASS_TEST_POSTGRES`. When that variable is empty they skip, except when `CI` is set, in which case they fail: CI must provide the service.
-- **SQLite** (self-hosted): `store/sqlite`, driver `modernc.org/sqlite` at the version pinned in ADR-0010. Pure Go, no cgo. Every test that can run on SQLite does.
+## The backend
 
-Nothing outside `internal/store` writes SQL. `LISTEN/NOTIFY`, logical export, backups, and the agent's on-server SQLite are out of scope.
+`store/sqlite`, driver `modernc.org/sqlite` at the version pinned in ADR-0010. Pure Go, no cgo. Every test runs on it.
 
-## Roles and connections (Postgres)
-
-Migrations run as a role that owns the tables. The application connects as a different role that does not own the tables and cannot bypass RLS (`BYPASSRLS` must be false; `NOLOGIN` is not required for the test role, but the role must not be a superuser and must not own the tables). Tests using the CI superuser URL create these two roles (or equivalent disposable roles) themselves. SQLite has no roles; the same migrations still run.
+Nothing outside `internal/store` writes SQL. Backups, a logical export, and the agent's on-server SQLite are out of scope.
 
 ## Schema
 
-SQL stays in the common subset of Postgres and SQLite, except that RLS policies, the application role, and `SET app.org_id` live only in `store/pg`.
+SQL is SQLite's own dialect.
 
-Every table has `org_id`, except the lookup tables listed in one file in `internal/store` (ADR-0002 decision 12). The conformance suite asserts that list against the schema on both backends. A lookup row holds only: a lookup key, the IDs it maps to (`user_id`, `org_id`, the row's own ID), an expiry, and a revoked (or used) marker. Never a secret, a wrapped key, a plaintext token, scopes or names.
+Every table has `org_id`, except the lookup tables listed in one file in `internal/store` (ADR-0002 decision 9). The conformance suite asserts that list against the schema. A lookup row holds only: a lookup key, the IDs it maps to (`user_id`, `org_id`, the row's own ID), an expiry, and a revoked (or used) marker. Never a secret, a wrapped key, a plaintext token, scopes or names.
 
 ### Lookup tables
 
 - `user_identities` — lookup key is an external identity (a single string such as `provider:subject`). Maps to `user_id`.
-- `user_orgs` — lookup key is `user_id`. Maps to `org_id`. One row per org the user belongs to. This is how a request finds the caller's orgs before `app.org_id` is set.
+- `user_orgs` — lookup key is `user_id`. Maps to `org_id`. One row per org the user belongs to. This is how a request finds the caller's orgs before an org is known.
 - `agent_keys` — lookup key is the agent's public key. Maps to `server_id` and `org_id`.
 - `enrolment_token_hashes` — lookup key is `SHA-256` of the bearer token. Maps to `org_id`, expiry, and a used/revoked marker. The plaintext token is never stored. Format of the bearer value is ADR-0005 (256 bits, `mg_` plus 52 lowercase unpadded base32); this ticket stores and looks up the hash only.
-- `token_hashes` — lookup key is `SHA-256` of an API token (`docs/specs/registry.md`). Maps to `org_id` and `token_id`, with a revoked marker. It has no RLS because the org is not known when it is read.
-- `session_hashes` — lookup key is `SHA-256` of a session bearer. Maps to the session `id` and `user_id`, with `expires_at` and a `revoked_at` marker. It has no RLS because the org is not known when it is read (`docs/specs/auth.md`).
-- `link_token_hashes` — lookup key is `SHA-256` of a link bearer. Maps to the link's `id` and `user_id`, with `expires_at` and a `used_at` marker. It has no RLS because the org is not known when it is read (`docs/specs/auth.md`).
+- `token_hashes` — lookup key is `SHA-256` of an API token (`docs/specs/registry.md`). Maps to `org_id` and `token_id`, with a revoked marker. It is read before the org is known.
+- `session_hashes` — lookup key is `SHA-256` of a session bearer. Maps to the session `id` and `user_id`, with `expires_at` and a `revoked_at` marker. It is read before the org is known (`docs/specs/auth.md`).
+- `link_token_hashes` — lookup key is `SHA-256` of a link bearer. Maps to the link's `id` and `user_id`, with `expires_at` and a `used_at` marker. It is read before the org is known (`docs/specs/auth.md`).
 - `purge_due` (W5-5c) — lookup key is the id of a soft-deleted row. Maps to `org_id`, with the expiry at which it is purged. It lets the hourly purge find due rows without knowing their orgs (`docs/specs/delete.md`).
 
 
-### Row-level tables
+### Org-scoped tables
 
 - `orgs` — `org_id` equals the org's `id`. Created with a row for itself.
-- `memberships` — `org_id`, `user_id`, `role`, uniqueness on `(org_id, user_id)`. `role` is one of `owner`, `admin`, `member`, `viewer` (ADR-0006). There is no separate `roles` table: the allowed values are the role list, enforced by a constraint on both backends.
-- `servers` — `org_id`, `id` (the `server_id`), `created_at`, `agent_age_recipient` (the agent's age X25519 recipient in Bech32 form, `age1…`; empty for servers enrolled before FR1-2). The signing public key lives only in `agent_keys`.
+- `memberships` — `org_id`, `user_id`, `role`, uniqueness on `(org_id, user_id)`. `role` is one of `owner`, `admin`, `member`, `viewer` (ADR-0006). There is no separate `roles` table: the allowed values are the role list, enforced by a constraint.
+- `servers` — `org_id`, `id` (the `server_id`), `created_at`, `agent_age_recipient` (the agent's age X25519 recipient in Bech32 form, `age1…`, empty when the enrolment carried none). The signing public key lives only in `agent_keys`.
 - `tokens` — `org_id`, `id`, `user_id` (the human owner), `name`, `last4`, `expires_at`, `created_at`. Never the secret; the `mg_` prefix is constant and not stored. W5-1a adds `agent_id`: empty for a person's token, otherwise the agent identity that holds it, whose owner is `user_id` (`docs/specs/agent-identities.md`).
 - `agent_identities` (W5-1a) — `org_id`, `id`, `name`, `owner_user_id`, `created_at`, `revoked_at`; unique `(org_id, name)` (`docs/specs/agent-identities.md`).
 - `token_scopes` — `org_id`, `token_id`, `project`, `environment`, `operation`; `*` is the wildcard. An owner token has exactly one row, `* * *`.
 - `audit_events` — `org_id`, `seq` (from 1, primary key with `org_id`), `id`, `at`, `principal_kind` (`human` or `agent`), `user_id`, `token_id`, `operation`, `outcome` (`allowed`, `denied` or `error`), `reason`, `prev_hash`, `hash`. `prev_hash` is empty for `seq` 1. The registry is the only writer, through `AppendAudit`, which reads the chain head and inserts in one transaction and retries when another writer takes the same `seq`. W5-1a adds `agent_id`; W5-5c adds `project_id`, `environment_id` and the principal kind `system` (`docs/specs/agent-identities.md`, `docs/specs/audit.md`). W4-1a adds `session_id` and `step_up_id`, empty when they don't apply (`docs/specs/auth.md`).
 
-A person is a stable `user_id` minted when their first `user_identities` row is written. There is no `users` table with names or other profile fields: those would need `org_id` and RLS (a person can belong to several orgs) and are not needed to enrol or store memberships. `user_identities` plus `user_orgs` plus `memberships` are the user tables for this ticket.
+A person is a stable `user_id` minted when their first `user_identities` row is written. There is no `users` table with names or other profile fields: those would need `org_id` (a person can belong to several orgs) and are not needed to enrol or store memberships. `user_identities` plus `user_orgs` plus `memberships` are the user tables for this ticket.
 
-Identifiers are 16 random bytes encoded as 32 lowercase hex characters, stored as `TEXT`. Timestamps are UTC RFC3339 text with a `Z`. These are the portable defaults; do not introduce UUID extensions or `timestamptz`.
+Identifiers are 16 random bytes encoded as 32 lowercase hex characters, stored as `TEXT`. Timestamps are UTC RFC3339 text with a `Z`. Do not introduce a UUID type or `timestamptz`.
 
 ### Projects, environments, services and releases (W2-11)
 
-Specified by the weeks 2–3 preflight (owner decisions D6, D18). All are row-level tables with `org_id`.
+All are org-scoped tables with `org_id`.
 
 - `projects` — `org_id`, `id`, `name`, `created_at`; unique `(org_id, name)`.
-- `environments` — `org_id`, `id`, `project_id`, `name`, `created_at`; unique `(org_id, project_id, name)`. W4-2 adds `protected`, boolean `NOT NULL`. The org's first environment is created true; later ones are created false. W4-2 stores the flag and does not gate deploys. W5-2 adds that gate. Until then a deploy to a protected environment runs and is audited. There is no plan-cap check in the open build. Resource limits are deferred to v1. The environment key is W3-2a.
+- `environments` — `org_id`, `id`, `project_id`, `name`, `created_at`; unique `(org_id, project_id, name)`. W4-2 adds `protected`, boolean `NOT NULL`, created false for every environment; W5-2 makes a deploy to a protected environment wait for an approval. There is no plan-cap check in the open build. The environment key is W3-2a.
 - `services` — `org_id`, `id`, `project_id`, `environment_id`, `name`, `server_id`, `current_release_id`, `previous_release_id` (nullable), `created_at`; unique `(org_id, environment_id, name)`. A service runs on exactly one server, chosen when it is created. The service `id` is the protocol's `app_id`. The two release columns copy the `app` state of the latest `CommandResult`. W2-11a creates `services` without `current_release_id` and `previous_release_id`; W2-11e adds both with `rollbacks`.
 - `releases` — `org_id`, `id` (the protocol's `release_id`), `service_id`, `image_ref` (or empty for a git source), `git_repository`, `git_commit` (empty for an image; W3-4), `port`, `health_path`, `domains` (JSON array), `pre_deploy` (JSON argv, empty for none), `pre_deploy_reversible`, `status`, `step`, `request_id`, `image_id`, `repo_digest`, `detail`, `created_at`, `finished_at`.
   - `status` is `queued`, `running`, `succeeded`, `failed`, `rejected` or `superseded`.
   - `step` is the command in flight (`build`, `deploy`, `pre_deploy`, `switch`) and `request_id` its envelope id (`docs/specs/connection.md`), so a restarted server can re-send it.
-  - `image_id` and `repo_digest` come from the `CommandResult`, so the history shows what actually ran (owner condition on D4).
+  - `image_id` and `repo_digest` come from the `CommandResult`, so the history shows what actually ran.
 - `rollbacks` — `org_id`, `id`, `service_id`, `request_id`, `status` (`running`, `succeeded`, `failed`, `rejected`), `detail`, `created_at`, `finished_at`.
 
-**Names** of projects, environments and services are 1 to 63 bytes of `[a-z0-9-]`, starting and ending with a letter or digit: the protocol's name format (`docs/specs/protocol.md`). They are never renamed, because the agent binds an app to them (owner decision D1). Identifiers and timestamps follow the rules below.
+**Names** of projects, environments and services are 1 to 63 bytes of `[a-z0-9-]`, starting and ending with a letter or digit: the protocol's name format (`docs/specs/protocol.md`). They are never renamed, because the agent binds an app to them. Identifiers and timestamps follow the rules above.
 
 The conformance suite gains: create a project, an environment and a service on a server of the same org; reject a service on another org's server; reject duplicate names; record a release and its result; a second org sees none of them.
 
-W2-11a adds `runProjectsConformance`, run as `TestProjectsConformanceSQLite` and `TestProjectsConformancePostgres`, covering: creating and listing a project, an environment and a service back with their ids, names, parent ids and `server_id`, in name order; refusing a service on another org's or an unknown server, a service in another org's environment and an environment in another org's project, with `ErrNotFound` and no row written; refusing a duplicate project, environment and service name with `ErrDuplicate` while the same name under another parent or org succeeds; `ResolveTarget` for a known project and environment, for a project alone, and `ErrNotFound` for an unknown name or a name only in another org; a second org listing nothing of the first. It also adds `TestPostgresRLSOnProjectTables`, which checks the `org_isolation` policy on `projects`, `environments` and `services` as the application role (unset, empty and nonexistent `app.org_id` return nothing; an `INSERT` for another org is refused by `WITH CHECK`; `rowsecurity` is on), and `TestProjectNamesValidated`, which checks the name format on all three create methods.
+W2-11a adds `runProjectsConformance`, run as `TestProjectsConformanceSQLite`, covering: creating and listing a project, an environment and a service back with their ids, names, parent ids and `server_id`, in name order; refusing a service on another org's or an unknown server, a service in another org's environment and an environment in another org's project, with `ErrNotFound` and no row written; refusing a duplicate project, environment and service name with `ErrDuplicate` while the same name under another parent or org succeeds; `ResolveTarget` for a known project and environment, for a project alone, and `ErrNotFound` for an unknown name or a name only in another org; a second org listing nothing of the first. It also adds `TestProjectNamesValidated`, which checks the name format on all three create methods.
 
 W2-11b adds `releases` and its queue. Every column is `NOT NULL`; text columns other than `id`, `org_id`, `service_id`, `domains`, `status` and `created_at` default to empty text. `domains` is a JSON array (`[]` for none) and `pre_deploy` a JSON argv, or empty text for no argv. `status` is checked against the six statuses and `step` against the empty step and the four steps, as `memberships.role` is checked. Two partial unique indexes, `releases_one_queued` on `(org_id, service_id) WHERE status = 'queued'` and `releases_one_running` on the same columns `WHERE status = 'running'`, are the database's guarantee of at most one queued and one running release per service.
 
@@ -75,9 +72,9 @@ The queue rules:
 - The history is ordered by `created_at`, then `id`, descending, and capped at 50.
 - The in-flight read returns the queued and running releases of the org's services on one server, oldest first, per org and server, so a reconnecting agent is never sent another org's step.
 
-`releases` is not a lookup table and `LookupTables` is unchanged. On Postgres it has `ENABLE ROW LEVEL SECURITY` and the `org_isolation` policy; the application role gets its grants through `pg.Migrate`, which is unchanged.
+`releases` is not a lookup table and `LookupTables` is unchanged.
 
-W2-11b adds `runReleasesConformance`, run as `TestReleasesConformanceSQLite` and `TestReleasesConformancePostgres`, covering: enqueueing a release and reading every input field back, with no argv for an empty one; refusing an unknown or another org's service with `ErrNotFound` and writing nothing; starting a release, superseding the queued one and refusing a start in the wrong status; recording a step and the image the agent ran, refusing both on a queued or finished release and refusing an unknown step; finishing as each final status, refusing a second finish and a non-final status, and starting the queued release after a finish; the history order and its cap of 50; the in-flight read per server; eight concurrent enqueues leaving one queued and seven `superseded`; and a second org getting `ErrNotFound`, no rows and no change to the first org's releases. It also adds `TestPostgresRLSOnReleases`, which checks the `org_isolation` policy on `releases` as the application role (unset, empty and nonexistent `app.org_id` return nothing; an `INSERT` for another org is refused by `WITH CHECK`; `rowsecurity` is on), and `TestReleaseConstraintsEnforced`, which checks the `CHECK`s and both partial unique indexes with raw SQL on a migrated SQLite database.
+W2-11b adds `runReleasesConformance`, run as `TestReleasesConformanceSQLite`, covering: enqueueing a release and reading every input field back, with no argv for an empty one; refusing an unknown or another org's service with `ErrNotFound` and writing nothing; starting a release, superseding the queued one and refusing a start in the wrong status; recording a step and the image the agent ran, refusing both on a queued or finished release and refusing an unknown step; finishing as each final status, refusing a second finish and a non-final status, and starting the queued release after a finish; the history order and its cap of 50; the in-flight read per server; eight concurrent enqueues leaving one queued and seven `superseded`; and a second org getting `ErrNotFound`, no rows and no change to the first org's releases. It also adds `TestReleaseConstraintsEnforced`, which checks the `CHECK`s and both partial unique indexes with raw SQL on a migrated SQLite database.
 
 W2-11e adds `services.current_release_id`, `services.previous_release_id` and `rollbacks`. `current_release_id` is `TEXT NOT NULL DEFAULT ''` and `previous_release_id` is nullable, `NULL` when the app has no previous release; neither carries a foreign key, because the store copies the ids it is given and does not interpret them. Every `rollbacks` column is `NOT NULL`; `request_id`, `detail` and `finished_at` default to empty text, as the release columns do; `status` is checked against `running`, `succeeded`, `failed` and `rejected`.
 
@@ -89,12 +86,12 @@ The rollback rules:
 - `FinishRollback` accepts only a `running` rollback and ends it as `succeeded`, `failed` or `rejected` with `detail` and `finished_at` now. A final rollback is `ErrRollbackState` and another org's is `ErrNotFound`; nothing changes in either case. A status outside the three final ones is refused before any SQL runs, and `finished_at` stays empty until the rollback is final.
 - The in-flight read returns the `running` rollbacks of the org's services on one server, oldest first, so a reconnecting agent is never sent another org's rollback.
 
-`rollbacks` is not a lookup table and `LookupTables` is unchanged. On Postgres it has `ENABLE ROW LEVEL SECURITY` and the `org_isolation` policy; the application role gets its grants through `pg.Migrate`, which is unchanged.
+`rollbacks` is not a lookup table and `LookupTables` is unchanged.
 
-W2-11e adds `runServiceReleaseStateConformance`, run as `TestServiceReleaseStateConformanceSQLite` and `TestServiceReleaseStateConformancePostgres`, covering: a new service reading back empty release ids from `CreateService`, `Services` and `ServiceByName`; `ServiceByName` returning every field of the service and `ErrNotFound` for an unknown name, a name in another environment of the org and a name asked by another org; `SetServiceReleases` reading back a current and a previous id through both reads, then a new current with an empty previous; and `ErrNotFound` for an unknown or another org's service, with the first org's ids kept. It also adds `runRollbacksConformance`, run as `TestRollbacksConformanceSQLite` and `TestRollbacksConformancePostgres`, covering: starting a rollback and reading it back in the in-flight list; refusing an unknown or another org's service with `ErrNotFound` and writing nothing; finishing as each final status, refusing a second finish with `ErrRollbackState` and a non-final status with an error that names the three final ones, leaving the rollback running; the in-flight read in created order with another server's and finished rollbacks left out; and a second org getting `ErrNotFound` from a finish, no rows from the in-flight reads of the first org's server and no change to the first org's rollback. `TestPostgresRLSOnRollbacks` checks the `org_isolation` policy on `rollbacks` as the application role (unset, empty and nonexistent `app.org_id` return nothing; an `INSERT` for another org is refused by `WITH CHECK`; `rowsecurity` is on), and `TestRollbackConstraintsEnforced` checks the `status` `CHECK` and the release-column defaults and nullability with raw SQL on a migrated SQLite database.
+W2-11e adds `runServiceReleaseStateConformance`, run as `TestServiceReleaseStateConformanceSQLite`, covering: a new service reading back empty release ids from `CreateService`, `Services` and `ServiceByName`; `ServiceByName` returning every field of the service and `ErrNotFound` for an unknown name, a name in another environment of the org and a name asked by another org; `SetServiceReleases` reading back a current and a previous id through both reads, then a new current with an empty previous; and `ErrNotFound` for an unknown or another org's service, with the first org's ids kept. It also adds `runRollbacksConformance`, run as `TestRollbacksConformanceSQLite`, covering: starting a rollback and reading it back in the in-flight list; refusing an unknown or another org's service with `ErrNotFound` and writing nothing; finishing as each final status, refusing a second finish with `ErrRollbackState` and a non-final status with an error that names the three final ones, leaving the rollback running; the in-flight read in created order with another server's and finished rollbacks left out; and a second org getting `ErrNotFound` from a finish, no rows from the in-flight reads of the first org's server and no change to the first org's rollback. `TestRollbackConstraintsEnforced` checks the `status` `CHECK` and the release-column defaults and nullability with raw SQL on a migrated SQLite database.
 
 
-**`ResolveTarget`** (owner decision of 2026-11-19, W2-11h) resolves a project name and an optional environment name in the org, in one org-bound transaction. It returns:
+**`ResolveTarget`** (W2-11h) resolves a project name and an optional environment name in the org, in one org-bound transaction. It returns:
 
 | Case | Project id | Environment id | Error |
 |---|---|---|---|
@@ -103,11 +100,11 @@ W2-11e adds `runServiceReleaseStateConformance`, run as `TestServiceReleaseState
 | The project does not exist in the org (including a name only in another org) | empty | empty | matches `ErrNotFound` |
 | Any other failure | empty | empty | the wrapped error |
 
-The project id on the second row is not a lookup of another org's data: it is the caller's own project, resolved inside the caller's org. `registry.Invoke` uses it to tell which name did not resolve and to match the project column of a scope row (`docs/specs/registry.md`). W2-11h adds `TestResolveTargetReportsKnownProjectSQLite` and `TestResolveTargetReportsKnownProjectPostgres`, which check the four rows on both backends, including that a project known only to another org returns two empty ids.
+The project id on the second row is not a lookup of another org's data: it is the caller's own project, resolved inside the caller's org. `registry.Invoke` uses it to tell which name did not resolve and to match the project column of a scope row (`docs/specs/registry.md`). W2-11h adds `TestResolveTargetReportsKnownProjectSQLite`, which checks the four rows, including that a project known only to another org returns two empty ids.
 
 ### Service settings on releases (W6-1d, W6-4b)
 
-Owner decision of 2026-11-19 (week 6). `releases` gains the settings a `deploy` sends in `DEPLOY` (`docs/specs/registry.md`, `docs/specs/protocol.md`). Every column is `TEXT NOT NULL` with the default shown, like the other release text columns:
+`releases` gains the settings a `deploy` sends in `DEPLOY` (`docs/specs/registry.md`, `docs/specs/protocol.md`). Every column is `TEXT NOT NULL` with the default shown, like the other release text columns:
 
 | Column | Ticket | Default | Holds |
 |---|---|---|---|
@@ -120,11 +117,11 @@ Owner decision of 2026-11-19 (week 6). `releases` gains the settings a `deploy` 
 
 - `EnqueueRelease` stores them as given and every release read returns them. A label value is not a secret: secrets travel only as ciphertext (`docs/specs/secrets.md`).
 - W6-4b: `Services` returns each service's `ComposeHash`, the `compose_hash` of the release named by its `current_release_id`, or empty when there is none.
-- W6-1d adds `runReleaseSettingsConformance`, run as `TestReleaseSettingsConformanceSQLite` and `TestReleaseSettingsConformancePostgres` (every setting read back as enqueued; an absent setting read back as its default), and `TestReleaseSettingsDefaults`, which checks the defaults and `NOT NULL` with raw SQL on a migrated SQLite database. W6-4b adds `TestComposeHashConformanceSQLite` and `TestComposeHashConformancePostgres` (the hash read back on the release, and on the service only once that release is current).
+- W6-1d adds `runReleaseSettingsConformance`, run as `TestReleaseSettingsConformanceSQLite` (every setting read back as enqueued; an absent setting read back as its default), and `TestReleaseSettingsDefaults`, which checks the defaults and `NOT NULL` with raw SQL on a migrated SQLite database. W6-4b adds `TestComposeHashConformanceSQLite` (the hash read back on the release, and on the service only once that release is current).
 
 ### Recovery recipients, environment keys and secrets (W3-2a)
 
-Specified by the weeks 2–3 preflight (`docs/specs/secrets.md`); the columns, methods and tests below are the owner's split decision of 2026-11-20. Row-level tables; they hold public keys and ciphertext only. Migration `0008_secrets.sql` on each backend creates all four. Each has `org_id TEXT NOT NULL REFERENCES orgs (id)`, and on Postgres `ENABLE ROW LEVEL SECURITY` and the `org_isolation` policy, `USING` and `WITH CHECK` both `(org_id = nullif(current_setting('app.org_id', true), ''))`. None is a lookup table. A `ciphertext` column is `BYTEA` on Postgres and `BLOB` on SQLite, `NOT NULL`, and holds the age file's bytes exactly as given. Every other column is `TEXT NOT NULL`.
+`docs/specs/secrets.md` gives the behaviour; these are org-scoped tables, and they hold public keys and ciphertext only. Migration `0008_secrets.sql` creates all four. Each has `org_id TEXT NOT NULL REFERENCES orgs (id)`. None is a lookup table. A `ciphertext` column is `BLOB NOT NULL` and holds the age file's bytes exactly as given. Every other column is `TEXT NOT NULL`.
 
 - `recovery_recipients` — `org_id`, `id` (primary key), `recipient` (an age X25519 recipient, `age1…`), `created_at`; unique `(org_id, recipient)`. W3-2a allows one per org (ADR-0003 decision 12).
 - `environment_keys` — `org_id`, `environment_id` (primary key, `REFERENCES environments (id)`), `public_key` (`age1…`), `created_at`.
@@ -140,11 +137,11 @@ The store copies recipients, public keys and ciphertext as given and parses none
 - `SetSecret(ctx, orgID, environmentID, kind, name string, ciphertext []byte) (Secret, error)` inserts the secret, or replaces the `ciphertext` of the row with that `(environment_id, kind, name)`, with `updated_at` now, and returns the row without its ciphertext. It returns `ErrNotFound` for an environment that is not the org's and `ErrNoEnvironmentKey` (a new sentinel) when the environment has no key. A kind other than `env` or `registry`, an empty name or an empty ciphertext is refused before any SQL runs.
 - `Secrets(ctx, orgID, environmentID) ([]Secret, error)` returns the environment's secrets ordered by `kind`, then `name`, and an empty slice when there are none. `Secret` is `EnvironmentID`, `Kind`, `Name` and `UpdatedAt` and has no ciphertext field, so no store method returns a secret's ciphertext before W4-8.
 
-W3-2a adds `runSecretsStoreConformance`, run as `TestSecretsStoreConformanceSQLite` and `TestSecretsStoreConformancePostgres`, covering: the first recovery recipient stored and listed; a second one refused with `ErrDuplicate`; a first one refused once the org has an environment key; an environment key created with one copy and its public key read back by `Environments`; `ErrDuplicate` for a second key; `ErrRecipientsMismatch` for a missing, an extra and an unknown recipient id, each writing nothing; `ErrNotFound` for another org's environment; `ErrNoEnvironmentKey` from `SetSecret` before the key exists; a secret set, replaced by a second set with a later `updated_at`, and listed in `kind`, `name` order; the same name under both kinds kept apart; and a second org reading none of the first's rows. `TestPostgresRLSOnSecretsTables` checks the `org_isolation` policy on all four tables as the application role (unset, empty and nonexistent `app.org_id` return nothing; an `INSERT` for another org is refused by `WITH CHECK`; `rowsecurity` is on). `TestSecretsTablesHoldCiphertextAsGiven` reads `ciphertext` back with raw SQL on a migrated SQLite database and compares it byte for byte with what was set.
+W3-2a adds `runSecretsStoreConformance`, run as `TestSecretsStoreConformanceSQLite`, covering: the first recovery recipient stored and listed; a second one refused with `ErrDuplicate`; a first one refused once the org has an environment key; an environment key created with one copy and its public key read back by `Environments`; `ErrDuplicate` for a second key; `ErrRecipientsMismatch` for a missing, an extra and an unknown recipient id, each writing nothing; `ErrNotFound` for another org's environment; `ErrNoEnvironmentKey` from `SetSecret` before the key exists; a secret set, replaced by a second set with a later `updated_at`, and listed in `kind`, `name` order; the same name under both kinds kept apart; and a second org reading none of the first's rows. `TestSecretsTablesHoldCiphertextAsGiven` reads `ciphertext` back with raw SQL on a migrated SQLite database and compares it byte for byte with what was set.
 
 ### Soft delete (W5-5c, W5-8a)
 
-Specified by the week 5 preflight. `services` gains `deleted_at` and `purge_detail` (W5-5c); `environments` and `projects` gain `deleted_at` (W5-8a). Every list, lookup and `ResolveTarget` leaves deleted rows out. The rules, the store methods and their conformance cases are `docs/specs/delete.md`.
+`services` gains `deleted_at` and `purge_detail` (W5-5c); `environments` and `projects` gain `deleted_at` (W5-8a). Every list, lookup and `ResolveTarget` leaves deleted rows out. The rules, the store methods and their conformance cases are `docs/specs/delete.md`.
 
 ### Server deploy keys (W3-8)
 
@@ -152,32 +149,32 @@ Specified by the week 5 preflight. `services` gains `deleted_at` and `purge_deta
 
 ### Agent age recipients (FR1-2)
 
-`servers` gains `agent_age_recipient`: `TEXT NOT NULL DEFAULT ''` on both backends. It is the agent's age X25519 recipient in Bech32 form, `age1…`, and it is a public key. Enrolment writes `keys.AgreeRecipient(EnrollRequest.agent_age_recipient).String()`. `AddServer` refuses an empty recipient before any SQL runs and writes it in the same transaction as the `agent_keys` row, so a duplicate signing key rolls the server row back. The store copies the text it is given and does not parse it. `ServerByPublicKey` and `Servers` return it on every server read.
+`servers` gains `agent_age_recipient`: `TEXT NOT NULL DEFAULT ''`. It is the agent's age X25519 recipient in Bech32 form, `age1…`, and it is a public key. Enrolment writes `keys.AgreeRecipient(EnrollRequest.agent_age_recipient).String()`. `AddServer` refuses an empty recipient before any SQL runs and writes it in the same transaction as the `agent_keys` row, so a duplicate signing key rolls the server row back. The store copies the text it is given and does not parse it. `ServerByPublicKey` and `Servers` return it on every server read.
 
-It lives on `servers`, not `agent_keys`, because a lookup row holds only its key and IDs. Servers enrolled before migration `0007` hold `''` until a re-enrolment or rotation ticket runs. Wrapping a key to this recipient is W4-8 and W3-3, and only after the owner's CLI fingerprint check in `docs/specs/secrets.md`.
+It lives on `servers`, not `agent_keys`, because a lookup row holds only its key and IDs. A server enrolled without one holds `''` until a re-enrolment or a rotation ticket runs. Wrapping a key to this recipient is W4-8 and W3-3, and only after the owner's CLI fingerprint check in `docs/specs/secrets.md`.
 
 ### Auto-rollback (W4-3e)
 
-Owner decision of 2026-11-20. The behaviour is `docs/specs/auto-rollback.md`.
+The behaviour is `docs/specs/auto-rollback.md`.
 
-`services` gains the seven settings, each `NOT NULL` with its default, so existing rows read back the defaults: `auto_rollback_off` and `auto_rollback_error_rate_enforce` (boolean on Postgres, integer 0 or 1 on SQLite, default false), `auto_rollback_restart_limit` (default 2), `auto_rollback_health_fail_seconds` (30), `auto_rollback_error_rate_percent` (5), `auto_rollback_error_rate_multiple` (3) and `auto_rollback_error_rate_min_requests` (50), integers with a `CHECK` for each range.
+`services` gains the seven settings, each `NOT NULL` with its default, so a service reads back the defaults until one is set: `auto_rollback_off` and `auto_rollback_error_rate_enforce` (integer 0 or 1, default false), `auto_rollback_restart_limit` (default 2), `auto_rollback_health_fail_seconds` (30), `auto_rollback_error_rate_percent` (5), `auto_rollback_error_rate_multiple` (3) and `auto_rollback_error_rate_min_requests` (50), integers with a `CHECK` for each range.
 
-`auto_rollback_reports` is a row-level table: `org_id`, `id`, `service_id`, `server_id`, `request_id` (the report's, `a` plus 32 hex), `release_id`, `previous_release_id`, `trigger` (`restarts`, `health`, `error_rate`), `action` (`rolled_back`, `shadow`, `held`, `skipped`, `failed`), `detail`, `restart_count`, `health_failing_seconds`, `window_requests`, `window_5xx`, `previous_requests`, `previous_5xx`, `previous_measured`, `detected_at`, `received_at`, `verdict` (`''`, `right` or `wrong`), `verdict_by` (a user id, or empty), `verdict_at` (empty until marked). Unique `(org_id, request_id)`. On Postgres it has `ENABLE ROW LEVEL SECURITY` and the `org_isolation` policy. It is not a lookup table.
+`auto_rollback_reports` is an org-scoped table: `org_id`, `id`, `service_id`, `server_id`, `request_id` (the report's, `a` plus 32 hex), `release_id`, `previous_release_id`, `trigger` (`restarts`, `health`, `error_rate`), `action` (`rolled_back`, `shadow`, `held`, `skipped`, `failed`), `detail`, `restart_count`, `health_failing_seconds`, `window_requests`, `window_5xx`, `previous_requests`, `previous_5xx`, `previous_measured`, `detected_at`, `received_at`, `verdict` (`''`, `right` or `wrong`), `verdict_by` (a user id, or empty), `verdict_at` (empty until marked). Unique `(org_id, request_id)`. It is not a lookup table.
 
 - `SetServiceAutoRollback` writes the seven settings of one service in one `UPDATE` bound to the org; a value outside its range is refused before any SQL runs; another org's service is `ErrNotFound`. `ServiceByName` and `Services` return the settings.
 - `AddAutoRollbackReport` inserts a report for a service of the org whose `server_id` is the given server, in one org-bound transaction; a service of another server or org is `ErrNotFound`. For `rolled_back` it also copies the report's app state in that transaction, as `SetServiceReleases` does. A `request_id` already stored returns the stored row and `ErrAlreadyStored`, and changes nothing.
 - `AutoRollbackReports` returns one service's reports, newest `detected_at` first, at most 50.
 - `MarkAutoRollbackReport` sets `verdict`, `verdict_by` and `verdict_at` = now on one report of the org; another verdict than `right` or `wrong` is refused before any SQL runs; marking again replaces the mark; another org's report is `ErrNotFound`.
 
-W4-3e adds `runAutoRollbackConformance`, run as `TestAutoRollbackConformanceSQLite` and `TestAutoRollbackConformancePostgres`, and `TestAutoRollbackReportsRLSPostgres`.
+W4-3e adds `runAutoRollbackConformance`, run as `TestAutoRollbackConformanceSQLite`.
 
 ### Sessions, links and step-ups (W4-1a, W4-1d)
 
-`session_hashes` (lookup table) and the `session_id` and `step_up_id` columns of `audit_events` are added by W4-1a. `link_token_hashes` (lookup table) and `step_ups` (row-level) are added by W4-1d. All four are specified in `docs/specs/auth.md`.
+`session_hashes` (lookup table) and the `session_id` and `step_up_id` columns of `audit_events` are added by W4-1a. `link_token_hashes` (lookup table) and `step_ups` (org-scoped) are added by W4-1d. All four are specified in `docs/specs/auth.md`.
 
-`link_token_hashes` holds the `TEXT` key `hash`, the `SHA-256` hex of an `mg_` link bearer, mapped to the link's `id` and `user_id`, with `expires_at` and `used_at` (NULL until the link is used). It has no `org_id` and no RLS, because it is read before an org is known.
+`link_token_hashes` holds the `TEXT` key `hash`, the `SHA-256` hex of an `mg_` link bearer, mapped to the link's `id` and `user_id`, with `expires_at` and `used_at` (NULL until the link is used). It is read before an org is known.
 
-`step_ups` has these columns: `org_id` (`TEXT NOT NULL REFERENCES orgs (id)`), `id` (the primary key), `user_id`, `operation`, `input_digest`, `created_at` and `expires_at` (`TEXT NOT NULL`); `token_id`, `session_id`, `project_id` and `environment_id` (`TEXT NOT NULL DEFAULT ''`); and `confirm_hash`, `signed_in_at`, `approved_at`, `declined_at` and `used_at` (nullable, NULL until set). A `CHECK` requires exactly one of `token_id` and `session_id` to be non-empty: `(token_id = '') <> (session_id = '')`, which is boolean SQL on Postgres and integer SQL on SQLite. On Postgres the table has `ENABLE ROW LEVEL SECURITY` and the `org_isolation` policy, `USING` and `WITH CHECK` both `(org_id = nullif(current_setting('app.org_id', true), ''))`; the application role gets its grants through `pg.Migrate`, which is unchanged.
+`step_ups` has these columns: `org_id` (`TEXT NOT NULL REFERENCES orgs (id)`), `id` (the primary key), `user_id`, `operation`, `input_digest`, `created_at` and `expires_at` (`TEXT NOT NULL`); `token_id`, `session_id`, `project_id` and `environment_id` (`TEXT NOT NULL DEFAULT ''`); and `confirm_hash`, `signed_in_at`, `approved_at`, `declined_at` and `used_at` (nullable, NULL until set). A `CHECK` requires exactly one of `token_id` and `session_id` to be non-empty: `(token_id = '') <> (session_id = '')`, which is integer SQL on SQLite.
 
 The link-token rules:
 
@@ -191,29 +188,20 @@ The step-up rules:
 - `CreateStepUp` mints the row's `id` and stores it in the org with `created_at` now and `expires_at` the given expiry, then returns the stored row. The caller's `OrgID`, `ID`, times and markers are ignored, and `confirm_hash` and the four markers stay NULL. An empty `UserID`, `Operation` or `InputDigest`, and credentials that are both set or both empty, are refused before any SQL runs, with an error that names the rule and no row written.
 - `StepUp` reads one row inside the org-bound transaction with `org_id` in the `WHERE`, so an id in another org is `ErrNotFound`. An unset marker column reads back as empty text.
 
-W4-1d adds `runLinkTokensConformance`, run as `TestLinkTokensConformanceSQLite` and `TestLinkTokensConformancePostgres`, covering: adding a link token by hash and reading back its id, user and expiry; using it once before expiry and refusing a second use with `ErrTokenUsed`, including after the expiry has passed; `ErrTokenExpired` for an unused token at and after its expiry, and on every later use; `ErrNotFound` for an unknown id; `ErrDuplicate` for a repeated hash with the first token still usable; and two tokens of one user staying independent. It also adds `TestLinkTokenStoredHashedOnly`, which proves on both backends that the dump of every table holds the hex SHA-256 and no plaintext or `mg_` value. `runStepUpsConformance`, run as `TestStepUpsConformanceSQLite` and `TestStepUpsConformancePostgres`, covers: creating a step-up with a token credential, a project and an environment target, and reading every field back with empty markers; a session credential with no target reading back empty credential and target columns; the caller's id, org, times and markers being ignored; the five refusals writing no row; `ErrNotFound` for an unknown id; and a second org reading none of the first's rows. `TestPostgresRLSOnStepUps` checks the `org_isolation` policy on `step_ups` as the application role (unset, empty and nonexistent `app.org_id` return nothing; an `INSERT` for another org is refused by `WITH CHECK`; `rowsecurity` is on), and `TestStepUpConstraintsEnforced` checks the credential `CHECK`, the empty-text defaults and the NULL markers with raw SQL on a migrated SQLite database.
+W4-1d adds `runLinkTokensConformance`, run as `TestLinkTokensConformanceSQLite`, covering: adding a link token by hash and reading back its id, user and expiry; using it once before expiry and refusing a second use with `ErrTokenUsed`, including after the expiry has passed; `ErrTokenExpired` for an unused token at and after its expiry, and on every later use; `ErrNotFound` for an unknown id; `ErrDuplicate` for a repeated hash with the first token still usable; and two tokens of one user staying independent. It also adds `TestLinkTokenStoredHashedOnly`, which proves that the dump of every table holds the hex SHA-256 and no plaintext or `mg_` value. `runStepUpsConformance`, run as `TestStepUpsConformanceSQLite`, covers: creating a step-up with a token credential, a project and an environment target, and reading every field back with empty markers; a session credential with no target reading back empty credential and target columns; the caller's id, org, times and markers being ignored; the five refusals writing no row; `ErrNotFound` for an unknown id; and a second org reading none of the first's rows. `TestStepUpConstraintsEnforced` checks the credential `CHECK`, the empty-text defaults and the NULL markers with raw SQL on a migrated SQLite database.
 
 ## Transactions and isolation
 
-Every request that reads or writes an RLS table runs in a transaction that has set `app.org_id` to that org (Postgres). Store methods that take an org run that way. Lookups that exist to find the org (a token hash, an agent public key, an external identity, a user's orgs) do not require `app.org_id` and do not return a secret.
+Every store method that takes an org runs in one transaction, and every statement in it carries `org_id` in its `WHERE`. That predicate is the whole boundary between orgs. Lookups that exist to find the org (a token hash, an agent public key, an external identity, a user's orgs) run without one and never return a secret.
 
-On Postgres each RLS table has the policy `USING (org_id = nullif(current_setting('app.org_id', true), ''))` with the same expression as `WITH CHECK`. Under the application role a `SELECT` with the `org_id` filter removed therefore returns:
-
-- nothing when `app.org_id` is unset, empty, or names a nonexistent org;
-- only org A's rows, never org B's, when `app.org_id` is A.
-
-An `INSERT` of a row for org B under `app.org_id` A is rejected by `WITH CHECK`. `TestPostgresMissingOrgFilterReturnsNothing` asserts all of this.
-
-Grants live in `pg.Migrate`, not in the numbered files, because the application role's name is not known to a migration: after applying the files as the owner it grants `SELECT, INSERT, UPDATE, DELETE` (no DDL) on every table except `schema_migrations` to the application role. The application role never migrates; `pg.Open` has no migration entry point.
-
-SQLite has no RLS. The same fixtures and queries run, always including an `org_id` predicate in store methods. The missing-filter test is Postgres-only.
+The conformance suite's second org, which sees none of the first org's rows through any store method, is what holds the rule: a store method that forgets the predicate is a failing test.
 
 ## Migrations
 
-Numbered plain SQL files per backend, applied by a small runner inside `internal/store`. No migration library. Applying an already-applied set is a no-op. The two schemas must describe the same tables and columns (names and nullability). A named test compares them.
+Numbered plain SQL files, applied by a small runner inside `internal/store`. No migration library. Applying an already-applied set is a no-op.
 
 ## Conformance
 
-One suite runs against both backends: create an org; mint a user via an external identity; add a membership; look up the user's orgs; reject a duplicate membership; store a server and find it by public key; store an enrolment token by hash, look it up, mark it used, and refuse a second use; a second org cannot see the first's memberships, servers, or tokens through store methods. Migrations are applied first. The suite is the same code for both backends.
+One suite runs on SQLite: create an org; mint a user via an external identity; add a membership; look up the user's orgs; reject a duplicate membership; store a server and find it by public key; store an enrolment token by hash, look it up, mark it used, and refuse a second use; a second org cannot see the first's memberships, servers, or tokens through store methods. Migrations are applied first.
 
 Enrolment, the server and agent commands, heartbeat, and authn are later tickets. This ticket only provides the store.

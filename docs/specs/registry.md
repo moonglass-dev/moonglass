@@ -20,7 +20,7 @@ An operation is a `Spec` and a handler, registered with `registry.Register`.
 
 ### Operations added in weeks 2 and 3
 
-Specified by the weeks 2–3 preflight (owner decisions D6, D18, D16). Registry operations are a contract (ADR-0006 decision 9): each ticket adds exactly the operations listed for it, regenerates the OpenAPI file and the CLI, and adds authz-matrix rows.
+Registry operations are a contract (ADR-0006 decision 9): each ticket adds exactly the operations listed for it, regenerates the OpenAPI file and the CLI, and adds authz-matrix rows.
 
 **Targets.** Inputs name projects, environments and services by name. `registry.Invoke` resolves the target's names in the caller's org and the scope check uses their ids ("Inputs and errors"); the handler resolves any other name, such as a service, after authorisation. An operation's target is the project and environment it acts on: empty for org-level operations, the project with an empty environment for project-level ones.
 
@@ -65,7 +65,7 @@ The three creates refuse a store error with fixed text built from the caller's i
   - The call returns when the release reaches a final status, and returns that release.
   - For `git`, `image` sent to the agent's `DEPLOY` is the `moonglass.local/<project>/<service>:<release_id>` reference the build produced (`docs/specs/build.md`).
   - A service whose server is not connected fails at once with `server <id> is offline`.
-- **Service settings on `deploy`** (W6-1d, owner decision of 2026-11-19). `deploy` also takes these optional inputs, each sent in `DEPLOY` as the field `docs/specs/protocol.md` names ("Service settings") and refused with `ErrInvalidInput`, before a release is minted, when it breaks that field's rule. They are stored on the release (`docs/specs/storage.md`).
+- **Service settings on `deploy`** (W6-1d). `deploy` also takes these optional inputs, each sent in `DEPLOY` as the field `docs/specs/protocol.md` names ("Service settings") and refused with `ErrInvalidInput`, before a release is minted, when it breaks that field's rule. They are stored on the release (`docs/specs/storage.md`).
   - `command` (repeated): the exec argv, `Deploy.command`.
   - `volume` (repeated): `<name>:<target>` or `<name>:<target>:ro`, one `VolumeMount` each.
   - `label` (repeated): `<key>=<value>`, split at the first `=`, one entry of `Deploy.labels` each.
@@ -79,7 +79,7 @@ The three creates refuse a store error with fixed text built from the caller's i
 
 ### Secrets operations (W3-2b, W3-2d)
 
-Owner decision of 2026-11-20, splitting W3-2. Every input follows "Inputs and errors": `project` and `environment` are required strings on the three environment-level operations and are not repeated in the tables below. The store methods are `docs/specs/storage.md` ("Recovery recipients, environment keys and secrets (W3-2a)").
+Every input follows "Inputs and errors": `project` and `environment` are required strings on the three environment-level operations and are not repeated in the tables below. The store methods are `docs/specs/storage.md` ("Recovery recipients, environment keys and secrets (W3-2a)").
 
 **Binary values.** A ciphertext travels as a JSON string holding the standard base64 encoding, with padding (RFC 4648 section 4), of the binary age file. Armor is not accepted. The value **is an age file** when it decodes as that encoding, and the decoded bytes start with the version line `age-encryption.org/v1` followed by `\n` and contain a line that starts with `--- `, the header's MAC line. The control plane checks nothing more: it cannot check the recipient (`docs/specs/secrets.md`). Sizes are of the decoded bytes.
 
@@ -94,7 +94,7 @@ Owner decision of 2026-11-20, splitting W3-2. Every input follows "Inputs and er
 Every input is a required string except `wrapped`, a required list. A list output is `[]` rather than null when empty. No output holds a ciphertext.
 
 - **`keys.recovery.add`** (W3-2b) parses `recipient` with `keys.ParseRecipient` and stores the canonical text. A recipient that does not parse is `ErrInvalidInput`, `recipient must be an age X25519 recipient (age1…)`. `store.ErrDuplicate` is `ErrConflict`, `this org already has a recovery key or an environment key: adding a recovery key is a recipient change and needs step-up` (ADR-0003 decision 12). Its generated subcommand is `moonglass keys recovery add --recipient age1…`.
-- **`keys.recovery.list`** (W3-2b, owner decision D21) returns the org's recovery recipients. They are public keys. The CLI checks them against its pins before it wraps an environment key (`docs/specs/secrets.md`).
+- **`keys.recovery.list`** (W3-2b) returns the org's recovery recipients. They are public keys. The CLI checks them against its pins before it wraps an environment key (`docs/specs/secrets.md`).
 - **`environments.key.create`** (W3-2d) takes the environment's `public_key`, parsed like `recipient` (`public_key must be an age X25519 recipient (age1…)`), and one `wrapped` element per recovery recipient on record, each `<recovery recipient id>:<ciphertext>`: the `id` from `keys.recovery.list`, a colon, and the wrapped key record in the binary form above. An X25519 age stanza does not name its recipient, so the copy is matched only by that id. An element without a colon, with an id that is not 32 lowercase hex characters, or with a ciphertext that is not an age file of at most 1 KiB is `ErrInvalidInput`, `wrapped copy <n> must be <recovery recipient id>:<base64 age file of at most 1 KiB>`, `<n>` counting from 1. Two elements with the same id are `ErrInvalidInput`, `wrapped copy <n> repeats recovery recipient <id>`. `store.ErrDuplicate` is `ErrConflict`, `environment "<environment>" of project "<project>" already has a key`, and `store.ErrRecipientsMismatch` is `ErrConflict`, `the wrapped copies must name exactly the org's recovery recipients: list them with moonglass keys recovery list`.
 - **`secrets.set`** (W3-2d) stores `ciphertext` under `kind` and `name`, replacing an existing value of that kind and name. `kind` other than `env` or `registry` is `ErrInvalidInput`, `kind must be env or registry`. The name rules are `docs/specs/secrets.md` ("Kinds of secret"): an `env` name that breaks them is `ErrInvalidInput`, `env secret name "<name>" must match [A-Z_][A-Z0-9_]*, be at most 128 bytes and not start with MOONGLASS_`; a `registry` name that breaks them is `ErrInvalidInput`, `registry secret name "<name>" must be a lowercase DNS name with an optional port`. A ciphertext that is not an age file is `ErrInvalidInput`, `ciphertext must be standard base64 of an age file`. The decoded ciphertext may be at most 33 KiB (33792 bytes) for `env` and 5 KiB (5120 bytes) for `registry`: the plaintext limit plus 1 KiB for age's header and tags. A larger one is `ErrInvalidInput`, `ciphertext for <kind> secret "<name>" is over <limit> bytes`. `store.ErrNoEnvironmentKey` is `ErrConflict`, `environment "<environment>" of project "<project>" has no key yet: create it with moonglass environments key create`. The messages never quote the ciphertext.
 - **`secrets.list`** (W3-2d) returns kinds, names and times, never ciphertext. Values are never read back through the API (`docs/specs/secrets.md`).
@@ -103,19 +103,19 @@ Every input is a required string except `wrapped`, a required list. A list outpu
 
 ### Protected flag (W4-2)
 
-W4-2 stores `environments.protected` and does not gate deploys. W5-2 adds that gate. Until then a deploy to a protected environment runs and is audited. There is no plan-cap check in the open build. Resource limits are deferred to v1.
+W4-2 stores `environments.protected`; W5-2 makes a deploy or source change in a protected environment wait for an approval (`docs/specs/approvals.md`). There is no plan-cap check in the open build.
 
-| Ticket | Name | Method, path | `MinRole` | Destructive | Target |
-|---|---|---|---|---|---|
-| W4-2 | `environments.set-protected` | `POST /v1/environments/protected` | member | no | project, environment |
+| Ticket | Name | Method, path | `MinRole` | Destructive | Step-up | Target |
+|---|---|---|---|---|---|---|
+| W4-2 | `environments.set-protected` | `POST /v1/environments/protected` | owner | no | yes | project, environment |
 
-- **`environments.set-protected`** takes `project`, `environment` and `protected` (bool).
-- **`environments.create`** sets `protected` true for the org's first environment and false for later ones. The column is `NOT NULL` (`docs/specs/storage.md`).
-- **`deploy`** is not gated on `protected` until W5-2. Until then a deploy to a protected environment runs and is audited like every other call.
+- **`environments.set-protected`** takes `project`, `environment` and `protected` (bool). It is not callable by agent identities (ADR-0006 decision 3).
+- **`environments.create`** sets `protected` false. Every environment starts unprotected until an owner protects it (ADR-0006 decision 4). The column is `NOT NULL` (`docs/specs/storage.md`).
+- **`deploy`** to a protected environment returns the pending approval from W5-2 instead of running.
 
 ### Auto-rollback (W4-3)
 
-Owner decision of 2026-11-20. The behaviour is `docs/specs/auto-rollback.md`, the storage `docs/specs/storage.md` ("Auto-rollback").
+The behaviour is `docs/specs/auto-rollback.md`, the storage `docs/specs/storage.md` ("Auto-rollback").
 
 | Ticket | Name | Method, path | `MinRole` | Destructive | Target |
 |---|---|---|---|---|---|
@@ -147,9 +147,7 @@ Secret reveal, grant, rotate and every other secret-recipient change also need t
 
 From W5-1b the order is agent, role, scope, destructive gate, step-up, and each operation also declares `Level` and `AgentCallable` (`docs/specs/agent-identities.md`, "Authorisation order"). The authz matrix that checks every operation against it is `internal/registry/testdata/authz-matrix.txt` (W5-1).
 
-## Week 5 operations
-
-Specified by the week 5 preflight (owner decisions D28 to D70, approved 2026-11-18):
+## Agent identity, policy and deletion operations
 
 - Agent identities and their scoped tokens, `agents.*` (W5-1c, W5-1): `docs/specs/agent-identities.md`.
 - `services.delete`, `services.restore`, `services.purge` and the `deleted` input of `services.list` (W5-5d, W5-5e), and the same for environments and projects (W5-8): `docs/specs/delete.md`.
@@ -183,7 +181,7 @@ The generated runner sends `Authorization: Bearer $MOONGLASS_TOKEN` to `$MOONGLA
 
 ## Inputs and errors
 
-Owner decision of 2026-11-18 (ADR-0006 decisions 3 and 9). W2-11c, W2-11f and W2-11g build it; every later operation follows it. Where another spec shows a different command shape, this section wins, and the ticket that builds that command corrects its spec.
+This section follows ADR-0006 decisions 3 and 9. W2-11c, W2-11f and W2-11g build it; every later operation follows it. Where another spec shows a different command shape, this section wins, and the ticket that builds that command corrects its spec.
 
 ### Input fields
 
@@ -194,7 +192,7 @@ An operation's `In` is a Go struct. Each field has a `json` tag in snake_case an
 - `registry.Target` carries names, `Project` and `Environment`. `internal/api` fills it from the input's `project` and `environment` fields, which every project- and environment-level operation has as required inputs. It never resolves a name itself.
 - `registry.Invoke` resolves the target with one `store.ResolveTarget` call in the caller's org, as the first half of the scope check: after the role check, before the scope rows are matched. A call the role check refuses reads nothing from the store.
 - A name that does not resolve stands for an id that no scope row names, so only a `*` in that column matches it. When no row matches, the call is denied exactly as for a target the token does not cover: 403, outcome `denied`, the same reason. So a scoped token cannot learn which names exist outside its scope.
-- **Which name did not resolve** (owner decision of 2026-11-19, W2-11h). `ResolveTarget` returns the project id with an error matching `store.ErrNotFound` when the project exists and the environment does not, and two empty ids when the project does not exist (`docs/specs/storage.md`). So the one call tells `Invoke` both which message applies and which column is unresolved: with an empty project id both columns are unresolved; with a project id, the project column is matched by that id and only the environment column is unresolved. `Invoke` never calls `ResolveTarget` a second time. A token scoped to another project gets the same denial whether or not the environment exists, because its row's project id differs either way.
+- **Which name did not resolve** (W2-11h). `ResolveTarget` returns the project id with an error matching `store.ErrNotFound` when the project exists and the environment does not, and two empty ids when the project does not exist (`docs/specs/storage.md`). So the one call tells `Invoke` both which message applies and which column is unresolved: with an empty project id both columns are unresolved; with a project id, the project column is matched by that id and only the environment column is unresolved. `Invoke` never calls `ResolveTarget` a second time. A token scoped to another project gets the same denial whether or not the environment exists, because its row's project id differs either way.
 - A store failure while resolving the target is not a refusal: the handler does not run, the call is answered 500, and the event has outcome `error` and reason `the target could not be resolved`.
 - When a row does match, the call is answered 404, `project "<name>" not found` or `environment "<name>" not found in project "<project>"`, and the handler does not run. The event has outcome `error` and reason `not found`.
 - On success the handler gets the ids in `Call.ProjectID` and `Call.EnvironmentID` and never resolves the target's names again. Other names, such as `service` or `server`, are the handler's to resolve in those ids, after authorisation.

@@ -1,320 +1,182 @@
-# Moonglass — Phase 4: Milestones
+# Moonglass — Milestones
 
-_2026-11-15, revised 2026-11-16 after an outside review. Builds on `research.md` (R§n), `vision.md` (V§n) and `stack.md` revision 3 (S§n)._
+_Builds on `research.md` (R§n), `vision.md` (V§n) and `stack.md` (S§n). The ticket list is `build-plan.md` (B§n)._
 
 **Short version**
 
-- **Week 8 is a free public launch for reputation.** No billing yet. Pro arrives around week 10, open hosted signups around week 11, Team and the self-hosted Team licence around week 14.
-- **The eight weeks were too full, so the scope moved.**
-  - To v1: passkeys and TOTP, Railpack, zero-downtime Compose, metrics charts, managed subdomains, the live-migration demo.
-  - Into the MVP: container-spec sanitization, the recovery key, pre-deploy steps, disk-full handling, `moonglass import`, signed releases with a canary channel.
-  - Net: less soak-sensitive work, more security-critical work.
-- **Week 0 now runs three experiments with pass/fail thresholds** before any product code: a waitlist page on moonglass.dev, a 48-hour agent-and-proxy memory spike, and ten migration interviews.
-- **Every week ends with a demo you run yourself on real servers.** That is the human check on agent-written code.
-- **Launch is invite-gated on hosted for about three weeks, then open.** Self-hosted is open from day one.
+- **Three milestones, each a release people can run, each a step toward v1:** the alpha, the launch and v1. There are no dates. A milestone ships when its gates pass (B§2).
+- **Alpha: the deploy path and the dashboard.** One install on a VPS, GitHub sign-in, push-to-deploy with zero downtime, secrets and environments in the dashboard, domains with TLS, live logs, rollback, several servers, upgrades from the dashboard. It opens to the waitlist.
+- **Launch: what most Coolify and Dokploy users use every day.** Auto-rollback and notifications, coding agents with inline approvals and MCP, teams and roles, deletion and the activity log, databases with backups and the Restore button, Railpack and Compose, PR previews, metrics and log history, templates and the Coolify import. It is the public launch.
+- **v1: the rest.** Cloud and Business, passkeys and OIDC, approver rules and agent-verified approvals, a container terminal, volume backups, private networking, scheduled jobs, more git hosts and templates.
+- **Every group of tickets ends with a demo the owner runs on real servers.** That is the human check on agent-written code.
 
 ---
 
 ## 1. How the plan is built
 
-- **Tests first.** Each week's acceptance tests are written before the code and stay in CI forever (S§7).
-- **Friday demo on the test fleet:** three cheap VPSs (2 GB x86, 2 GB arm64, 4 GB x86), freshly reinstalled.
-- **Parallel tracks** suit agent development: agent/runtime, control plane/API, UI, docs. Each track gets a written spec; the protocol file and the operation registry are the contracts between them.
-- **Multi-user from the first schema.** The MVP shows one person per org on hosted. Organisations, memberships, roles and `org_id` on every row exist from day one, so teams in v1 are not a migration.
-- **The product name is a single constant** in code, binary name, config paths (`/etc/moonglass/`), environment variables (`MOONGLASS_*`) and the Go module path (`moonglass.dev/moonglass`, a vanity import so the module path never depends on the GitHub org name).
+- **Tests first.** Each group's acceptance tests are written before the code and stay in CI forever (S§7).
+- **A demo on the test fleet at every gate:** three cheap VPSs (2 GB x86, 2 GB arm64, 4 GB x86), freshly reinstalled.
+- **Parallel tracks** suit agent development: agent and runtime, control plane and API, dashboard, docs. Each track gets a written spec; the protocol file and the operation registry are the contracts between them.
+- **Multi-user from the first schema.** Organisations, memberships, roles and `org_id` on every row exist from day one, so teams are not a migration.
+- **Dashboard first.** A capability is done when its dashboard flow ships. The CLI, API and MCP come from the same registry operations, so each flow exists on every surface (ADR-0006).
+- **The product name is a single constant** in code, binary name, config paths (`/etc/moonglass/`), environment variables (`MOONGLASS_*`) and the Go module path (`moonglass.dev/moonglass`, a vanity import so the module path never depends on the GitHub organisation).
 
 **Never cut:**
-- Zero-downtime deploys for the shapes promised in S§5.3, instant rollback, and auto-rollback (crash and health triggers on, error-rate trigger in shadow mode)
+- Zero-downtime deploys for the shapes promised in S§5.3, instant rollback, and auto-rollback (crash and health triggers on, error-rate trigger in shadow mode until enabled)
 - The typed protocol, the local policy file and container-spec sanitization
 - Encrypted secrets with the recovery key
-- Scoped tokens, approvals on protected environments with step-up, the audit trail
+- Scoped tokens, step-up, approvals and the audit trail
+- Backups with a restore you can click
 - Disk-full protection
 - Signed releases with automatic revert
 - One-command install
+- The dashboard flow for every capability
 
-**Cut order if a week slips** (first to go at the top):
-1. The Coolify importer (keep Compose import)
-2. One-click Redis (keep Postgres)
-3. Webhook notifications (keep email)
-4. Current resource usage in the UI (keep live logs)
-5. Re-enrolment between hosted and self-hosted (keep `moonglass export`)
-
-If the week 1 or week 2 gates slip by more than a week, move the launch to week 10. Do not cut from the never-cut list to hold the date.
+If the work runs long, a milestone waits. Nothing moves from a milestone to a later one to make a date, because there are no dates.
 
 ---
 
-## 2. Week 0: before the clock starts
+## 2. Before the alpha
 
 ### 2.1 Things with lead times
 
 | Do | Why now |
 |---|---|
-| **Name: done.** Moonglass, moonglass.dev owned. The code is public at `github.com/moonglass-dev/moonglass` under the `moonglass-dev` organization. Package names and social handles are still open | The repository no longer blocks development |
-| **Buy a separate user-content domain** for managed subdomains (V§8, open decision 2) | Needed for the Public Suffix List application; cannot be a subdomain of moonglass.dev |
-| **Apply to the Public Suffix List** on cookie-isolation grounds, and **ask Let's Encrypt for a rate-limit adjustment** | No SLA; often one to two weeks, sometimes months, and requests aimed at Let's Encrypt limits are rejected (S§3.4). Managed subdomains are v1, so this no longer blocks launch |
+| **Name: done.** Moonglass, moonglass.dev owned. The code is public at `github.com/moonglass-dev/moonglass` | The repository is live |
 | Repository, CI on real Docker, test fleet; **two release signing keys on hardware tokens (ADR-0007); canary and stable channels** | Everything after depends on it; the first agent binary must already be signed |
-| Write the threat model (S§4), the first protocol file, the **container-spec deny list** (S§3.2) and the **key design** (S§3.11) as documents | These are the specs the agents build against and the reviewer agent checks against |
-| Agent workflow: track specs, reviewer-agent brief, definition of done | So week 1 produces product, not process |
+| The threat model (S§4), the protocol file, the **container-spec deny list** (S§3.2) and the **key design** (S§3.11) as documents | These are the specs the agents build against and the reviewer checks against |
+| The waitlist page (W0-5) from `docs/plan/landing.md` | The alpha opens to it |
+| The user-content domain, its Public Suffix List entry and a Let's Encrypt rate-limit request | Cloud's managed subdomains (V1-4) need them |
+| A Stripe account with Stripe Tax, and the Business licence key | Cloud and Business (W7-4) |
 
 ### 2.2 Three experiments, with thresholds
 
-Thresholds are my proposals. Each one says what we do if it fails, so a miss changes the plan rather than getting explained away.
+Thresholds are proposals. Each one says what changes if it fails, so a miss changes the plan rather than getting explained away.
 
-**1. Waitlist page on moonglass.dev (a fake door).** _Runs weeks 0–3._
-- **What:** the headline and subline from V§1, three short proof points, and two buttons: "Join the hosted waitlist" and "Tell me when self-hosted ships". One optional question: "What do you deploy with today?" It is an honest waitlist, not a fake checkout, and the page says when each will be ready.
-- **Where:** a short post in the places R§3 lists, and the week 2 video once it exists.
-- **Pass:** ≥ 300 signups, and ≥ 35% choose hosted.
-- **Fail and what changes:**
-  - Under 100 signups: the positioning does not land. Rework the headline before the week 5 video.
-  - Under 20% hosted: the hosted revenue lines in V§5.6 are weaker than assumed. Weight the Team licence and Enterprise, and keep free hosted small.
+**1. The waitlist on moonglass.dev.**
+- **What:** the hero, the status section and the pricing from `docs/plan/landing.md`, a "Join the waitlist" form with one optional question ("What do you deploy with today?"), and the plan in public.
+- **Where:** a technical post with the ten-deploy video, and the places R§3 lists. Not a Show HN: that waits for the launch, when anyone can install it.
+- **Pass:** ≥ 1,000 signups before the alpha opens, at least a third of them on Coolify or Dokploy.
+- **Fail and what changes:** under 300 signups means the positioning does not land: rework the headline and the demo before the launch.
 
-**2. 48-hour memory spike.** _Runs in week 0, before the budget in S§6 is written into any public copy._
-- **What:** a throwaway `moonglass agent` and `moonglass proxy` (Caddy 2.11.9 with a stub counter module) on the 2 GB VPS. Ten routes, steady synthetic traffic (~20 requests a second), one certificate issuance, one simulated deploy an hour. Also tests the proxy upgrade path (S§3.3): systemd socket activation versus `SO_REUSEPORT`.
-- **Pass:**
-  - Combined RSS at or under 100 MB at the 99th percentile.
-  - Under 5% growth between hour 2 and hour 48.
-  - Proxy at or under 60 MB.
-  - One proxy upgrade under load with zero failed requests.
-- **Fail and what changes:**
-  - Over budget: tune the memory limit, drop HTTP/3 by default, or move the public number before anything says "under 100 MB".
-  - Neither upgrade path is clean: proxy upgrades become a short, announced, drained restart, and the docs say so.
+**2. 48-hour memory spike (SPIKE-1).** _Before the alpha, and before "under 100 MB" goes into any public copy._
+- **What:** a throwaway `moonglass agent` and `moonglass proxy` (Caddy 2.11.9 with the counter module) on the 2 GB VPS. Ten routes, steady synthetic traffic (about 20 requests a second), one certificate issuance, one simulated deploy an hour. Also tests the proxy upgrade path (S§3.3): systemd socket activation versus `SO_REUSEPORT`.
+- **Pass:** combined RSS at or under 100 MB at the 99th percentile; under 5% growth between hour 2 and hour 48; proxy at or under 60 MB; one proxy upgrade under load with zero failed requests.
+- **Fail and what changes:** over budget means tune the memory limit, drop HTTP/3 by default, or change the public number before anything says "under 100 MB". If neither upgrade path is clean, proxy upgrades stay a short, announced, drained restart, and the docs say so.
 
-**3. Ten migration interviews.** _Runs weeks 0–2._
-- **What:** 30-minute calls with people running production on Coolify, Dokploy or Railway. Ask what made them pick it, what last went wrong, what a move would take, and what they would pay for. Show the import idea and check what their Coolify API can export.
-- **Pass:** at least 6 of 10 describe a recent pain the MVP solves (dropped requests, restores needing SSH, a security worry, footprint, a full disk), **and** at least 3 would move a production app within a month of launch.
-- **Fail and what changes:** fewer than 4 of 10 means the lead is wrong. Revisit V§1 before week 5, and check whether guardrails should lead after all.
-- **Side effect:** the alpha group. Aim to leave with five people who will run the private alpha from week 5.
+**3. Ten conversations with people switching.**
+- **What:** 30-minute calls with people running production on Coolify, Dokploy, Kamal or Railway, and with agencies that run servers for clients. Ask what made them pick it, what last went wrong, what a move would take, and what is missing from Moonglass's feature list.
+- **Pass:** at least 6 of 10 would move a real app once the launch milestone ships.
+- **Fail and what changes:** fewer means a parity gap the list does not cover. File it as a ticket in the launch before the launch gate.
+- **Side effect:** the first alpha users. Aim to leave with ten people who will run the alpha.
 
 ---
 
-## 3. The eight weeks
+## 3. The milestones
 
-### Week 1: skeleton, sanitizer and the two gates
-- **Build:**
-  - Install script.
-  - `agent enroll` over an outbound connection, printing the key fingerprint; heartbeat.
-  - `moonglass proxy` as its own systemd unit with Caddy 2.11.9 embedded, configured by the agent over a Unix socket; our counter module; one hand-written route with automatic HTTPS.
-  - **Container-spec sanitizer with its escape suite**, before any `Deploy` exists.
-- **Demo:**
-  - On a fresh VPS, one command installs agent and proxy, the server shows as online, and a real domain serves over HTTPS.
-  - Restart and upgrade the agent under load: the proxy keeps serving with zero failed requests.
-- **Gates:** combined idle memory at or under 100 MB in CI, matching the week 0 spike. The sanitizer rejects every fixture in the escape suite.
+Each group of tickets in B§3 ends with a gate. The demos below are the owner's, on the reinstalled fleet.
 
-### Week 2: deploy, switch, roll back, pre-deploy steps
-- **Build:**
-  - Typed `Deploy`, `SwitchRelease`, `Rollback`, `RunPreDeploy`.
-  - Health-gated switch and connection draining.
-  - Keep the last five releases; deploy history.
-  - One deploy per app at a time.
-  - Pre-deploy steps in a sanitized one-off container (S§3.13).
-  - **The operation registry** generating REST and the CLI, with owner tokens and hash-chained audit events. It lands here rather than in week 5 so the API is never written twice (build plan W2-1).
-  - The UI shell moved to week 4, behind sign-in (W4-1); the preflight of 2026-11-17 decided this, because the UI must not hold a token page script can read.
-- **Demo:**
-  - A load generator holds steady traffic through ten consecutive deploys with **zero failed requests**, then `rollback` completes in under five seconds.
-  - A failing pre-deploy step leaves the old release serving.
-- **Output:** the first public video. Start building in public here, and link it from the waitlist page.
+### Alpha
 
-### Week 3: git push to live, with secrets and a disk that cannot fill
-- **Build:**
-  - Builds on the server from a GitHub repository and commit, with a deploy key generated on the server (`moonglass deploy --git`); builds of a Dockerfile or prebuilt image through BuildKit; the build-in-CI template. The GitHub App moves to week 4: creating one from a manifest needs a signed-in session (W4-1).
-  - **Environment keys, `moonglass keys init`, and `secrets set` from the CLI.** The control plane stores ciphertext only.
-  - Moved to week 4 because each needs step-up (ADR-0003 decision 11): delivering secrets to servers, environment variables and private registry pulls (which use them), `secrets reveal`, `secrets grant` and `secrets rotate`. Browser encryption (W4-5) arrives with the UI in week 4.
-  - Build-cache cap and image cleanup; **disk-full handling** (S§3.13).
-- **Demo:**
-  - `git push` goes live on the 2 GB server, through the build-in-CI template. The stored secret is shown to be ciphertext in the control-plane database.
-  - Fill the disk to 95%: the build is refused, the cache is pruned, an alert fires, and the app keeps serving.
+**Alpha 1 to 3: skeleton, deploys, git and secrets (G1 to G3).**
+- **Build:** the install script; `agent enroll` over an outbound connection with the key fingerprint; heartbeat; `moonglass proxy` with Caddy embedded, configured by the agent over a Unix socket; the container-spec sanitizer with its escape suite; typed `Deploy`, `SwitchRelease`, `Rollback` and `RunPreDeploy`; the health-gated switch and draining; the operation registry generating REST and the CLI, with hash-chained audit; the control plane on SQLite; builds on the server from a GitHub repository and commit with a server-made deploy key; environment keys and encrypted secrets; disk-full handling.
+- **Demo:** ten consecutive deploys under load with **zero failed requests**, then a rollback in under five seconds; a failing pre-deploy step leaves the old release serving; a commit builds and goes live on the 2 GB box; the stored secret is ciphertext in the database; a disk filled to 95% refuses the build, prunes the cache, and keeps the app serving.
 
-### Week 4: auto-rollback, environments, sign-in, first real UI
-- **Build:**
-  - Auto-rollback with shadow mode for the error-rate trigger (S§5.4).
-  - Environments with a protected flag. The org's first environment is created protected and later ones are not. Until W5-2, a deploy to a protected environment runs and is audited. Resource limits are deferred to v1.
-  - Live logs and current resource usage.
-  - **GitHub sign-in, email magic links, sessions list and revoke.**
-  - UI for projects, services, deploys and logs.
-  - Email and webhook notifications.
-  - From week 3: secret delivery, environment variables and private registries, `secrets grant`, `rotate` and `reveal`, the GitHub App, and the UI shell from week 2.
-- **Demo:**
-  - Add a second server to the environment and watch it receive the wrapped key (moved from week 3).
-  - Push a commit that crash-loops. It rolls back automatically inside two minutes, and a notification arrives.
-  - Push a commit that raises the 5xx rate. Shadow mode reports "this would have rolled back" with the numbers. Turn the trigger on, push again, and watch it roll back in the UI.
+**Alpha 4 to 6: sign-in, the one-box install, the dashboard, upgrades (G4).**
+- **Build:** GitHub sign-in, sessions and step-up; server, agent and proxy on one box from one install, with the control plane's domain on the box's proxy; the control-plane backup; secret grant and delivery; private registries; live logs and current usage; the dashboard shell with Inbox, Servers and Projects, the project tabs, the live runtime panel and status dots; secrets, the recovery key and environments in the dashboard; the GitHub App and push-to-deploy; adding servers from the dashboard; the first-run flow; signed self-update with revert, and Update from the dashboard; the quick start.
+- **Demo:** on a fresh VPS, one install; sign in with GitHub; make the recovery key; connect a repository; set a secret; push and watch it go live in the dashboard; roll back; add a second server; upgrade with one click, and watch a broken canary revert itself.
+- **Then:** the alpha opens to the waitlist. Install it with the first users on a call and time their first deploy (§6).
 
-### Week 5: the agent-safety story
-- **Build:**
-  - MCP generated from the operation registry that has existed since week 2 (official Go SDK v1.7+).
-  - Agent identities with scoped tokens.
-  - Approval flow for protected environments and destructive operations, with a diff of what will change and **step-up re-authentication**.
-  - Soft delete; audit trail, hash-chained; enforcement of the local policy file.
-- **Demo:** a coding agent connected over MCP deploys to staging freely, has its production deploy held for your approval with a diff, and is refused when it tries to delete the production database. Every step appears in the audit trail under the agent's name.
-- **Also:** private alpha opens with the interviewees. Second public video.
+### Launch
 
-### Week 6: databases, backups, restore, Compose
-- **Build:**
-  - One-click Postgres and Redis.
-  - Scheduled backups, compressed and encrypted to the environment key, to any S3-compatible bucket; one-click restore; restore in CI.
-  - **Compose import:** unchanged services are never touched, and changed services restart in place, with the UI listing them first.
-- **Demo:**
-  - Create Postgres, schedule a backup, destroy the server, then **restore onto a different server using only the recovery key**.
-  - Redeploy a Compose app and show the database container was never touched.
-- **Check:** run the swappable/pinned classifier over 30 popular open-source Compose files and record how many services land in each class. This sizes v1 blue/green; it is not a launch item.
+**Launch 1 to 4: auto-rollback, notifications, coding agents, teams, deletion (G5).**
+- **Build:** auto-rollback with shadow mode for the error-rate trigger (S§5.4); notifications by webhook, Slack, Discord, Telegram and email, with an outside heartbeat URL; agent identities and scoped tokens with the authorisation matrix; local policy enforcement; protected environments and approvals with inline diffs; MCP; the Agents screen; members, invitations and roles; Google sign-in; soft delete, restore and purge for services, environments and projects; the Activity view.
+- **Demo:** push a commit that crash-loops: it rolls back inside two minutes and a Slack message arrives. Push one that raises the 5xx rate: shadow mode reports "this would have rolled back" with the numbers; turn the trigger on and watch it roll back. A coding agent deploys to staging over MCP, and its production deploy waits in the Inbox until you approve it from the diff. Invite a teammate as a viewer, who can see everything and deploy nothing.
 
-### Week 7: self-hosting, portability, import, releases
-- **Build:**
-  - Self-hosted mode (server, agent and proxy on one box, a one-time bootstrap token, `moonglass server login-link`), with SQLite behind the same storage interface. The storage conformance suite runs green against both backends.
-  - `moonglass export` and re-enrolment between hosted and self-hosted.
-  - **`moonglass import`** for Compose and Coolify.
-  - Free-tier limits on hosted (one person, two servers, no managed subdomains).
-  - Control-plane backup (managed PITR on hosted; encrypted snapshot to the user's bucket on self-hosted).
-  - **Agent self-update from the canary channel, with signature check and automatic revert**; staged rollout on hosted.
-  - First-deploy wizard.
-- **Demo:**
-  - Import a real Coolify project from an alpha user and deploy it.
-  - Upgrade the agent under load with zero failed requests.
-  - Push a deliberately broken canary build and watch the agent revert itself.
-- **Start:** a seven-day soak on the fleet with scheduled deploys, backups, certificate renewals, a disk filling slowly, and canary updates.
+**Launch 5 and 6: databases, backups, restore, secrets complete (G6).**
+- **Build:** one-click Postgres, MySQL, MariaDB, MongoDB and Redis; scheduled backups, compressed and encrypted to the environment key, to any S3-compatible bucket; the Restore button; restore in CI; reveal, rotate and grant in the dashboard.
+- **Demo:** create Postgres from the dashboard, schedule a backup, destroy the server, then **restore onto a different server using only the recovery key**, from the Restore button.
 
-### Week 8: harden and launch
-- **Build:** nothing new.
-  - Fix what the soak test and alpha users found.
-  - Adversarial pass by the reviewer agent over the protocol, sanitizer, key handling and auth surface. Fuzzing left running.
-  - Docs: quick start; the "which apps get zero downtime" page (S§5.3, word for word); the threat model with its limits; the recovery-key page; an honest comparison page including Temps Premium (V§1.1).
-  - The reproducible benchmark repository (§5). Landing and pricing pages, written in the voice in V§1.2.
-- **Demo:** the launch. Three videos: zero dropped requests through ten deploys, a restore onto a new server, and a coding agent that asks before production.
-- **Hosted signups are invite-gated** from the waitlist, in batches, so abuse and support load stay inside what one person can handle. Self-hosted is open to everyone.
-- **Opening hosted (target ~week 11, after Pro ships).** Open signups once all three hold:
-  - Abuse controls are live: account-age checks on GitHub sign-in, per-account rate limits, a report link on every deploy page.
-  - Support takes under five hours a week for two weeks running.
-  - No serious incident in the previous 14 days.
+**Launch 7 to 10: builds, previews, metrics, templates, import (G7).**
+- **Build:** Railpack zero-config builds; Compose done properly, in the dashboard and the CLI; PR previews with their own URLs and databases; metrics charts and log history; the template format, twenty tested templates and the gallery; the Coolify import.
+- **Demo:** import a Coolify setup; deploy a template with its database; open a pull request and click its preview URL; close it and watch the preview go; see a week of CPU and requests in the runtime panel.
 
-  The free funnel in V§5.6 needs thousands of orgs, which invites alone cannot supply, so the gate is deliberately short.
+**Launch 11: harden and launch (G8).**
+- **Build:** nothing new. Fix what the soak and the alpha users found; the adversarial review of the whole trusted core; the launch docs; the benchmark repository; the comparison page; the landing and pricing pages.
+- **Demo:** the launch, as a Show HN. Two videos: zero dropped requests through ten deploys, and a coding agent's deploy approved from the Inbox.
+
+### v1
+
+**v1 1 and 2: Cloud and Business (G9).**
+- **Build:** the extension points of the licensed build; managed instance mode; the Cloud service, sign-up and billing (`docs/specs/billing.md`) in its own repository; staged rollout; export, import and re-enrolment between Cloud and self-hosted; managed subdomains; the Business module.
+- **Demo:** sign up for Cloud, connect a server, deploy, add a server and see the price change before it enrols, then export to a self-hosted box and watch the agents re-enrol. **Cloud opens to the waitlist, founding members first.**
+
+**v1 3 and 4: the rest (G10).**
+- **Build:** passkeys and TOTP; OpenID Connect sign-in; approver rules and two-person approval; agent-verified approvals; the container terminal; scheduled key rotation; volume backups and restore drills; moving a service between servers; private networking between servers; scheduled jobs; resource limits; build servers; GitLab, Gitea and Forgejo; thirty more templates; the Dokploy import; DNS-01 wildcard certificates; uptime checks; declarative environments; marketplace images; the external security review.
+- **Demo:** approve a production deploy with a passkey that the server itself verifies; open a terminal into a container from the dashboard; move a service with its database to another server.
 
 ---
 
-## 4. The cut: every item from your brief
+## 4. Every capability, by milestone
 
-### In the eight-week MVP
+| Capability | Alpha | Launch | v1 |
+|---|---|---|---|
+| Git push-to-deploy | GitHub App; Dockerfile and image builds | Railpack | GitLab, Gitea, Forgejo; build servers |
+| Compose | | Unchanged services untouched, stateless blue/green, stateful stop-then-start, in the dashboard and CLI | Declarative environments from the repository |
+| PR previews | | Preview environments, URLs, databases, PR comments and statuses | Previews from GitLab, Gitea and Forgejo |
+| Domains and TLS | Custom domains, automatic HTTPS, DNS check | Wildcard preview domains | DNS-01 wildcards; managed subdomains on Cloud |
+| Variables and secrets | Set in the dashboard and CLI, encrypted end to end; recovery key and environments in the dashboard | Reveal, rotate and grant in the dashboard | Scheduled rotation |
+| Databases | | Postgres, MySQL, MariaDB, MongoDB, Redis; backups to S3; Restore button | Volume backups and restore drills; move between servers |
+| Logs and metrics | Live logs, current usage | Log history, metrics charts | Uptime checks |
+| Servers | Many servers, outbound agents, add from the dashboard | | Private networking between servers |
+| Rollbacks | Instant rollback | Auto-rollback, shadow mode for the error rate | |
+| Webhooks and notifications | The Inbox | Webhooks, Slack, Discord, Telegram, email, outside heartbeat | |
+| Teams and roles | | Members, invitations, four roles, organisations | Approver rules |
+| Coding agents | | Agent identities, scoped tokens, approvals with inline diffs, MCP | Agent-verified approvals |
+| Sign-in | GitHub, login link | Google | Passkeys, TOTP, OpenID Connect; SAML and SCIM in Business |
+| Audit | The hash chain is written from the first operation | The Activity view, `audit verify` | Export in Business |
+| API, CLI | Generated from the registry | API reference in the docs | |
+| Templates | | Twenty tested templates, the gallery | Fifty |
+| Import | | Coolify | Dokploy; export and re-enrol between Cloud and self-hosted |
+| Upgrades | Signed self-update, revert, Update in the dashboard | | Staged rollout on Cloud |
+| Container access | | | The container terminal |
+| Other | Disk-full handling, control-plane backup | Deletion with restore | Scheduled jobs, resource limits, marketplace images |
+| Hosting | Self-hosted | Self-hosted | Cloud and Business |
 
-| Item | Scope at launch |
-|---|---|
-| Build and deploy Docker images | Yes |
-| Git sources | GitHub only |
-| Registry images | Public and private |
-| Connect your own servers | Yes, outbound agent |
-| Logs and metrics | Live logs and current resource usage; charts in v1 |
-| Database deployments, one-click databases | Postgres and Redis |
-| Notifications and alerts | Email and webhook: deploy failed, rolled back, would have rolled back, server offline, disk low, backup failed, approval needed |
-| Scheduled backups, S3 storage | Postgres dumps to any S3-compatible bucket, encrypted to the environment key |
-| Database restoration | One-click for Postgres, including onto a new server with the recovery key |
-| Environment variables and secrets, encrypted at rest and in transit | Yes; envelope keys and recovery key; write-only in the web UI |
-| Health checks and alerting | On the server, plus offline detection from the control plane |
-| Low footprint | Measured, published, reproducible |
-| Domains and SSL | Custom domains with automatic HTTPS; managed subdomains in v1 |
-| Self-hosted on the master node | Yes |
-| MCP for everything, scoped API and MCP tokens, MCP scopes | Yes, generated from one registry |
-| Security at its base | Typed protocol, container-spec sanitization, local policy, no inbound ports |
-| Zero-downtime deploys, graceful shutdown | Yes for single-service apps; exact shapes documented (S§5.3) |
-| Docker Compose | Import; unchanged services untouched, changed services restart in place; blue/green in v1 |
-| Zero-config builds | v1 (Railpack via CLI); MVP has Dockerfile, image and the build-in-CI template |
-| Instant rollback, auto-rollback | Yes; error-rate trigger in shadow mode until enabled |
-| Pre-deploy steps (migrations) | Yes; failures abort the deploy; irreversible by default |
-| Environments | Yes, with a protected flag |
-| Deployment diffs and approvals | Single approver, with a diff and step-up |
-| Resource limits, deployment history | Deployment history yes; resource limits deferred to v1 |
-| Image and container cleanup, Docker cleanup | Yes, including the build cache, plus disk-full handling |
-| Network management | One isolated network per project |
-| Control-plane backup and recovery | Yes |
-| Audit events, MFA, session management | Audit and sessions, yes; MFA through GitHub sign-in at launch; passkeys and TOTP in v1 |
-| Deployment wizard, one-command install, CLI | Yes |
-| Import from elsewhere | `moonglass import` for Compose and Coolify |
-| Releases | Signed, canary and stable channels, staged rollout, automatic revert |
-| Declarative config | Export only |
-| Deployment concurrency control | One per app; newest wins |
-| Free-tier limits on hosted | One person, two servers, no managed subdomains, from day one |
-| Linear-style UI | Core screens |
-
-### v1, roughly weeks 9–20, in this order
-
-| Item | Note |
-|---|---|
-| Billing and the Pro plan | First revenue, around week 10 |
-| Open hosted signups | Around week 11, on the criteria in week 8 |
-| Passkeys and TOTP | Before Team, so approvals can require a real second factor |
-| Teams, basic roles, the Team plan; self-hosted Team licence | The main paid trigger (V§5.5), around week 14 |
-| Approver rules and agent policy rules | Commercial module (V§5.2) |
-| PR previews, including Compose and per-preview migrations | Open core. The best-evidenced team feature (R§10) |
-| Zero-downtime Compose | Blue/green for swappable services, sized by the week 6 classifier check |
-| Railpack zero-config builds | Through its CLI and BuildKit frontend, pinned, behind canary |
-| Metrics charts | From the samples the agent already collects |
-| Resource limits | Deferred from week 4 |
-| Managed subdomains | Pro and Team; needs the PSL entry or a Let's Encrypt adjustment |
-| Live hosted ↔ self-hosted migration without restart, and its demo | Tested on every release from here |
-| Agent-verified approvals | Closes the gap in S§4 for protected environments |
-| External security review | Protocol, sanitizer, key design, auth. Before any "audited" claim |
-| Volume backups and scheduled restore drills | restic |
-| Move a project between servers | Parity with Dokploy v0.31.0; depends on volume backups |
-| Marketplace listings live | Hetzner and DigitalOcean (§5) |
-| MySQL/MariaDB and MongoDB | One-click |
-| GitLab and Gitea/Forgejo | Git sources |
-| Generic OIDC sign-in | Open core |
-| External probes from several regions, on-call routing | Team plan |
-| Scheduled jobs | Cron-style |
-| Private networking between servers | WireGuard |
-| Dedicated build servers | The build-in-CI path covers the MVP |
-| Container exec | CLI, human-only, second factor |
-| Curated one-click services | About ten, including Ollama and a GitHub Actions runner |
-| Wildcard certificates, more DNS providers | DNS-01 |
-| Importers for Dokploy and others | Whatever the interviews say people are leaving |
-| Automatic rotation of Moonglass-generated secrets; scheduled agent key rotation | S§3.11 |
-| Retention and health-check schedule settings | Per app |
-| Declarative config applied from a repository | GitOps |
-| Anything cut from the MVP | |
-
-### Later
-
-| Item | Note |
-|---|---|
-| SAML, SCIM, custom roles, air-gapped packaging, compliance exports | Enterprise, in the commercial module; sells after a year of credibility (V§5.6) |
-| Secret-manager integrations | Requested at Komodo (R§10) |
-| Load balancing across servers | Deliberately late (V§4) |
-| Image vulnerability scanning, SBOM for user images | |
-| Point-in-time recovery for Postgres | |
-| Canvas view | No demand evidence yet (V§4) |
-| Podman, log search, OpenTelemetry export | |
-| Agency and partner pricing | |
+**Not planned:** SAML outside Business; load balancing across servers; image vulnerability scanning; point-in-time recovery for Postgres; Podman; a canvas view (V§4).
 
 ---
 
 ## 5. Distribution
 
-The free funnel needs reach a solo founder cannot buy (V§5.6). Three channels that keep working after launch day:
+Reach a small team cannot buy, in the order it happens:
 
 | Channel | What | When |
 |---|---|---|
-| **Marketplace apps** | A DigitalOcean Marketplace 1-Click and a Hetzner Cloud app: a fresh server with the agent and proxy installed, waiting for an enrolment token | Built in week 7; submitted at launch. Both have review lead times I have not verified, so plan for listings to go live in v1 |
-| **`moonglass import`** | Compose and Coolify at launch; Dokploy and others in v1. The comparison page links straight to it | Week 7 |
-| **Reproducible benchmark repository** | Scripts that provision identical VPSs and measure idle memory, idle CPU and failed requests across ten deploys for Moonglass, Coolify, Dokploy and, where it fits the hardware, Temps. Method, raw data and versions published; pull requests from other projects welcome | Week 8; rerun on every Moonglass release |
+| **A technical post** | The ten-deploy video, the plan in public, and the waitlist. Not a launch | Before the alpha |
+| **Show HN** | The public launch, once anyone can install it | At the launch |
+| **Reproducible benchmark repository** | Scripts that provision identical VPSs and measure idle memory, idle CPU and failed requests across ten deploys for Moonglass, Coolify, Dokploy and, where it fits the hardware, Temps. Method, raw data and versions published; pull requests from other projects welcome | At the launch; rerun on every release |
+| **The Coolify import and the comparison page** | Switching in one pass, and a fair comparison (V§1.1) | At the launch |
+| **Cloud for the waitlist** | Founding members first (`docs/specs/pricing.md`) | v1 |
+| **Marketplace apps** | A DigitalOcean 1-Click and a Hetzner Cloud app | v1 |
 
 The benchmark is written calmly (V§1.2). It reports numbers and credits what others do well; it is not a takedown.
 
 ---
 
-## 6. What to measure from launch day
+## 6. What to measure from the alpha
 
 | Measure | Why |
 |---|---|
-| Waitlist size, hosted versus self-hosted split, and how fast invites convert to a first deploy | The first read on V§5.6 before billing exists |
-| Servers enrolled; orgs with a deploy in the last 30 days | The denominator for every conversion number |
-| Time from install, or from `moonglass import`, to first successful deploy | The first-hour promise (V§3) |
+| Waitlist size, and the share on Coolify or Dokploy | The first read on V§5.4 |
+| Time from install to first successful deploy | The first-hour promise (V§3) |
 | Share of installs that reach a second deploy within a week | Early retention |
-| Shadow-mode "would have rolled back" events, and how many the user marked right | Whether the error-rate trigger is ready to be on by default |
-| Real auto-rollbacks fired, and how many the user judged wrong | Whether the default triggers are right |
-| Sanitizer rejections, by field | Which `agent.toml` exceptions people actually need, and whether the errors explain themselves |
+| Flows people finish in the dashboard, and the ones they drop to the CLI for | Whether the dashboard is complete |
+| Shadow-mode "would have rolled back" events, and how many people marked right | Whether the error-rate trigger is ready to be on by default |
+| Real auto-rollbacks fired, and how many people judged wrong | Whether the default triggers are right |
+| Sanitizer rejections, by field | Which `agent.toml` exceptions people need, and whether the errors explain themselves |
 | Disk-low events and prunes | Whether the thresholds are right on small servers |
-| Hosted versus self-hosted split | Whether hosted is worth paying for (V§5.8) |
-| Orgs hitting the two-server limit | The Pro trigger, before Pro exists |
-| Orgs that try to invite a second person | The Team trigger, before Team exists |
-| After billing: paid-first signups | The largest line in V§5.6 |
-
-The two limit measures tell you how large the paying population is before you build billing.
+| What alpha users ask for that is not in the plan | Parity gaps, filed as launch tickets |
 
 ---
 
@@ -324,47 +186,27 @@ The two limit measures tell you how large the paying population is before you bu
 
 | Risk | Why it matters | Retired by |
 |---|---|---|
-| A security product written by agents, with no human who reviews every line | One authorisation or sanitization bug undoes the positioning | The five permanent suites and the reviewer agent from week 1 (S§7); small trusted core; external review in v1; docs that never say "audited" before it is true |
-| A container spec gets past the sanitizer | "A short, typed list" stops being true | Deny by default; checks after Compose interpolation; the escape suite from week 1; an external review of the sanitizer specifically |
-| Users lose the recovery key and every server | Secrets and backups are unrecoverable, by design | Mandatory `keys init`; a second owner key; the quarterly recovery-key check; plain warnings at setup and on the pricing page |
-| Deploys drop requests under real conditions: WebSockets, slow starts, long uploads | It is the headline claim | Load tests from week 2 on every change, across agent and proxy upgrades; the promise scoped to the shapes in S§5.3 |
-| A proxy upgrade drops connections | Rare, but visible | Proxy upgrades separate from agent upgrades; the handover tested in the week 0 spike and the deploy suite |
-| Two storage backends drift apart | A bug that exists only on self-hosted, found by users | One interface; the conformance suite against both on every change; SQL kept to the common subset |
-| Auto-rollback fires on healthy deploys, or rolls code back over a migrated schema | Users switch it off and the feature is dead | Shadow mode for the error-rate trigger; no auto-rollback after an irreversible step; alpha users' real deploys in weeks 5–8 |
-| Backup or restore silently produces something unusable | Data loss ends trust permanently | Restore in CI on every change from week 6, including onto a fresh server; an unverifiable restore is reported as failed |
-| A bad agent release reaches every server | Every user hit at once | Canary channel, 72 hours before stable, staged rollout, automatic revert |
-| Memory creeps above the target | The footprint claim is public | The week 0 spike; measured in CI from week 1 with a fixed budget |
-| Docker differences across versions 25 to 29 | Breaks on users' servers, not yours | Version matrix in CI from week 2 |
-| Builds or logs exhaust a 2 GB server | First impression on the cheapest hardware | One build at a time; the build-in-CI template; disk-full handling; tested on the 2 GB machines every week |
+| A security product written by agents, with no human who reviews every line | One authorisation or sanitization bug undoes the positioning | The permanent suites and the reviewer from the first ticket (S§7); `high` review on the whole trusted core; the adversarial review before the launch; an external review in v1; docs that never say "audited" before it is true |
+| A container spec gets past the sanitizer | "A short, typed list" stops being true | Deny by default; the escape suite from the skeleton; the external review of the sanitizer |
+| Browser-side key handling | The dashboard trusts the JavaScript the control plane serves | The strict CSP, the age library loaded only where keys are handled, the threat model's honest limits, and the CLI as the stronger path (S§3.11) |
+| Users lose the recovery key and every server | Secrets and backups are unrecoverable, by design | The key saved and checked at first run; a second owner key; the quarterly check; plain warnings |
+| Deploys drop requests under real conditions: WebSockets, slow starts, long uploads | It is the headline claim | Load tests on every change, across agent and proxy upgrades; the promise scoped to the shapes in S§5.3 |
+| Compose files in the wild do not fit | Compose is a launch feature | LN-13 widens the subset before W6-4a builds it, and the survey (W6-5) checks thirty real files |
+| Auto-rollback fires on healthy deploys, or rolls code back over a migrated schema | People switch it off | Shadow mode for the error-rate trigger; no auto-rollback after an irreversible step |
+| Backup or restore silently produces something unusable | Data loss ends trust | Restore in CI on every change, including onto a fresh server; an unverifiable restore is reported as failed |
+| A bad agent release reaches every server | Every user hit at once | Canary channel, 72 hours before stable, automatic revert; staged rollout on Cloud |
+| Memory creeps above the target | The footprint claim is public | SPIKE-1; measured in CI on every change with a fixed budget |
+| Docker differences across versions 25 to 29 | Breaks on users' servers | The version matrix in CI |
+| Builds or logs exhaust a 2 GB server | First impression on the cheapest hardware | One build at a time; disk-full handling; tested on the 2 GB machines at every gate |
 
 ### Business
 
 | Risk | Why it matters | Retired by |
 |---|---|---|
-| The free tier converts at 1–2%, not 4% | The free funnel alone needs ~29,000–57,000 active free orgs for $10K MRR (V§5.6) | Plan on four revenue lines; measure paid-first signups; recalibrated gates in V§5.8; keep free hosted cheap |
-| No revenue until about month three, and $10K MRR is an 18–30 month outcome | Runway and motivation | Know it going in; Pro before Team because it is the cheapest revenue to ship |
-| Temps cuts the price of Premium | Our "team price" angle narrows | The approval gate is free in our open core; the footprint gap cannot be closed with a price change; the comparison page stays fair so it stays credible |
-| Coolify ships quickly and already has scoped MCP tokens | The agent-safety story can be claimed by someone else | Lead with correct deploys and architecture they cannot copy without a rewrite (R§5); publish the demos as they happen |
-| An unknown vendor asking for deploy rights | Indies hesitate, teams refuse | Open source from the first commit, the published threat model, the local policy file and sanitizer, portability shown on the pricing page |
-| Licence backlash | The Dokploy story | The split in V§5.2 is published before launch and never moves features out of the open core |
-| PSL entry slow or refused | Managed subdomains stall | They are v1 and not on Free; the Let's Encrypt adjustment request runs in parallel; custom domains always work |
-| Abuse of free hosted | Domain reputation and your time | No managed subdomains on Free; invite-gated for about three weeks; account-age checks and rate limits before opening |
-| Support load on one person | Launch attention turns into a queue | Docs before launch; error messages that say what to do, including every sanitizer rejection; a public issue tracker for free users |
-| Nobody notices | No funnel, no conversion data | The waitlist from week 0, three videos, the benchmark repository, marketplace apps and the importer (§5) |
-
----
-
-## 8. Decisions
-
-**Resolved 2026-11-16**
-1. The name: **Moonglass**.
-2. Invite-gated hosted signups at launch, opening around week 11 on the criteria in week 8.
-3. Alpha users come out of the week 0 interviews.
-
-**Resolved 2026-11-20**
-1. **GitHub organization:** `moonglass-dev`. The repository `github.com/moonglass-dev/moonglass` is public. The module path stays `moonglass.dev/moonglass`.
-
-**Open**
-1. **Is week 8 a date or a quality bar?** I recommend a quality bar with week 10 as the fallback.
-2. **The user-content domain** (V§8, open decision 2). Needed in week 0.
-3. **Experiment thresholds** in 2.2. They are my numbers; adjust them before the experiments start, not after the results arrive.
+| The parity list misses what switchers need | They try it and go back | The ten conversations, the alpha's requests filed as launch tickets, and the Coolify import as the test |
+| Cloud at $4 does not cover its costs | Free self-hosted is not a business by itself | One small process per account (S§5.5); yearly billing to cut payment fees; Business at $29 |
+| Coolify ships quickly and already has scoped MCP tokens | A feature-list wedge has a short shelf life | Lead with correct deploys, approvals and an architecture they cannot copy without a rewrite (R§5) |
+| An unknown vendor asking for deploy rights | People hesitate | Open source from the first commit, the published threat model, the local policy file and the sanitizer |
+| Licence backlash | The Dokploy story | The split in V§5.1 is published before the launch, and nothing ever moves out of the open core |
+| Support load | Free users at scale | Docs that answer the question, error messages that say what to do, and priority support only on Business |
+| Nobody notices | No funnel | The post, the videos, the benchmark repository, the import and the Show HN (§5) |

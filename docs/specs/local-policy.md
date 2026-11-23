@@ -1,6 +1,6 @@
 # Local command policy: `[commands]` and `[sources]`
 
-**Status: Approved** by the owner on 2026-11-18 (week 5 preflight). This refines the `agent.toml` schema and ADR-0004 decision 8, which are contracts (ADR-0004 decisions 13 and 14). The owner decisions are listed at the end.
+**Status: Approved.** This refines the `agent.toml` schema and ADR-0004 decision 8, which are contracts (ADR-0004 decisions 13 and 14). The decisions are listed at the end.
 
 What W5-3a and W5-3 build. `docs/specs/container-policy.md` loads and validates `[commands]` and `[sources]` (W1-1); this spec says what they mean and where the agent enforces them. Local policy beats remote command (threat model §8): nothing the control plane sends can widen what `agent.toml` allows.
 
@@ -20,7 +20,7 @@ W5-3 needs the command dispatcher (W2-10) and `BUILD` (W3-4), so it depends on b
 | Class | Rule | Command types |
 |---|---|---|
 | `delete` | The type is sent by a registry operation that is `Destructive: Yes` (ADR-0006 decision 4) | `STOP_APP` and `REMOVE_APP` (W5-5a, `docs/specs/delete.md`). Later: a database restore that replaces data (W6-3) and any volume removal |
-| `exec` | Runs a process in an existing container | None. Container exec is v1 (threat model §8) |
+| `exec` | Runs a process in an existing container | None until the container terminal (V1-10) adds its command type (threat model §8) |
 | none | Anything else | `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `BUILD`, `LOG_REQUEST` (W4-4); later `UPDATE_OFFER` (W7-6d) and the secret messages of W4-8, W3-3 and W4-9 |
 
 - Deploy, rollback and pre-deploy steps are not destructive (ADR-0006), so they are not `delete`, even though a pre-deploy step can run an irreversible migration.
@@ -74,11 +74,11 @@ An image with upper case in its normal form's path is rejected whatever the patt
 
 Patterns are checked at load: each is lower case, starts with the literal `github.com/` and has exactly three elements, so `github.com/acme/*` and `github.com/*/*` are valid and `github.com/acme` is an error that suggests `github.com/acme/*`.
 
-**Every build is labelled.** W5-3 adds `--label dev.moonglass.repository=github.com/<owner>/<repo>` (lower-cased) to the `docker buildx build` argv. It is an agent label (ADR-0004 decision 11), set from the validated `Build` fields.
+**Every build is labelled.** Every `docker buildx build` argv carries `--label dev.moonglass.repository=github.com/<owner>/<repo>` (lower-cased, W5-3). It is an agent label (ADR-0004 decision 11), set from the validated `Build` fields.
 
 ### An empty list
 
-A present, empty list allows nothing of that kind: `registries = []` makes a server that runs only its own builds, and `repositories = []` one that never builds. This replaces W1-1's rule that an empty list is an error; W5-3a changes that one test case, which the owner approves as a test edit.
+A present, empty list allows nothing of that kind: `registries = []` makes a server that runs only its own builds, and `repositories = []` one that never builds.
 
 ### What is checked, and when
 
@@ -115,24 +115,24 @@ func (p *Policy) CheckRepositorySource(repo string) error
 ## Named tests
 
 - W5-3a: `TestImageSourceNormalForm` (every row of the normal-form table), `TestImageSourceMatching`, `TestRepositorySourceMatching`, `TestSourcePatternsValidatedAtLoad`, `TestEmptySourceListAllowsNothing`, `TestForbidsClasses`.
-- W5-3: `TestEveryCommandTypeHasAClass`; `TestForbiddenClassIsRejected` (a test table registers a `delete`-class type until W5-5a supplies a real one); `TestDeployFromUnlistedRegistryIsRejectedBeforePull` and `TestBuildFromUnlistedRepositoryIsRejectedBeforeClone`, against a real Engine, asserting that nothing was pulled, created or cloned; `TestMoonglassLocalImageIsNeverPulled`; `TestRejectedSourceResultIsStored`.
+- W5-3: `TestEveryCommandTypeHasAClass`; `TestForbiddenClassIsRejected` (a synthetic `delete`-class type in the test table); `TestDeployFromUnlistedRegistryIsRejectedBeforePull` and `TestBuildFromUnlistedRepositoryIsRejectedBeforeClone`, against a real Engine, asserting that nothing was pulled, created or cloned; `TestMoonglassLocalImageIsNeverPulled`; `TestRejectedSourceResultIsStored`.
 
 ## Not in W5-3
 
-Reporting the local policy to the control plane, so the UI can explain a refusal before it happens. Base-image checks. Exec, which is v1.
+Reporting the local policy to the control plane, so the UI can explain a refusal before it happens. Base-image checks. Exec, which the container terminal adds (V1-10).
 
-## Owner decisions
+## Decisions
 
-Each line is a choice no ADR or earlier spec fixed. The owner approved every line as recommended on 2026-11-18.
+Each line is a choice no ADR or spec fixed.
 
-- **D43** A command type is `delete` when a destructive registry operation sends it; `STOP_APP` and `REMOVE_APP` are `delete`, and no current type is. Recommended: yes. So `forbid = ["delete"]` refuses soft delete as well as purge (`docs/specs/delete.md`).
-- **D44** Forbidding `exec` is valid and does nothing until exec exists (v1); no stand-in type is added. Recommended: yes.
-- **D45** A forbidden command is answered `REJECTED` with the fixed detail above, checked before anything else. Recommended: yes.
-- **D46** `registries` matches the normalised repository without tag or digest, with `docker.io` and `library/` filled in, `localhost` as a host and `index.docker.io` folded. Recommended: yes. The allow blocks share the normaliser, so `localhost/x` there stops meaning `docker.io/localhost/x`.
-- **D47** Patterns must be in the normal form with a literal host, or the agent does not start. Recommended: yes; a pattern that silently matches nothing is worse than a refusal to start.
-- **D48** `repositories` matches `github.com/<owner>/<repo>`, lower-cased; patterns start with `github.com/` and have three elements. Recommended: yes.
-- **D49** A build is checked against `repositories` only; Dockerfile base images are not checked, and the threat model says so. Recommended: yes.
-- **D50** Sources are checked on `DEPLOY` and `BUILD` before any pull or clone, against the reference as sent; `SWITCH_RELEASE`, `ROLLBACK` and `RUN_PRE_DEPLOY` are not re-checked. Recommended: yes.
-- **D51** `moonglass.local` images are never pulled, must belong to the deploying service, and are checked through the `dev.moonglass.repository` label each build carries. Recommended: yes. Without the label, an image built before a restart that tightened `repositories` could still be deployed.
-- **D52** A present, empty `[sources]` list allows nothing of its kind, replacing W1-1's error. Recommended: yes; otherwise there is no way to say "build only" or "images only". It changes one W1-1 test case.
-- **D53** W5-3 is split: W5-3a (pure decisions, depends on W1-1) and W5-3 (enforcement, depends on W5-3a, W2-10 and W3-4). Recommended: yes.
+- **D43** A command type is `delete` when a destructive registry operation sends it; `STOP_APP` and `REMOVE_APP` are `delete`, and no other current type is. So `forbid = ["delete"]` refuses soft delete as well as purge (`docs/specs/delete.md`).
+- **D44** Forbidding `exec` is valid and does nothing until the container terminal exists (V1-10); no stand-in type is added.
+- **D45** A forbidden command is answered `REJECTED` with the fixed detail above, checked before anything else.
+- **D46** `registries` matches the normalised repository without tag or digest, with `docker.io` and `library/` filled in, `localhost` as a host and `index.docker.io` folded. The allow blocks share the normaliser, so `localhost/x` there means `localhost/x`.
+- **D47** Patterns must be in the normal form with a literal host, or the agent does not start; a pattern that silently matches nothing is worse than a refusal to start.
+- **D48** `repositories` matches `github.com/<owner>/<repo>`, lower-cased; patterns start with `github.com/` and have three elements.
+- **D49** A build is checked against `repositories` only; Dockerfile base images are not checked, and the threat model says so.
+- **D50** Sources are checked on `DEPLOY` and `BUILD` before any pull or clone, against the reference as sent; `SWITCH_RELEASE`, `ROLLBACK` and `RUN_PRE_DEPLOY` are not re-checked.
+- **D51** `moonglass.local` images are never pulled, must belong to the deploying service, and are checked through the `dev.moonglass.repository` label each build carries. Without the label, an image built while `repositories` was wider could still be deployed.
+- **D52** A present, empty `[sources]` list allows nothing of its kind; otherwise there is no way to say "build only" or "images only".
+- **D53** W5-3a (pure decisions) depends on W1-1; W5-3 (enforcement) depends on W5-3a, W2-10 and W3-4.

@@ -62,11 +62,11 @@ No field is a host shell command.
 
 `Heartbeat` carries `agent_version` (string). `HeartbeatAck` has no fields. Both round-trip through the envelope. Opening a Heartbeat acknowledgement as an Enroll request is an error. The control plane is expected to see heartbeats about every 30 seconds (S§5); v0 does not schedule them.
 
-W7-6d adds `update_channel` to `Heartbeat` and validates it; W7-6e sets it from `update.channel` in agent.toml. The agent maps the file's lower-case value to the upper-case wire value: `update.channel = "stable"` reports `STABLE`, `update.channel = "canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE`. It is empty only from an agent built before W7-6e, and such an agent is never sent an `UpdateOffer`. Any other non-empty value is rejected: `stable`, `UNSPECIFIED` and whitespace are not accepted. The field carries no `UNSPECIFIED` value; the zero value is empty (`docs/specs/update.md` §1).
+W7-6d adds `update_channel` to `Heartbeat` and validates it; W7-6e sets it from `update.channel` in agent.toml. The agent maps the file's lower-case value to the upper-case wire value: `update.channel = "stable"` reports `STABLE`, `update.channel = "canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE`. The field is empty only on an agent that does not set it, and such an agent is never sent an `UpdateOffer`. Any other non-empty value is rejected: `stable`, `UNSPECIFIED` and whitespace are not accepted. The field carries no `UNSPECIFIED` value; the zero value is empty (`docs/specs/update.md` §1).
 
 ## Deploy commands (W2-2)
 
-Four commands, each a protobuf type carried in the envelope. None has a field that is a host shell command or a host path. W2-2 gave them no response type. W2-8 adds `CommandResult` (below): an `ERROR` envelope reports a message that could not be accepted at all, and a `CommandResult` reports what happened when the agent acted on one. The legal order of these commands for one app is `docs/specs/release.md`.
+Four commands, each a protobuf type carried in the envelope. None has a field that is a host shell command or a host path. They have no response type of their own: an `ERROR` envelope reports a message that could not be accepted at all, and a `CommandResult` (W2-8, below) reports what happened when the agent acted on one. The legal order of these commands for one app is `docs/specs/release.md`.
 
 An identifier (`app_id`, `release_id`) is 1 to 64 bytes of `[A-Za-z0-9._-]`. Violations are rejected with `ErrMalformed` when the payload is opened, before any later code acts.
 
@@ -85,11 +85,11 @@ An identifier (`app_id`, `release_id`) is 1 to 64 bytes of `[A-Za-z0-9._-]`. Vio
 
 ## Deploy identity, service settings and results (W2-8)
 
-Specified by the weeks 2–3 preflight (owner decisions D1, D7, D9). W2-8 adds these to the `.proto`, validates them in `internal/protocol`, and regenerates the Go.
+W2-8 adds these to the `.proto`, validates them in `internal/protocol`, and regenerates the Go.
 
 Opening a payload rejects unknown fields at every nesting level, including inside `AppState`, before any later code acts.
 
-### Deploy gains
+### Deploy fields
 
 | Field | Type | Rule |
 |---|---|---|
@@ -105,7 +105,7 @@ Opening a payload rejects unknown fields at every nesting level, including insid
 
 ### CommandResult
 
-A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` is the `request_id` of the command it answers. The agent sends exactly one per command envelope it accepted: `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, and from W3-7 `BUILD`, and from W5-5b `STOP_APP` and `REMOVE_APP`.
+A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` is the `request_id` of the command it answers. The agent sends exactly one per command envelope it accepted: `DEPLOY`, `SWITCH_RELEASE`, `ROLLBACK`, `RUN_PRE_DEPLOY`, `BUILD` (W3-7), `STOP_APP` and `REMOVE_APP` (W5-5b).
 
 | Field | Type | Rule |
 |---|---|---|
@@ -119,7 +119,7 @@ A new `MessageType`, `COMMAND_RESULT`, sent by the agent only. Its `request_id` 
 
 ## Builds and server reports (W3-7)
 
-Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds them to the `.proto`. The owner approved these field numbers on 2026-11-18: `BUILD` = 11; `Build` `app_id` = 1, `release_id` = 2, `project` = 3, `environment` = 4, `service` = 5, `repository` = 6, `commit` = 7; `Heartbeat` `disk` = 2, `deploy_key` = 3; `DiskReport` `data_root_free_bytes` = 1, `data_root_total_bytes` = 2, `agent_dir_free_bytes` = 3, `agent_dir_total_bytes` = 4, `level` = 5; `DiskLevel` `UNSPECIFIED` = 0, `OK` = 1, `LOW` = 2, `CRITICAL` = 3.
+W3-7 adds them to the `.proto`. Field numbers: `BUILD` = 11; `Build` `app_id` = 1, `release_id` = 2, `project` = 3, `environment` = 4, `service` = 5, `repository` = 6, `commit` = 7; `Heartbeat` `disk` = 2, `deploy_key` = 3; `DiskReport` `data_root_free_bytes` = 1, `data_root_total_bytes` = 2, `agent_dir_free_bytes` = 3, `agent_dir_total_bytes` = 4, `level` = 5; `DiskLevel` `UNSPECIFIED` = 0, `OK` = 1, `LOW` = 2, `CRITICAL` = 3.
 
 `Build`, a new type `BUILD` = 11:
 
@@ -130,11 +130,11 @@ Specified by the weeks 2–3 preflight (owner decisions D16, D17). W3-7 adds the
 | `repository` | `string` | A GitHub repository as `<owner>/<repo>`. `owner` is 1 to 39 bytes of `[A-Za-z0-9-]` not starting with `-`. `repo` is 1 to 100 bytes of `[A-Za-z0-9._-]`, not `.` or `..`, not starting with `-` or `.`. No scheme, host or path: the agent builds the clone URL itself (`docs/specs/build.md`). |
 | `commit` | `string` | Exactly 40 lowercase hex characters. No branch or tag names. |
 
-`Heartbeat` gains:
+`Heartbeat` fields:
 
 | Field | Type | Rule |
 |---|---|---|
-| `disk` | `DiskReport` | Optional (owner decision D25): absent means not measured. When present, `data_root_free_bytes`, `data_root_total_bytes`, `agent_dir_free_bytes`, `agent_dir_total_bytes` (`uint64`), each free value at most its total, and `level`: `OK`, `LOW` or `CRITICAL` (`docs/specs/disk.md`); `UNSPECIFIED` (0) and unknown levels are rejected. From W3-6 the agent always sends it. |
+| `disk` | `DiskReport` | Optional: absent means not measured. When present, `data_root_free_bytes`, `data_root_total_bytes`, `agent_dir_free_bytes`, `agent_dir_total_bytes` (`uint64`), each free value at most its total, and `level`: `OK`, `LOW` or `CRITICAL` (`docs/specs/disk.md`); `UNSPECIFIED` (0) and unknown levels are rejected. The agent always sends it (W3-6). |
 | `deploy_key` | `string` | The server's SSH deploy public key as one OpenSSH line, `ssh-ed25519 <base64> moonglass-deploy`, at most 256 bytes; empty until the key exists (`docs/specs/build.md`). It is a public key, not a secret. |
 
 Free at most total, for each of the two filesystem pairs, is the only rule relating the numbers. Zero totals are allowed when the matching free value is also zero. Nothing ties `level` to the byte counts, because the hysteresis that computes it (W3-6) means one sample cannot give it.
@@ -144,8 +144,6 @@ Free at most total, for each of the two filesystem pairs, is the only rule relat
 Opening a payload rejects unknown fields at every nesting level, including inside `DiskReport`.
 
 ## Log and usage streaming (W4-4)
-
-The owner approved these messages on 2026-11-17.
 
 `LogRequest`, type `LOG_REQUEST` = 12, server to agent. One open log stream per app. A new `LOG_REQUEST` for that app replaces the previous one.
 
@@ -183,7 +181,7 @@ The streams and the SSE routes are `docs/specs/live.md`. What each side sends an
 
 ## Stop and remove an app (W5-5a)
 
-Specified by the week 5 preflight (`docs/specs/delete.md`, owner decision D62). Two commands, server to agent, each answered with one `CommandResult`. Each payload has one field, `app_id`, an identifier as for `Deploy`; opening it rejects unknown fields. Field numbers: `STOP_APP` = 15, `StopApp.app_id` = 1; `REMOVE_APP` = 16, `RemoveApp.app_id` = 1. Messages added later take numbers after these.
+Two commands, server to agent, each answered with one `CommandResult` (`docs/specs/delete.md`). Each payload has one field, `app_id`, an identifier as for `Deploy`; opening it rejects unknown fields. Field numbers: `STOP_APP` = 15, `StopApp.app_id` = 1; `REMOVE_APP` = 16, `RemoveApp.app_id` = 1. Messages added later take numbers after these.
 
 | Message | Type | Fields |
 |---|---|---|
@@ -194,9 +192,9 @@ Both are `delete` class for `agent.toml` (`docs/specs/local-policy.md`). In thei
 
 ## Service settings (W6-1a)
 
-Owner decision of 2026-11-19 (week 6): the owner approved these fields, their rules and their numbers. They carry a service's container settings for the databases of W6-1 and the Compose services of W6-4 (`docs/specs/managed-services.md`, `docs/specs/compose.md`). How the agent applies them is `docs/specs/release.md` ("Service settings, volumes and names"). No field is a host path, and none is run by a host shell: `command` and `healthcheck.test` run inside the container.
+These fields carry a service's container settings for the databases of W6-1 and the Compose services of W6-4 (`docs/specs/managed-services.md`, `docs/specs/compose.md`). How the agent applies them is `docs/specs/release.md` ("Service settings, volumes and names"). No field is a host path, and none is run by a host shell: `command` and `healthcheck.test` run inside the container.
 
-`Deploy` field numbers: W4-8 takes `env_key` = 11 and `secrets` = 12 (`docs/specs/secrets.md`); W6-1a adds `command` = 13, `volumes` = 14, `labels` = 15, `restart` = 16, `healthcheck` = 17; W4-3a adds `auto_rollback` = 18 ("Auto-rollback (W4-3a)" below). The tickets may land in any order; the numbers do not move.
+`Deploy` field numbers: `env_key` = 11 and `secrets` = 12 (W4-8, `docs/specs/secrets.md`); `command` = 13, `volumes` = 14, `labels` = 15, `restart` = 16, `healthcheck` = 17 (W6-1a); `auto_rollback` = 18 (W4-3a, "Auto-rollback (W4-3a)" below). The numbers do not move.
 
 | Field | Type | Rule |
 |---|---|---|
@@ -230,16 +228,16 @@ Opening a `Deploy` rejects unknown fields inside `VolumeMount` and `Healthcheck`
 
 ## Update messages (W7-6d)
 
-Specified by `docs/specs/update.md` §1 and §6 (owner decision 5 of its §10). W7-6d adds them to the `.proto`. The owner approved these numbers and names on 2026-11-19. They are wire format: once released they never change.
+Specified by `docs/specs/update.md` §1 and §6. W7-6d adds them to the `.proto`. They are wire format: once released they never change.
 
-- `MessageType`: `UPDATE_OFFER` = 17, `UPDATE_REPORT` = 18. Numbers 12 to 16 stay reserved for the live, delete and secrets messages (`docs/specs/live.md`, `docs/specs/delete.md`); the auto-rollback messages take 19 and 20 ("Auto-rollback (W4-3a)" below), and the secrets messages take numbers after 20.
+- `MessageType`: `UPDATE_OFFER` = 17, `UPDATE_REPORT` = 18. Numbers 12 to 16 belong to the live, delete and secrets messages (`docs/specs/live.md`, `docs/specs/delete.md`); the auto-rollback messages take 19 and 20 ("Auto-rollback (W4-3a)" below), and the secrets messages take numbers after 20.
 - `UpdateOffer`: `version` = 1. An offer names no URL, path, channel, hash or older version.
 - `UpdateReport`: `version` = 1, `sha256` = 2, `outcome` = 3 (`UpdateOutcome`), `reason` = 4 (`UpdateReason`), `proxy_restarted` = 5. The report has no free-text field.
 - `Heartbeat`: `update_channel` = 4 (see "Heartbeat" above).
 - `UpdateOutcome`: `UPDATE_OUTCOME_UNSPECIFIED` = 0, `UPDATE_OUTCOME_REJECTED` = 1, `UPDATE_OUTCOME_VERIFY_FAILED` = 2, `UPDATE_OUTCOME_SWITCHING` = 3, `UPDATE_OUTCOME_PASSED` = 4, `UPDATE_OUTCOME_REVERTED` = 5, `UPDATE_OUTCOME_CHECK_FAILED` = 6.
 - `UpdateReason`: `UPDATE_REASON_UNSPECIFIED` = 0, `NOT_NEWER` = 1, `NOT_ON_CHANNEL` = 2, `REVERTED_BEFORE` = 3, `TRIAL_IN_PROGRESS` = 4, `POINTER` = 5, `DISK` = 6, `DOWNLOAD` = 7, `TOO_LARGE` = 8, `SIGNATURE` = 9, `CHECKSUM` = 10, `POINTER_MISMATCH` = 11, `WRITE` = 12, `RESTARTED` = 13, `NOT_CONNECTED` = 14, `EXE_MISMATCH` = 15, `PROXY` = 16, `DEADLINE` = 17, each with the prefix `UPDATE_REASON_`.
 
-Protobuf enum values share the package scope, so every value of both new enums carries its prefix (`REJECTED` and `TOO_LARGE` already exist). In prose the names appear without the prefix. `docs/specs/update.md` §1 and §6 give the behaviour.
+Protobuf enum values share the package scope, so every value of both new enums carries its prefix (`REJECTED` and `TOO_LARGE` collide with names outside them). In prose the names appear without the prefix. `docs/specs/update.md` §1 and §6 give the behaviour.
 
 The validation rules, checked when a payload is opened:
 
@@ -252,7 +250,7 @@ The validation rules, checked when a payload is opened:
 
 ## Auto-rollback (W4-3a)
 
-Specified by `docs/specs/auto-rollback.md`, owner decision of 2026-11-20: the owner approved these names, numbers and rules. W4-3a adds them to the `.proto`. They are wire format: once released they never change.
+Specified by `docs/specs/auto-rollback.md`. W4-3a adds them to the `.proto`. They are wire format: once released they never change.
 
 - `MessageType`: `AUTO_ROLLBACK_REPORT` = 19 (agent to server), `AUTO_ROLLBACK_ACK` = 20 (server to agent, empty payload, the report's `request_id`).
 - `Deploy`: `auto_rollback` = 18, an `AutoRollback` message. Optional: absent means the defaults of `docs/specs/auto-rollback.md`, "Settings".
@@ -276,7 +274,7 @@ The validation rules, checked when a payload is opened:
 
 ## Secret delivery (W4-8) and reveal (W4-9)
 
-Those messages are specified in `docs/specs/secrets.md` and added to the `.proto` by those tickets. `Deploy.env_key` is field 11 and `Deploy.secrets` is field 12 (owner decision of 2026-11-19, so they cannot collide with the service settings above).
+Those messages are specified in `docs/specs/secrets.md` and added to the `.proto` by those tickets. `Deploy.env_key` is field 11 and `Deploy.secrets` is field 12, so they cannot collide with the service settings above.
 
 ## Error codes
 

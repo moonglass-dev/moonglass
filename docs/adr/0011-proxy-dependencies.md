@@ -14,7 +14,7 @@ Pin `github.com/caddyserver/caddy/v2 v2.11.9` in `go.mod` and in the depguard al
 - `cmd/moonglass` calls `proxy.Run` and does not import Caddy. depguard denies Caddy from `cmd/`, `internal/agent`, `internal/keys`, `internal/protocol` and `internal/policy`.
 - `internal/proxy` imports only the Caddy packages it serves with: the core, `caddyhttp` with `reverseproxy`, `caddytls`, `caddypki` (the internal issuer needs the `pki` app) and `logging`. It does not import `caddy/v2/modules/standard`.
 - Caddy's transitive modules stay indirect in `go.mod`.
-- Until SPIKE-1 picks an upgrade mechanism, a proxy upgrade is a short, announced, drained restart, the fallback ADR-0001 already names. No socket activation and no `SO_REUSEPORT` is built. ADR-0001's open questions are unchanged.
+- A proxy upgrade is a short, announced, drained restart. No socket activation and no `SO_REUSEPORT` is built; ADR-0001 keeps the open question that decides the upgrade mechanism.
 
 ## Consequences
 
@@ -29,11 +29,11 @@ Pin `github.com/caddyserver/caddy/v2 v2.11.9` in `go.mod` and in the depguard al
 
 ## Open questions
 
-None. SPIKE-1's questions stay in ADR-0001.
+None. SPIKE-1's questions live in ADR-0001.
 
 ## Links
 
 - `docs/specs/proxy.md`
 - `docs/adr/0001-two-process-proxy.md`
 - `docs/threat-model.md` boundary B4
-- B§6: W1-5
+- B§3: W1-5

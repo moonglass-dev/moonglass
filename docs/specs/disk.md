@@ -1,6 +1,6 @@
 # Disk guard
 
-The agent keeps a small server from filling its disk (stack §3.13). Specified by the weeks 2–3 preflight (owner decision D17). W3-6 builds it in `internal/agent/disk`.
+The agent keeps a small server from filling its disk (stack §3.13). W3-6 builds it in `internal/agent/disk`.
 
 ## What is watched
 
@@ -27,7 +27,7 @@ On entering `LOW`, and on every check while still there, until the level is `OK`
 1. **Build cache**, with the Engine's build-cache prune, down to the cap below.
 2. **Unused images** that are not one of the five kept releases of any app (`docs/specs/release.md`, "Keep five"), with the Engine's image remove, oldest first.
 
-Never pruned: volumes, the images of any app's current and previous release, and any container. Docker's log files are not pruned by the agent: every container the agent creates uses the `local` log driver capped at 3 × 10 MB (`docs/specs/release.md`), so logs are bounded at creation. This replaces stack §3.13's "rotated logs", which the agent cannot reach.
+Never pruned: volumes, the images of any app's current and previous release, and any container. Docker's log files are not pruned by the agent: every container the agent creates uses the `local` log driver capped at 3 × 10 MB (`docs/specs/release.md`), so logs are bounded at creation.
 
 **Build cache cap:** 2 GiB, applied after every build as well as on `LOW`.
 
@@ -37,7 +37,7 @@ Never pruned: volumes, the images of any app's current and previous release, and
 
 ## Reporting
 
-From W3-6 every `Heartbeat` carries the `disk` report (`docs/specs/protocol.md`, W3-7). The field is optional on the wire, so heartbeats sent between W3-7 and W3-6 stay valid; the control plane treats an absent report as not measured. The control plane keeps the latest report per connected server in memory. Showing it (the servers screen) and alerting on it (notifications, W4-7) are later tickets. A change of level is also written to the agent's log.
+Every `Heartbeat` carries the `disk` report (W3-6, `docs/specs/protocol.md`, W3-7). The field is optional on the wire, and the control plane treats an absent report as not measured. The control plane keeps the latest report per connected server in memory. Showing it (the servers screen) and alerting on it (notifications, W4-7) are later tickets. A change of level is also written to the agent's log.
 
 ## Tests
 

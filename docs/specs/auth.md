@@ -1,13 +1,13 @@
 # Sign-in, sessions and step-up
 
-What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005 as amended on 2026-11-18. The owner approved this spec on 2026-11-18, including the registry operations, the tables and the step-up rules below, which are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1.
+What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005. The registry operations, the tables and the step-up rules below are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1. Invitations are LN-3, passkeys and TOTP V1-6, OpenID Connect V1-7, and SAML and SCIM the Business module (V1-5); each adds its own section here when it is planned.
 
 ## Which ticket builds what
 
 | Ticket | Builds |
 |---|---|
-| W4-1a | The tables: `session_hashes`, and the two new `audit_events` columns, on both backends with conformance |
-| W4-1d | The tables: `link_token_hashes` and `step_ups`, on both backends with conformance |
+| W4-1a | The tables: `session_hashes`, and the two new `audit_events` columns, with conformance tests |
+| W4-1d | The tables: `link_token_hashes` and `step_ups`, with conformance tests |
 | W4-1e | Session authentication in the registry: `Registry.Authenticate` with the `__Host-mg_session` cookie and `Moonglass-Org`, or a bearer, never both; `Principal.SessionID`; the audit hash and event with `session_id` and `step_up_id`; `http.CrossOriginProtection` on every route of the HTTP listener |
 | W4-1f | `internal/auth` with GitHub: the operator variables with the pairing and public-URL rules, `state`, PKCE and the `__Host-mg_oauth` cookie, the GitHub exchange and `/user`, sign-in sessions, sign-out, the failure page and its CSP, the routes on `registry.NonOperationRoutes` mounted under `/auth`, and the read-only `Store.UserByIdentity` |
 | W4-1b | Google: the provider and its `nonce`, the ID-token `iss`, `aud`, `exp` and `nonce` checks, and the Google variables |
@@ -16,8 +16,8 @@ What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005 as am
 
 ## Decisions in short
 
-- **Hosted sign-in is GitHub or Google.** There are no passwords and no email links in the MVP, so there is no email provider (ADR-0005 decisions 1 and 5).
-- **No sign-up in W4-1.** An identity that is not linked to a user is refused. A user gets their first identity from `moonglass server --print-owner-link` on the box, or from `identities.link`. Open sign-up on hosted is decided with W7-1's hosted and self-hosted modes.
+- **Sign-in is GitHub or Google** on every control plane, through OAuth apps the operator configures. There are no passwords, and email is never a sign-in method (ADR-0005 decisions 1 and 5).
+- **No open sign-up.** An identity that is not linked to a user is refused. A user gets their first identity from `moonglass server --print-owner-link` on the box, from `identities.link`, or by accepting an invitation (LN-3). On Cloud the Cloud service creates the first owner at sign-up (`docs/specs/billing.md`).
 - **A step-up approves one exact request.** It is not a "recently signed in" flag on the user. The person does a fresh provider round trip, then presses Approve on a page that shows the request. The approval is single use, lasts 10 minutes, and is bound to one user, one credential, one operation, one target and one digest of the inputs.
 - **The control plane keeps no provider token.** The provider's access token is used once to learn the subject and then dropped.
 - **Standard library only.** OAuth 2.0 with PKCE over `net/http`, and `http.CrossOriginProtection` for cross-site requests. Nothing here needs a new module.
@@ -72,7 +72,7 @@ One flow serves sign-in, step-up and linking. Its `purpose` says which.
 ## Sessions
 
 **Sign-in** (`purpose=sign-in`):
-- The identity is looked up with `Store.UserByIdentity` (W4-1f, owner decision of 2026-11-19). It reads `user_identities` and returns the `user_id`, or `ErrNotFound` for an identity linked to no user, and never writes. `Store.UserForIdentity`, which mints a user for an unseen identity, is never called on a sign-in. `UserByIdentity` adds no table or column, so the storage schema does not change. W4-1f names `TestUserByIdentityConformanceSQLite` and `TestUserByIdentityConformancePostgres` (a linked identity returns its user; an unknown one is `ErrNotFound` and leaves `user_identities` and `user_orgs` unchanged).
+- The identity is looked up with `Store.UserByIdentity` (W4-1f). It reads `user_identities` and returns the `user_id`, or `ErrNotFound` for an identity linked to no user, and never writes. `Store.UserForIdentity`, which mints a user for an unseen identity, is never called on a sign-in. `UserByIdentity` adds no table or column, so the storage schema does not change. W4-1f names `TestUserByIdentityConformanceSQLite` (a linked identity returns its user; an unknown one is `ErrNotFound` and leaves `user_identities` and `user_orgs` unchanged).
 - An identity linked to a user gets a session, and the browser is redirected to `return`.
 - An unknown identity is refused with: "This GitHub account is not linked to a Moonglass user. Ask an owner of your organisation to link it." The message names Google for a Google account.
 
@@ -81,7 +81,7 @@ One flow serves sign-in, step-up and linking. Its `purpose` says which.
 - It expires 14 days after sign-in, absolute. It is never extended.
 - It is sent as the cookie `__Host-mg_session` (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, `Max-Age` up to the expiry). Page script can never read it (`docs/specs/ui.md`).
 
-**Authentication.** A request authenticates with a bearer token or a session cookie, never both. A request with both is answered 401 `send a bearer token or a session cookie, not both`. `Registry.Authenticate(ctx, bearer)` authenticates a bearer, as it does today, and `Registry.AuthenticateSession(ctx, session, orgID)` (W4-1e) a session; `internal/api` reads the `Authorization` header, the `__Host-mg_session` cookie and `Moonglass-Org`, applies the rules below, and calls exactly one of them.
+**Authentication.** A request authenticates with a bearer token or a session cookie, never both. A request with both is answered 401 `send a bearer token or a session cookie, not both`. `Registry.Authenticate(ctx, bearer)` authenticates a bearer, and `Registry.AuthenticateSession(ctx, session, orgID)` (W4-1e) a session; `internal/api` reads the `Authorization` header, the `__Host-mg_session` cookie and `Moonglass-Org`, applies the rules below, and calls exactly one of them.
 - A session request must carry `Moonglass-Org: <org id>`, naming an org the user is a member of. Otherwise it gets 401.
 - The principal has the session ID, the user's role in that org, and the single scope row `* * *`.
 - A bearer token's org comes from the token. A `Moonglass-Org` header that differs from it gets 401.
@@ -93,7 +93,7 @@ One flow serves sign-in, step-up and linking. Its `purpose` says which.
 
 ## Step-up
 
-ADR-0005 decision 3 as amended: a step-up approves one request. It is checked in `registry.Invoke`, after role and scope and before the handler, never in a handler or middleware.
+ADR-0005 decision 3: a step-up approves one request. It is checked in `registry.Invoke`, after role and scope and before the handler, never in a handler or middleware.
 
 **The flag.** `Spec` gains `StepUp`, with the values `registry.Yes` or `registry.No`. Like `Destructive` it has no default, and `Register` rejects `Unset`. W4-1c ships no operation with `StepUp: Yes`. Its tests register one in a test registry. W4-1's `identities.link` is the first real one, followed by W4-8, W4-9 and W3-3.
 
@@ -151,7 +151,7 @@ Removing an identity is not in W4-1.
 
 ## Registry operations
 
-Each is org-level. Each acts only on the caller's own user: its sessions, its identities. So each is declared viewer, under the ADR-0006 decision 3 amendment of 2026-11-18. None is destructive.
+Each is org-level. Each acts only on the caller's own user: its sessions, its identities. So each is declared viewer (ADR-0006 decision 3). None is destructive.
 
 | Ticket | Name | Method, path | `MinRole` | Destructive | StepUp |
 |---|---|---|---|---|---|
@@ -180,30 +180,30 @@ Added to `registry.NonOperationRoutes` (ADR-0006 decision 6):
 | `POST /step-up/{org}/{id}` | The one-time confirmation value from a matching callback, same origin, before expiry |
 | `GET /link/{token}` | The unexpired, unused link token |
 
-The pages are server-rendered by `html/template` with no script. They are sent with `Content-Security-Policy: default-src 'none'; style-src 'self'; form-action 'self'; frame-ancestors 'none'`. `/sign-in` itself is the UI's (W2-S). Until W2-S, the provider start URLs are the way in.
+The pages are server-rendered by `html/template` with no script. They are sent with `Content-Security-Policy: default-src 'none'; style-src 'self'; form-action 'self'; frame-ancestors 'none'`. `/sign-in` itself is the UI's (W2-S). Until W2-S, the way in is each provider's start route.
 
 `registry.LocalCommands` changes the `server` synopsis to add `--print-owner-link`.
 
 ## Storage
 
-W4-1a adds `session_hashes` and the `session_id` and `step_up_id` columns of `audit_events` on both backends, with conformance. W4-1d adds `link_token_hashes` and `step_ups` on both backends, with conformance.
+W4-1a adds `session_hashes` and the `session_id` and `step_up_id` columns of `audit_events`, with conformance tests. W4-1d adds `link_token_hashes` and `step_ups`, with conformance tests.
 
-**Lookup tables** (ADR-0002 decision 12, no RLS):
+**Lookup tables** (ADR-0002 decision 9):
 - `session_hashes`: `hash` (SHA-256 hex of the bearer), `id`, `user_id`, `expires_at`, `revoked_at` (NULL while the session is live; set once, to the revocation time, when the session is revoked).
 - `link_token_hashes`: `hash`, `id`, `user_id`, `expires_at`, `used_at`.
 
-**Row-level table:**
+**Org-scoped table:**
 - `step_ups`: `org_id`, `id`, `user_id`, `token_id`, `session_id` (exactly one is set), `operation`, `project_id`, `environment_id` (empty when the target has none), `input_digest`, `confirm_hash` (set at the callback), `created_at`, `expires_at`, `signed_in_at`, `approved_at`, `declined_at`, `used_at`.
 
 **`audit_events`** gains `session_id` and `step_up_id`, empty when they don't apply. The hash becomes:
 
 `SHA-256(JSON [prev_hash, org_id, seq, id, at, principal_kind, user_id, token_id, session_id, step_up_id, operation, outcome, reason])`
 
-There is no compatibility code (build plan §4). A development database made before W4-1a is recreated.
+There is no compatibility code (build plan §4): a development database without these tables is recreated.
 
 W4-1a conformance covers:
 - create a session, look it up by hash, revoke it, and refuse it once revoked or expired;
-- the audit chain with the two new columns.
+- the audit chain with `session_id` and `step_up_id`.
 
 W4-1d conformance covers:
 - mark a link token used once and refuse the second use;
@@ -220,4 +220,4 @@ W4-1d conformance covers:
 
 ## Not in W4-1
 
-Sign-up and org creation on first sign-in. Inviting members. Removing an identity. Email of any kind. Self-hosted sign-in (W7-1). Approvals of agent requests (W5-2). The `/sign-in` screen (W2-S).
+Org creation on first sign-in. Invitations (LN-3). Removing an identity. Email (LN-5). Self-hosted sign-in (W7-1). Approvals of agent requests (W5-2). The `/sign-in` screen (W2-S).

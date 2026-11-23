@@ -1,6 +1,6 @@
 # Secrets
 
-How secrets are kept, set, delivered and revealed, per ADR-0003 as amended on 2026-11-17 by the weeks 2–3 preflight (owner decisions D13, D14, D15). The cryptography library is ADR-0015. The control-plane tables are `docs/specs/storage.md`; the operations are `docs/specs/registry.md`.
+How secrets are kept, set, delivered, revealed and rotated, in the CLI and in the dashboard, per ADR-0003. The cryptography libraries are ADR-0015 (Go) and ADR-0018 (the browser). The control-plane tables are `docs/specs/storage.md`; the operations are `docs/specs/registry.md`.
 
 ## Which ticket builds what
 
@@ -12,16 +12,19 @@ How secrets are kept, set, delivered and revealed, per ADR-0003 as amended on 20
 | W3-2c | `keys init` registering the first recovery recipient, and the pins file with its recovery pins | no |
 | W3-2d | `environments.key.create`, `secrets.set`, `secrets.list` and the environment's `public_key` | no |
 | W3-2 | The `secrets set` and `environments key create` local commands: environment-key pins, the recovery check, creating an environment key wrapped to the pinned recovery recipients only, and encrypting each value | no |
-| W4-8 | Granting the first server (the first agent-wrapped copy) and delivering secrets at deploy | yes |
-| W4-9 | `secrets reveal` | yes |
-| W3-3 | `RewrapEnvKey`, `secrets grant` and `secrets rotate` | yes |
-| W4-5 | Browser-side encryption | no (setting a value) |
+| W4-8 | `secrets grant` for any server with the recovery key, and delivering secrets at deploy | yes |
+| W4-5 | The Variables tab: setting, replacing and deleting values in the browser | no (setting a value) |
+| AL-2 | The recovery key and environment keys in the browser, and granting the servers picked at creation | yes (a grant) |
+| AL-3 | Granting a new server from the dashboard with the recovery key file | yes |
+| W3-3 | `RewrapEnvKey` and `secrets rotate` | yes |
+| W4-9 | Reveal, to a one-time key from the CLI or the browser | yes |
+| LN-11 | Reveal, rotate and grant by fingerprint in the dashboard | yes |
 
-**Step-up is never replaced by holding a key** (ADR-0003 decision 11). Holding the recovery key is not proof that a human is present: on a machine where an AI agent works, that agent can read the key file or type into the terminal. The week 5 agent-safety story depends on this rule. So every grant, rotation, reveal and recipient change waits for W4-1. Until W4-8 merges, no agent holds an environment key, and deployed containers get no secrets.
+**Step-up is never replaced by holding a key** (ADR-0003 decision 11). Holding the recovery key is not proof that a human is present: on a machine where a coding agent works, that agent can read the key file or type into the terminal. The coding-agent approval story depends on this rule. So every grant, rotation, reveal and recipient change needs step-up (W4-1c), in the dashboard and in the CLI alike.
 
 ## The key record
 
-The plaintext of every wrapped environment key, to an agent or to a recovery recipient, is this JSON object, encrypted with age to that one recipient (owner decision D14):
+The plaintext of every wrapped environment key, to an agent or to a recovery recipient, is this JSON object, encrypted with age to that one recipient (ADR-0003 decision 5):
 
 ```json
 {"v": 1, "environment_id": "<32 hex>", "protected": false, "identity": "AGE-SECRET-KEY-1…"}
@@ -34,7 +37,7 @@ The plaintext of every wrapped environment key, to an agent or to a recovery rec
 
 ## Kinds of secret
 
-Owner decision D15. There are no plain environment variables: every one is a secret.
+There are no plain environment variables: every one is a secret (ADR-0003 decision 13).
 
 | Kind | Name | Value | Used by the agent |
 |---|---|---|---|
@@ -51,13 +54,13 @@ Names are visible everywhere. Values are write-only: no operation returns a valu
 - The agent's recipient and identity are the age Bech32 encoding of the public and private halves of `agent-agree.key`. The file on disk is unchanged.
 - From W3-2c, `keys init` reads `MOONGLASS_URL` and `MOONGLASS_TOKEN` like the generated runner (`docs/specs/registry.md`, "Generation"). It checks both before it creates anything: either one empty, or a `MOONGLASS_URL` the runner would refuse, exits 2 with a message naming the variable, and no file is written. It also reads the pins file first, so a pins file it cannot parse exits 1 before the key file exists.
 - Once the file is written and flushed to disk, it calls `keys.recovery.add` with the recipient. That succeeds only while the org has no recovery recipient and no environment key (ADR-0003 decision 12); the owner accepted the risk that someone holding an owner token could register a key first. On success it sets the recovery pin for that control plane to exactly that recipient, replacing any recovery pin it held, and prints the three lines. Its environment pins are not touched.
-- **When registration fails** (owner decision D23), the file is kept, nothing is printed to stdout, and the command exits 1. stderr holds `moonglass: keys init: registering the recovery key failed: <detail>`, then the lines the generated runner would print for the call's `errors`, then `The key file <FILE> is kept. Retry with: moonglass keys recovery add --recipient <age1…>`. The recipient is a public key. The file is never written after registering, so the org can never hold a registered recovery key that nobody has.
+- **When registration fails**, the file is kept, nothing is printed to stdout, and the command exits 1. stderr holds `moonglass: keys init: registering the recovery key failed: <detail>`, then the lines the generated runner would print for the call's `errors`, then `The key file <FILE> is kept. Retry with: moonglass keys recovery add --recipient <age1…>`. The recipient is a public key. The file is never written after registering, so the org can never hold a registered recovery key that nobody has.
 - **When the pin cannot be written** after registration succeeded, the command exits 1 with nothing on stdout and `moonglass: keys init: the recovery key is registered, but <pins path> could not be written: <error>. The next secrets set pins the recovery set it lists.` on stderr. The key file is kept.
 - `keys init` is a local command (`registry.LocalCommands`) that calls one operation. From W3-2c its `Touches` names the key file, `keys.recovery.add` and the pins file.
 
 ## The pins file (W3-2c, W3-2)
 
-Owner decision of 2026-11-20, from ADR-0003 decision 9 and D22. The CLI keeps `$XDG_CONFIG_HOME/moonglass/pins.json`, or `~/.config/moonglass/pins.json` when `XDG_CONFIG_HOME` is empty. The owner edits it by hand to accept a changed key, so its layout is part of the CLI's interface:
+From ADR-0003 decision 9, the CLI keeps `$XDG_CONFIG_HOME/moonglass/pins.json`, or `~/.config/moonglass/pins.json` when `XDG_CONFIG_HOME` is empty. The owner edits it by hand to accept a changed key, so its layout is part of the CLI's interface:
 
 ```json
 {
@@ -90,7 +93,7 @@ Owner decision of 2026-11-20, from ADR-0003 decision 9 and D22. The CLI keeps `$
 1. The CLI fetches the environment with `environments.list`. If it has no key yet, it fetches the recovery recipients with `keys.recovery.list` and checks them against its pins (step 2). An empty list with no recovery pin stops the command with `moonglass: secrets set: this org has no recovery key: run moonglass keys init --out FILE first` (ADR-0003 decision 1). The CLI then generates an age X25519 key pair, wraps the key record to every recovery recipient on record, and calls `environments.key.create`. The private half never leaves the CLI process unwrapped.
 2. **Pinning** (ADR-0003 decision 9), in the pins file above. Per control-plane URL it holds each environment id's public key and the set of recovery recipients.
    - **Environment keys.** The first use records the key, whether the CLI created it or found it in `environments.list`. A different key later stops the command with the stop message above; the owner removes the entry by hand to accept the new one.
-   - **Recovery recipients** (owner decision D22). `keys init` records the recipient it registered. A CLI with no recovery pin for that URL records the set `keys.recovery.list` returns and prints each recipient. A different set later stops the command with the stop message above, including a pinned set the control plane now lists as empty; the owner removes the entry by hand to accept the new one. This stops a taken-over control plane from naming its own recipient and receiving the new environment key.
+   - **Recovery recipients.** `keys init` records the recipient it registered. A CLI with no recovery pin for that URL records the set `keys.recovery.list` returns and prints each recipient. A different set later stops the command with the stop message above, including a pinned set the control plane now lists as empty; the owner removes the entry by hand to accept the new one. This stops a taken-over control plane from naming its own recipient and receiving the new environment key.
 3. The CLI encrypts the value with age to the environment public key and calls `secrets.set` with `kind` `env`, or `registry` with `--registry`. The control plane stores the ciphertext as it came.
 4. The control plane checks only that the ciphertext is an age file within the size limit for its kind. It cannot check the recipient, and does not try.
 5. **Output.** On success stdout holds exactly the `secrets.set` response body, as the generated runner prints it, and the command exits 0. Pin lines, and `moonglass: created the key of environment <project>/<environment>` when it created one, go to stderr. A refused call prints as the generated runner does and exits 1.
@@ -101,13 +104,13 @@ Owner decision of 2026-11-20, from ADR-0003 decision 9 and D22. The CLI keeps `$
 
 ## Delivery (W4-8)
 
-- **First server.** `moonglass secrets grant --env E --server S` for the first server: the owner's CLI unwraps the record with the recovery key, shows the server's fingerprint for the owner to compare with the one `agent enroll` printed, wraps the record to the agent's recipient, and uploads it. It is a recipient change, with step-up.
+- **Granting a server.** `moonglass secrets grant --env E --server S`, for any server of the environment: the owner's CLI unwraps the record with the recovery key, shows the server's fingerprint for the owner to compare with the one `agent enroll` printed, wraps the record to the agent's recipient, and uploads it. It is a recipient change, with step-up. The dashboard does the same with the recovery key file read into the browser (AL-3, "In the dashboard").
 - **At deploy,** `Deploy` gains `env_key` (this agent's wrapped record) and `secrets` (repeated `kind`, `name`, `ciphertext`). Together they must fit the 1 MiB envelope. The agent unwraps the record in memory, decrypts each value, puts `env` values into `policy.Spec.Env` for the app and its pre-deploy step, and keeps `registry` values for the pull only.
 - Plaintext, unwrapped keys and records are never written to disk, to agent state, or to a log. A value that does not decrypt fails the step with `secret <name> could not be decrypted`.
 
 ## Secrets set by other commands (W6-1, W6-4)
 
-Owner decision of 2026-11-19 (week 6). `moonglass databases create` and `moonglass compose apply` set `env` secrets the same way `secrets set` does: in the CLI, encrypted to the environment's public key after the pin checks, with `secrets.set`. Neither sends a plaintext value to the control plane.
+`moonglass databases create` and `moonglass compose apply` set `env` secrets the same way `secrets set` does: in the CLI, encrypted to the environment's public key after the pin checks, with `secrets.set`. Their dashboard flows (LN-10, LN-14) do the same in the browser. None sends a plaintext value to the control plane.
 
 - `databases create` makes the password in the CLI (32 characters from `[A-Za-z0-9]`, `crypto/rand`, rejection sampling) and sets two secrets per database: the password under the name its image reads (`POSTGRES_PASSWORD` or `REDISCLI_AUTH`) and the connection URL (`DATABASE_URL` or `REDIS_URL`). It prints the URL once (`docs/specs/managed-services.md`).
 - `compose apply` sets each Compose `environment` entry as a secret of that name (`docs/specs/compose.md`, "Environment values").
@@ -117,8 +120,24 @@ The delivery fields are `Deploy.env_key` = 11 and `Deploy.secrets` = 12 (`docs/s
 
 ## Reveal (W4-9)
 
-Unchanged from ADR-0003 decision 8: the CLI sends a one-time X25519 recipient; an online agent in the environment re-encrypts the value to it; the control plane relays only ciphertext. Owner-only, step-up, refused for any token owned by an agent identity, audited.
+ADR-0003 decision 8: the CLI or the browser sends a one-time X25519 recipient; an online agent in the environment re-encrypts the value to it; the control plane relays only ciphertext. Owner-only, step-up, refused for any token owned by an agent identity, audited. The browser shows the value in place and forgets it when the person leaves the screen or after 60 seconds (`docs/specs/ui.md` §11).
 
 ## Grant and rotate (W3-3)
 
 ADR-0003 decisions 5 and 6, with step-up. An agent refuses `RewrapEnvKey` when its own record says `protected: true`. An unprotected rotation by an agent wraps only to recipients already stored for that environment.
+
+## In the dashboard
+
+Every flow above has a dashboard flow through the same registry operations (`docs/specs/ui.md` §2.1). Keys are generated, unwrapped and used in the browser's memory with `age-encryption` (ADR-0018), loaded only on these screens, and never sent anywhere unwrapped. The browser cannot pin against the control plane that serves it, so each screen shows the fingerprints it uses and links the CLI command that does the same work with pins (ADR-0003 decisions 9 and 14).
+
+| Flow | What the browser does | Ticket |
+|---|---|---|
+| **First run** | Makes the recovery key, offers it as a file to save, asks for the saved file back and proves it unwraps a test value, then registers the public half with `keys.recovery.add` | AL-2 |
+| **New environment** | Makes the environment key, wraps it to every recovery recipient on record and to the servers the owner picks after each server's fingerprint is shown, then calls `environments.key.create` and the grant, with step-up | AL-2 |
+| **Variables tab** | Encrypts each value to the environment's public key and calls `secrets.set`; deleting calls `secrets.delete` | W4-5 |
+| **Grant a server** | Reads the recovery key file, unwraps the record, shows the new server's fingerprint beside the one its enrolment printed, wraps the record to the agent, uploads it, with step-up; or, in an unprotected environment, confirms the fingerprint for `RewrapEnvKey` | AL-3, LN-11 |
+| **Reveal** | Makes a one-time X25519 identity, sends its recipient, decrypts the agent's answer and shows it in place | LN-11 |
+| **Rotate** | Starts the rotation of ADR-0003 decision 6: by an online agent in an unprotected environment, or with the recovery key file read in the browser | LN-11 |
+| **Recovery-key check** | Every quarter, asks for the recovery key file and proves it unwraps a test value | AL-2 |
+
+A recovery key file read into the page is held in memory for one operation and dropped when it ends. Nothing a key operation touches is written to browser storage.

@@ -1,8 +1,8 @@
 # Moonglass
 
-Calm deploys on your own servers.
+Every app on your servers, in one calm place.
 
-Moonglass is an open-source deploy platform for your own servers. It is being built so that deploys don't drop requests, restores are one click, there is nothing to SSH into, and it runs in under 100 MB.
+Moonglass is an open-source deploy platform for your own servers. It is being built so that git pushes deploy without dropping a request, databases restore with one click, every pull request gets a preview, a coding agent's deploys wait for your approval, and the control plane never SSHes into your servers. Agent and proxy run in under 100 MB. Self-hosted Moonglass is free, with every feature, for any number of people and servers.
 
 **Status: pre-alpha, not usable yet.** This repository holds the plan and the first plumbing. Nothing above works today.
 
@@ -20,6 +20,7 @@ make ci      # everything CI runs
 
 ## Where things are
 
-- [`docs/plan/`](docs/plan/): what is being built, and in what order.
+- [`docs/plan/`](docs/plan/): what is being built, and in what order: the alpha, the launch and v1.
+- [`docs/specs/pricing.md`](docs/specs/pricing.md): Free, Cloud and Business.
 - [`AGENTS.md`](AGENTS.md): how work is done in this repository.
 - [`LICENSE`](LICENSE): Apache-2.0.
