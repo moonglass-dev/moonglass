@@ -336,7 +336,7 @@ Compose parsing uses the official library, so interpolation, profiles and `exten
 - All thresholds are per-app settings.
 
 **5. Cost of a Cloud control plane.**
-A Cloud control plane is one `moonglass server` process with its SQLite file, per account, including trials. Estimate: tens of megabytes of memory each, so hundreds of accounts fit on one small machine, plus object storage for their encrypted backups. Payment fees and support time, not compute, are the real costs, which is why yearly billing costs ten months (V§5.3).
+A Cloud control plane is one `moonglass server` process with its SQLite file, per account, including trials. Estimate: tens of megabytes of memory each, so hundreds of accounts fit on one small machine, plus object storage for their encrypted backups. A free Cloud control plane (one server, no paid servers) with no login for 30 days is paused, so abandoned accounts do not keep a process running. Payment fees and support time, not compute, are the real costs of paying accounts, which is why yearly billing costs ten months (V§5.3).
 
 ---
 

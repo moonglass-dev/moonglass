@@ -55,20 +55,21 @@ Push-to-deploy from GitHub · Dockerfile, Railpack and Compose · PR previews ·
 
 ## Pricing
 
-**Free means every feature. Cloud starts at $4.**
+**Free means every feature. Cloud's first server is free.**
 
 | | Free | Cloud | Business |
 |---|---|---|---|
-| Price | $0 forever | $4/mo with 2 servers, +$2/mo per server | $29/mo |
+| Price | $0 forever | First server free, then $5/mo per extra server | $29/mo |
 | Control plane | On your server | We run it | Ours or yours |
 | People, apps, deploys, backups | Unlimited | Unlimited | Unlimited |
 | Teams, roles, approvals, previews, MCP | Included | Included | Included |
 | SSO, SCIM, audit export | | | Included |
 | Support | Community | Email | Priority |
 
-- No seat prices. No usage surprises: the only meter is the servers you connect, and the price shows before you add one.
-- **Founding members** pay $3/mo on Cloud ($1.50 per extra server) and $19/mo on Business, for as long as they stay.
-- Apache-2.0. A lapsed plan never stops your apps.
+- No seat prices. No usage surprises: the only meter is the extra servers you add, and the price shows before you add one.
+- On Cloud, Business server charges are the same as Cloud (first server free, $5 per extra) on top of $29. Self-hosted Business is a $29 licence for one control plane, any number of servers.
+- **Founding members** (first 1,000 Cloud and first 100 Business) get 40% off list for the first 12 months: $3/mo per extra Cloud server, $17/mo Business, then list price.
+- Apache-2.0. A lapsed plan never stops your apps. An idle free Cloud account pauses the control plane after 30 days with no login; apps keep running.
 
 ## Status
 
@@ -85,13 +86,19 @@ Push-to-deploy from GitHub · Dockerfile, Railpack and Compose · PR previews ·
 Nothing is ready for production yet. The alpha opens to the waitlist first, then the public launch, then v1 with Cloud. There are no dates: each step ships when its demo passes on real servers.
 
 **Is the free version limited?**
-No. Self-hosted Moonglass has every feature, for any number of people, servers and apps. Business adds SSO, SCIM, audit export and priority support, and Cloud runs the control plane for you.
+No. Self-hosted Moonglass has every feature, for any number of people, organisations, servers, apps, deploys, backups, teams, roles, approvals and MCP. Business adds SAML, SCIM, SSO enforcement, audit export and priority support, and Cloud runs the control plane for you.
+
+**Is Cloud free?**
+The first server is free, with no card. Each extra server is $5 a month. Unlimited people, no seats. One free Cloud server per GitHub account. Yearly is ten months' price. A 14-day no-card trial covers paid servers and Business.
+
+**What if I do not log into Cloud?**
+If a free Cloud account (one server, no paid servers) has no login for 30 days, we pause the control plane. Apps on your server keep running. Sign in again and the dashboard, deploys and enrolment resume. There is no app cap.
 
 **Can I move between Cloud and self-hosted later?**
 Yes, in both directions, with `moonglass export` or the Export button. Your servers keep running your apps while you move.
 
 **How is this different from Coolify or Dokploy?**
-Moonglass never SSHes into your servers, never drops a request on deploy, keeps secrets encrypted end to end, and lets a person approve what a coding agent proposes. The comparison page credits what they do well.
+Moonglass never SSHes into your servers, never drops a request on deploy, keeps secrets encrypted end to end, and lets a person approve what a coding agent proposes. The comparison page credits what they do well. Coolify Cloud is $5 for two servers then $3 each; Dokploy Cloud is $4.50 per server for one user, or $15 for three with unlimited people (checked 2026-11-23). Our first Cloud server is free. From three servers Coolify is cheaper.
 
 **What happens if I stop paying?**
 Your apps keep running and you can always export. A lapsed plan only stops new servers, projects and members from being added.

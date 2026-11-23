@@ -7,8 +7,8 @@ _Builds on `research.md`, cited as R§n. The product is Moonglass (moonglass.dev
 - **Moonglass is the deploy platform for your own servers that Coolify and Dokploy users switch to and stay on.** It covers everything 99% of their users rely on: git push-to-deploy, Dockerfile, Railpack and Compose builds, PR previews, domains with automatic TLS, variables and secrets, one-click databases with backups and restore, logs and metrics, many servers, rollbacks, webhooks and notifications, teams and roles, an API, a CLI, MCP, one-click templates and a Coolify import.
 - **It is better where it counts:** one static binary, deploys that never drop a request, agents that only dial out, deploys a coding agent proposes and a person approves from an inline diff, upgrades that are one click and revert themselves, and a calm, dense dashboard.
 - **Dashboard first.** Everything is doable in the web dashboard: secrets, keys, environments, approvals, restores, settings. The CLI, the API and MCP mirror it. Nothing is CLI-only, and a feature is done only when its dashboard flow ships.
-- **Free forever, self-hosted, with nothing held back:** unlimited people, servers, apps, deploys and backups, with roles and approvals. No seat prices, no usage surprises, no "contact sales".
-- **Paid where we do the work:** Cloud runs the control plane for you at $4 a month for two servers and $2 for each one after. Business adds SSO, SCIM, audit log export and priority support for $29 a month. Founding members pay less for life.
+- **Free forever, self-hosted, with nothing held back:** unlimited people, organisations, servers, apps, deploys, backups, teams, roles, approvals and MCP. No seat prices, no usage surprises, no "contact sales".
+- **Paid where we do the work:** Cloud runs the control plane for you. The first server is free, with no card; each extra server is $5 a month. Business adds SAML, SCIM, SSO enforcement, audit log export and priority support for $29 a month. Founding members get 40% off list for the first 12 months.
 - **Built in three launchable steps:** the alpha (the deploy path and the dashboard), the launch (the features most people use every day) and v1 (everything else, Cloud and Business). Each step is a release people can run, and each is a step toward v1 (M§3).
 
 ---
@@ -48,7 +48,7 @@ The comparison page says this calmly and credits what each does well:
 | Footprint | 300 MB to 1.2 GB idle (R§3) | Similar (R§3) | Agent and proxy under 100 MB; fits a 2 GB VPS with room for apps |
 | Upgrades | A script, then hope | A script, then hope | One click, signed, and a failed upgrade reverts itself |
 | Free self-hosted | Everything, unlimited | Core free; SSO and audit logs paid | Everything, unlimited, including teams, roles, approvals and the audit trail |
-| Hosted control plane | $5/mo for 2 servers, +$3 each | $4.50 per server, or $15 for 3 | $4 for 2 servers, +$2 each, unlimited people |
+| Hosted control plane | $5/mo for 2 servers, +$3 each (checked 2026-11-23) | $4.50 per server (1 user), or $15 for 3 with unlimited people (checked 2026-11-23) | First server free, then $5 each, unlimited people |
 
 Temps sells approval gates in a $399 licence (R§3), and many teams gate production with GitHub Environments. Both are credited on the page: Moonglass's gate is enforced on your own control plane, works for deploys a coding agent proposes over MCP, and shows the diff where you approve.
 
@@ -126,23 +126,23 @@ Three plans. Full rules in `docs/specs/pricing.md`.
 
 | | **Free** | **Cloud** | **Business** |
 |---|---|---|---|
-| Price | $0, forever | $4/month with 2 servers, then $2/month per server | $29/month, then $2/month per server over 10 on Cloud |
+| Price | $0, forever | First server free, then $5/month per extra server | $29/month; on Cloud, server charges as Cloud on top |
 | Who runs the control plane | You, on your own box | We do | Either: Business on Cloud, or a licence for your own box |
 | People, projects, apps, deploys, backups | Unlimited | Unlimited | Unlimited |
 | Every open-core feature | Yes | Yes | Yes |
 | SSO, SCIM, audit export | | | Yes |
 | Support | Community | Email | Priority |
 
-- **Founding members.** The first 1,000 Cloud accounts and the first 100 Business accounts keep a founding price for as long as they stay subscribed: Cloud $3/month with 2 servers and $1.50 per extra server, Business $19/month.
+- **Founding members.** The first 1,000 Cloud accounts and the first 100 Business accounts get 40% off list for the first 12 months only, then list price: $3/month per extra Cloud server, $17/month Business. The discount ends if the subscription is canceled.
 - **Yearly billing** costs ten months' price for twelve.
-- **Why these prices.** Coolify Cloud is $5 for two servers and $3 per server after; Dokploy Cloud is $4.50 per server for one person, or $15 for three servers with unlimited people (checked 2026-11-23). Cloud is cheaper than both at every server count, with unlimited people. Dokploy's SSO and audit logs are "contact sales"; ours are $29.
+- **Why these prices.** Coolify Cloud is $5 for two servers and $3 per extra server; Dokploy Cloud is $4.50 per server for one person, or $15 for three servers with unlimited people (checked 2026-11-23). The free first server is the hook: Cloud is $0 at one server and matches Coolify at two. From three servers Coolify is cheaper. Cloud is cheaper than Dokploy Hobby at one and two servers, then similar at ten, with unlimited people on every Cloud account. Dokploy's SSO, SCIM and audit logs are Enterprise; ours are $29.
 
 ### 5.3 Does it add up?
 
 All figures are estimates.
 
-- **Cost.** A Cloud control plane is one `moonglass server` process with its SQLite file, tens of megabytes of memory (S§5.5). Hundreds fit on one small machine. Payment fees and support time, not compute, are the real costs.
-- **Revenue goal: $10K MRR within 12 months of Cloud opening.** For example, 1,100 Cloud accounts at an average of $6 (three servers) and 100 Business accounts at an average of $35. Coolify reached about $23K MRR from about 4,000 customers at about $6 each (R§1), so the Cloud half is a share of the same market, priced below it.
+- **Cost.** A Cloud control plane is one `moonglass server` process with its SQLite file, tens of megabytes of memory (S§5.5). Hundreds fit on one small machine. A free Cloud control plane (one server, no paid servers) with no login for 30 days is paused, so abandoned accounts do not keep a process running. Payment fees and support time, not compute, are the real costs of paying accounts.
+- **Revenue goal: $10K MRR within 12 months of Cloud opening.** A large share of Cloud accounts stay on the free first server and pay $0. Revenue is extra servers and Business. For example, at list, 500 Cloud accounts with two extra servers ($10) is $5,000, 200 with one extra ($5) is $1,000, and 140 Business accounts at $29 is $4,060. In the founding year those extra-server and Business prices are 40% off, so the same $10K needs more extra servers or more Business accounts, or it lands as founding terms end. Coolify reached about $23K MRR from about 4,000 customers at about $6 each (R§1). We are not cheaper at every server count; the free first server is the conversion hook.
 - **Why free self-hosted helps.** Every self-hosted install is a future Cloud or Business account. People who stop wanting to run the box, or whose clients ask for SSO, move without changing tools (§6).
 
 ### 5.4 Gates: how we know early whether it is working

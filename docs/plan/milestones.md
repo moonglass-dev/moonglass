@@ -109,7 +109,7 @@ Each group of tickets in B§3 ends with a gate. The demos below are the owner's,
 
 **v1 1 and 2: Cloud and Business (G9).**
 - **Build:** the extension points of the licensed build; managed instance mode; the Cloud service, sign-up and billing (`docs/specs/billing.md`) in its own repository; staged rollout; export, import and re-enrolment between Cloud and self-hosted; managed subdomains; the Business module.
-- **Demo:** sign up for Cloud, connect a server, deploy, add a server and see the price change before it enrols, then export to a self-hosted box and watch the agents re-enrol. **Cloud opens to the waitlist, founding members first.**
+- **Demo:** sign up for Cloud, connect the free first server with no card, deploy, add a second server and see $5 a month before it enrols, then export to a self-hosted box and watch the agents re-enrol. **Cloud opens to the waitlist, founding members first.**
 
 **v1 3 and 4: the rest (G10).**
 - **Build:** passkeys and TOTP; OpenID Connect sign-in; approver rules and two-person approval; agent-verified approvals; the container terminal; scheduled key rotation; volume backups and restore drills; moving a service between servers; private networking between servers; scheduled jobs; resource limits; build servers; GitLab, Gitea and Forgejo; thirty more templates; the Dokploy import; DNS-01 wildcard certificates; uptime checks; declarative environments; marketplace images; the external security review.
@@ -204,7 +204,7 @@ The benchmark is written calmly (V§1.2). It reports numbers and credits what ot
 | Risk | Why it matters | Retired by |
 |---|---|---|
 | The parity list misses what switchers need | They try it and go back | The ten conversations, the alpha's requests filed as launch tickets, and the Coolify import as the test |
-| Cloud at $4 does not cover its costs | Free self-hosted is not a business by itself | One small process per account (S§5.5); yearly billing to cut payment fees; Business at $29 |
+| A free first Cloud server does not cover its costs | Unused free control planes are the cost | Idle pause after 30 days with no login; one small process per account (S§5.5); yearly billing; extra servers at $5; Business at $29 |
 | Coolify ships quickly and already has scoped MCP tokens | A feature-list wedge has a short shelf life | Lead with correct deploys, approvals and an architecture they cannot copy without a rewrite (R§5) |
 | An unknown vendor asking for deploy rights | People hesitate | Open source from the first commit, the published threat model, the local policy file and the sanitizer |
 | Licence backlash | The Dokploy story | The split in V§5.1 is published before the launch, and nothing ever moves out of the open core |
