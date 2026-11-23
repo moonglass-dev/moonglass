@@ -1,6 +1,6 @@
 # Auto-rollback
 
-What the agent watches after a switch, when it rolls a release back on its own, what it reports, and what the control plane stores and lets people change. Stack §5.4 gives the intent; this spec turns it into rules. W4-3a to W4-3f build it (`docs/plan/build-plan.md`, week 4).
+What the agent watches after a switch, when it rolls a release back on its own, what it reports, and what the control plane stores and lets people change. Stack §5.4 gives the intent; this spec turns it into rules. W4-3a to W4-3f build it (`docs/plan/build-plan.md`, Launch 1).
 
 Auto-rollback runs on the server and keeps working while the control plane is unreachable (stack rule 2). The control plane only receives reports, stores them, and holds the per-service settings it sends with each `Deploy`.
 

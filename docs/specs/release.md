@@ -2,7 +2,7 @@
 
 This is the behaviour spec for `internal/release`: the legal sequence of the deploy commands in `docs/specs/protocol.md` against one app's releases. The machine is pure. It has no Docker, no I/O and no timers. The executor sections below (W2-3, W2-4, W2-6) say what the agent does on the server for each command.
 
-Sources: `docs/plan/stack.md` §3.1, `docs/plan/build-plan.md` (week 2).
+Sources: `docs/plan/stack.md` §3.1, `docs/plan/build-plan.md` (Alpha 2).
 
 ## State
 

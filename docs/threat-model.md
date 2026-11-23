@@ -1,6 +1,6 @@
 # Moonglass threat model
 
-_W0-2 · 2026-11-16 · Sources: `docs/plan/stack.md` (S§), `vision.md` (V§), `milestones.md` (M§), `build-plan.md` (B§) and `AGENTS.md`. Owner decisions of 2026-11-16 are recorded in the ADRs and folded in here._
+_Sources: `docs/plan/stack.md` (S§), `vision.md` (V§), `milestones.md` (M§), `build-plan.md` (B§), the ADRs and `AGENTS.md`. Every change is reviewed against this document._
 
 This file is the reviewer's whole brief. Read it, then the diff, and look for the way the change breaks something below (S§7).
 

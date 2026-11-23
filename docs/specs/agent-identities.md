@@ -232,18 +232,18 @@ Approvals for an agent's pending call (W5-2). MCP sign-in for agents (W5-4). Sco
 
 Each line is a choice no ADR or earlier spec fixed.
 
-- **D28** An agent identity is owned by the person who creates it, and its tokens act with that person's current role. Recommended: yes. The alternative, an identity with a role of its own, survives its owner leaving but needs a second role model and an ADR-0006 rewrite.
-- **D29** The agent role is capped at admin, so owner-only operations are never reachable by agents. Recommended: yes.
-- **D30** `Spec` gains `Level` and `AgentCallable`, neither with a default, and step-up implies `AgentCallable: No`. Recommended: yes; the declarations table above applies the rule.
-- **D31** `environments.key.create`, `environments.set-protected` and `keys.recovery.add` are `AgentCallable: No`. Recommended: yes. An agent could keep the private half of a key it generated, or switch protection off ahead of its own deploy.
-- **D32** Any member creates identities they own; only the owner mints an identity's tokens; any member revokes any identity or agent token. Recommended: yes.
-- **D33** `agents.create` and `agents.tokens.create` need step-up; lists and revokes do not. Recommended: yes. Minting is a lasting grant; revoking must be fast.
-- **D34** Scope rows are refused at mint when they could never match or name an operation the identity may not call (rules 1 to 8). Recommended: yes.
-- **D35** An agent token may hold `* * *`. Recommended: yes. The agent check, the admin cap, the destructive gate, step-up and W5-2's protected gate hold for every agent token, whatever its rows.
-- **D36** Every token expires 1 hour to 90 days after minting; agent tokens state it with a required `expires_in_hours`. Recommended: yes.
-- **D37** At most 5 live tokens per identity; no cap on identities in the open build. Recommended: yes.
-- **D38** A removed owner's agent tokens get 401; their identities stay listed and revocable. Recommended: yes.
-- **D39** W5-1 adds no scoped tokens for people. Recommended: yes; people use sessions or the hook.
-- **D40** Revoked identity names are never reused. Recommended: yes.
-- **D41** The authz matrix is a hand-written test file: 8 principals, 9 scope columns, codes `A R S H P U`, the check order above, and a fixture that never targets a protected environment. Recommended: yes. A generated snapshot would let the build step write its own expectations.
-- **D42** `audit_events` gains `agent_id` in the hash. Recommended: yes; the chain then names the agent without a join to `tokens`.
+- **D28** An agent identity is owned by the person who creates it, and its tokens act with that person's current role. The alternative, an identity with a role of its own, survives its owner leaving but needs a second role model and an ADR-0006 rewrite.
+- **D29** The agent role is capped at admin, so owner-only operations are never reachable by agents.
+- **D30** `Spec` gains `Level` and `AgentCallable`, neither with a default, and step-up implies `AgentCallable: No`. The declarations table above applies the rule.
+- **D31** `environments.key.create`, `environments.set-protected` and `keys.recovery.add` are `AgentCallable: No`. An agent could keep the private half of a key it generated, or switch protection off ahead of its own deploy.
+- **D32** Any member creates identities they own; only the owner mints an identity's tokens; any member revokes any identity or agent token.
+- **D33** `agents.create` and `agents.tokens.create` need step-up; lists and revokes do not. Minting is a lasting grant; revoking must be fast.
+- **D34** Scope rows are refused at mint when they could never match or name an operation the identity may not call (rules 1 to 8).
+- **D35** An agent token may hold `* * *`. The agent check, the admin cap, the destructive gate, step-up and W5-2's protected gate hold for every agent token, whatever its rows.
+- **D36** Every token expires 1 hour to 90 days after minting; agent tokens state it with a required `expires_in_hours`.
+- **D37** At most 5 live tokens per identity; no cap on identities in the open build.
+- **D38** A removed owner's agent tokens get 401; their identities stay listed and revocable.
+- **D39** W5-1 adds no scoped tokens for people. People use sessions or the hook.
+- **D40** Revoked identity names are never reused.
+- **D41** The authz matrix is a hand-written test file: 8 principals, 9 scope columns, codes `A R S H P U`, the check order above, and a fixture that never targets a protected environment. A generated snapshot would let the build step write its own expectations.
+- **D42** `audit_events` gains `agent_id` in the hash. The chain then names the agent without a join to `tokens`.

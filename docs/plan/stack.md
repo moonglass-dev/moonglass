@@ -111,7 +111,7 @@ bind_mounts = ["/proc:/host/proc:ro", "/sys:/host/sys:ro"]
 - **The proxy has less authority.** It reaches the network and its own certificate store; only the agent holds the Docker socket.
 - The agent never hands sockets to the proxy, so an agent upgrade never touches traffic.
 
-**Proxy upgrades without dropped requests:** the preferred path is systemd socket activation, so the listening sockets outlive the process. Whether Caddy 2.11.9 accepts inherited listeners cleanly is **unverified** (Caddy's network-address docs list TCP, UDP and Unix sockets). The week 0 spike tests it against the one alternative, where the new proxy process binds alongside the old one with `SO_REUSEPORT` and the old one drains and exits. **The spike picks exactly one; the other is never built.** Long-lived connections (WebSockets) get a drain window, then close.
+**Proxy upgrades without dropped requests:** the preferred path is systemd socket activation, so the listening sockets outlive the process. Whether Caddy 2.11.9 accepts inherited listeners cleanly is **unverified** (Caddy's network-address docs list TCP, UDP and Unix sockets). SPIKE-1 tests it against the one alternative, where the new proxy process binds alongside the old one with `SO_REUSEPORT` and the old one drains and exits. **The spike picks exactly one; the other is never built.** Long-lived connections (WebSockets) get a drain window, then close.
 
 **Rejected:** Traefik (CPU complaints in R§3, and label-driven config is the "magic" users dislike); Pingora (best footprint, but a framework to assemble and own); kamal-proxy (purpose-built for switching, without Caddy's certificate engine).
 

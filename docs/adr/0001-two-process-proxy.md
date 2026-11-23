@@ -22,9 +22,9 @@ The server side is authoritative for runtime: routing and certificates must keep
 
 ## Consequences
 
-- The agent can restart, crash or self-update while the proxy keeps serving. The week 1 demo upgrades the agent under load with zero failed requests (M§3).
+- The agent can restart, crash or self-update while the proxy keeps serving. The G1 demo upgrades the agent under load with zero failed requests (M§3).
 - There are two processes to supervise, and the Go runtime baseline is paid twice, roughly 8 MB each (S§1).
-- Memory budget: agent about 32 MB, proxy about 45 MB, 100 MB hard ceiling for both, measured in CI from week 1 (S§6). SPIKE-1 passes at proxy RSS ≤ 60 MB and combined RSS ≤ 100 MB at the 99th percentile (M§2.2). Caddy's 32 MB idle figure is an estimate until SPIKE-1 measures it.
+- Memory budget: agent about 32 MB, proxy about 45 MB, 100 MB hard ceiling for both, measured in CI on every change (S§6). SPIKE-1 passes at proxy RSS ≤ 60 MB and combined RSS ≤ 100 MB at the 99th percentile (M§2.2). Caddy's 32 MB idle figure is an estimate until SPIKE-1 measures it.
 - The proxy has less authority than the agent, which narrows what a proxy bug can reach.
 - The deploy-correctness suite covers agent upgrades and proxy upgrades (S§7).
 
@@ -46,6 +46,6 @@ Left open on purpose. SPIKE-1 closes all three in this ADR (B§3, M§2.2); nothi
 ## Links
 
 - S rules 1 and 2, S§1, S§3.3, S§3.4, S§3.6, S§6, S§9
-- M§2.2 experiment 2, M§3 week 1
+- M§2.2 experiment 2, M§3 (Alpha 1)
 - B§3: SPIKE-1, W1-5, W1-6
 - `docs/threat-model.md` §3, boundary B4

@@ -1,6 +1,6 @@
 # Builds and git sources
 
-Builds on the server from a GitHub repository and commit, using the server's own deploy key, plus the build-in-CI template. Specified by the weeks 2–3 preflight (owner decision D16). Sources: stack §3.5, §3.11; ADR-0003 decision 10; ADR-0004 decision 2; ADR-0014.
+Builds on the server from a GitHub repository and commit, using the server's own deploy key, plus the build-in-CI template. Sources: stack §3.5, §3.11; ADR-0003 decision 10; ADR-0004 decision 2; ADR-0014.
 
 ## Which ticket builds what
 
@@ -13,7 +13,7 @@ Builds on the server from a GitHub repository and commit, using the server's own
 | W3-4 | `moonglass deploy --git <owner>/<repo>@<commit>`, the build on the server, the per-server build queue, `moonglass.toml`, and the build-in-CI template |
 | W4-10 | The GitHub App: created from a manifest in a signed-in session, a push webhook that deploys, and adding the deploy key to the repository. It depends on W4-1 because creating an App from a manifest is a browser redirect that needs a signed-in session |
 
-Until W4-10, `git push` goes live only through the build-in-CI template (G3), and the owner adds the deploy key to the repository by hand.
+W3-4 builds a commit on the server with its deploy key, and the build-in-CI template turns a `git push` into a deploy (G3); the owner adds the deploy key to the repository by hand. W4-10 adds the GitHub App, its push webhook that deploys, and adding the deploy key to the repository.
 
 ## Deploy key (W3-8)
 
@@ -39,8 +39,8 @@ Until W4-10, `git push` goes live only through the build-in-CI template (G3), an
 - The agent runs the host's `docker buildx build` with an argv: the context is the checkout, the Dockerfile is `Dockerfile` at its root, `--tag moonglass.local/<project>/<service>:<release_id>`, `--load`, and never `--allow`. From W5-3 it also passes `--label dev.moonglass.repository=github.com/<owner>/<repo>`, lower-cased, which `[sources] repositories` is checked against when the image is deployed (`docs/specs/local-policy.md`). BuildKit's default denies the entitlements `security.insecure` and `network.host`, so a Dockerfile that asks for them fails.
 - Before the build, the agent calls `policy.Check` with `Kind` `build`, the project, environment and service, and empty `BuildEntitlements`. Builds never request entitlements, so no allow block applies (`docs/specs/container-policy.md`, open question 1).
 - `DOCKER_CONFIG` is `<data-dir>/docker-config`, because the agent's user has no home directory (`docs/specs/install.md`).
-- **One build at a time** per server (owner decision D26). The control plane queues builds per server and sends the next `BUILD` only after the previous one has a result (`docs/specs/connection.md`). The agent answers a `BUILD` that arrives while another runs with `REJECTED`.
-- `git` and `docker buildx` run as children of the agent, inside the agent unit's memory cap, which is 512 MiB for that reason (owner decision D19, W3-9, `docs/specs/install.md`). The idle budget (agent plus proxy at or under 100 MB, W1-7) is unchanged.
+- **One build at a time** per server. The control plane queues builds per server and sends the next `BUILD` only after the previous one has a result (`docs/specs/connection.md`). The agent answers a `BUILD` that arrives while another runs with `REJECTED`.
+- `git` and `docker buildx` run as children of the agent, inside the agent unit's memory cap, which is 512 MiB for that reason (W3-9, `docs/specs/install.md`). The idle budget (agent plus proxy at or under 100 MB, W1-7) holds.
 - A build has a 30-minute limit; over it, the build is killed and the step fails.
 - The build's output is not put in the result. Its last 200 lines are written to `<data-dir>/builds/<release_id>.log`, mode 0600, kept for 7 days, for live logs (W4-4).
 - The build cache is capped by the disk guard (`docs/specs/disk.md`).
@@ -68,4 +68,4 @@ reversible  = false        # the pre-deploy step; stack §3.13
 
 ## The build-in-CI template (W3-4)
 
-`examples/ci/github-actions.yml`: a GitHub Actions workflow that, on a push to the default branch, builds the image, pushes it to GHCR, and runs `moonglass deploy --image ghcr.io/<owner>/<repo>@<digest>` with `MOONGLASS_URL` and `MOONGLASS_TOKEN` from repository secrets. The owner gets the token from `moonglass server --print-owner-token NAME` (W3-10). A comment in the template says that until scoped tokens (W5-1) it is a full owner token with a 90-day expiry, to be stored only as a repository secret and replaced before it expires (owner decision D27). From W5-1 the comment instead says to create an agent identity such as `ci` and mint it a token scoped to `<project>/<environment>/deploy` (`docs/specs/agent-identities.md`). Actions are pinned by commit SHA. Pulling a private GHCR image needs a `registry` secret (`docs/specs/secrets.md`), which works once W3-5 and W4-8 land; until then the template deploys public images.
+`examples/ci/github-actions.yml`: a GitHub Actions workflow that, on a push to the default branch, builds the image, pushes it to GHCR, and runs `moonglass deploy --image ghcr.io/<owner>/<repo>@<digest>` with `MOONGLASS_URL` and `MOONGLASS_TOKEN` from repository secrets. The owner gets the token from `moonglass server --print-owner-token NAME` (W3-10). A comment in the template says that until scoped tokens (W5-1) it is a full owner token with a 90-day expiry, to be stored only as a repository secret and replaced before it expires. From W5-1 the comment instead says to create an agent identity such as `ci` and mint it a token scoped to `<project>/<environment>/deploy` (`docs/specs/agent-identities.md`). Actions are pinned by commit SHA. Pulling a private GHCR image needs a `registry` secret (`docs/specs/secrets.md`), which works once W3-5 and W4-8 land; until then the template deploys public images.

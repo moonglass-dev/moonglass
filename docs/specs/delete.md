@@ -2,7 +2,7 @@
 
 The registry operations, the protocol messages, the tables and the agent-state change below are contracts (ADR-0006 decision 9, ADR-0002, `docs/specs/protocol.md`). The decisions are listed at the end.
 
-A deleted thing can be brought back for 7 days, then it is purged. Nobody, a coding agent included, removes data in one step: deleting needs admin and, for an agent, a person's approval (W5-2); purging early needs a person with step-up and is never an agent's. Sources: V§4 ("soft delete" is free everywhere), M§3 week 5, R§3 (Railway's 48-hour soft delete after an agent deleted a production volume).
+A deleted thing can be brought back for 7 days, then it is purged. Nobody, a coding agent included, removes data in one step: deleting needs admin and, for an agent, a person's approval (W5-2); purging early needs a person with step-up and is never an agent's. Sources: V§4 ("soft delete" is free everywhere), M§3 (Launch 4), R§3 (Railway's 48-hour soft delete after an agent deleted a production volume).
 
 ## Which ticket builds what
 
@@ -13,7 +13,7 @@ A deleted thing can be brought back for 7 days, then it is purged. Nobody, a cod
 | W5-5c | `services.deleted_at`, `services.purge_detail`, the `purge_due` lookup table (and the audit columns of `docs/specs/audit.md`) |
 | W5-5d | `services.delete`, `services.restore`, `services.list` with `deleted` |
 | W5-5e | `services.purge` and the retention purge |
-| W5-7 | Delete, restore and purge on the service screens (`docs/specs/ui.md`) |
+| W5-7 | Delete, restore and purge for services, environments and projects in the dashboard (`docs/specs/ui.md`) |
 | W5-8a | `deleted_at` on `environments` and `projects`, and the store methods that purge an environment's secrets and keys |
 | W5-8 | The delete, restore and purge operations for environments and projects |
 
@@ -159,14 +159,14 @@ Deleting servers, secrets, releases or agent identities. Removing named volumes 
 
 Each line is a choice no ADR or earlier spec fixed.
 
-- **D54** Services are soft-deleted in W5-5; environments and projects in W5-8, only when empty, with no cascade. Recommended: yes.
-- **D55** Retention is 7 days, fixed. Recommended: 7 days. Railway chose 48 hours; 7 covers a weekend and costs only disk for stopped containers.
-- **D56** A deleted service is stopped and unrouted on its server, hidden and 404 on the control plane, and its name stays taken. Recommended: yes.
-- **D57** Delete and purge are destructive (admin; an agent's delete waits for approval); purge also needs step-up, so no agent can purge; restore is a member's, not destructive. Recommended: yes.
-- **D58** A restore redeploys the current release's pinned image as a new release, with no pre-deploy step. Recommended: yes; it reuses `DEPLOY` and `SWITCH_RELEASE`, so only stop and remove are new messages.
-- **D59** Delete needs the server online and no deploy in flight; a service that never had a release is handled on the control plane alone. Recommended: yes.
-- **D60** Purge removes containers, unshared images, agent state and the service's control-plane rows; named volumes wait for W6-1. Recommended: yes.
-- **D61** The control plane purges due rows hourly as a `system` principal, skipping offline servers. Recommended: yes.
-- **D62** `STOP_APP` and `REMOVE_APP` are new protocol messages, numbers 15 and 16, both `delete` class, so `forbid = ["delete"]` refuses soft delete too. Recommended: yes.
-- **D63** `REMOVE_APP` is refused for an app that is not stopped. Recommended: yes, as a guard against mistakes only.
-- **D64** Purging an environment deletes its key and every wrapped copy, the recovery copy included. Recommended: yes; purge means gone. Keeping the recovery copy would keep old backups readable, but leaves key material for an environment that is gone.
+- **D54** Services are soft-deleted in W5-5; environments and projects in W5-8, only when empty, with no cascade.
+- **D55** Retention is 7 days, fixed. 7 days. Railway chose 48 hours; 7 covers a weekend and costs only disk for stopped containers.
+- **D56** A deleted service is stopped and unrouted on its server, hidden and 404 on the control plane, and its name stays taken.
+- **D57** Delete and purge are destructive (admin; an agent's delete waits for approval); purge also needs step-up, so no agent can purge; restore is a member's, not destructive.
+- **D58** A restore redeploys the current release's pinned image as a new release, with no pre-deploy step. It reuses `DEPLOY` and `SWITCH_RELEASE`, so only stop and remove are new messages.
+- **D59** Delete needs the server online and no deploy in flight; a service that never had a release is handled on the control plane alone.
+- **D60** Purge removes containers, unshared images, agent state and the service's control-plane rows; named volumes wait for W6-1.
+- **D61** The control plane purges due rows hourly as a `system` principal, skipping offline servers.
+- **D62** `STOP_APP` and `REMOVE_APP` are new protocol messages, numbers 15 and 16, both `delete` class, so `forbid = ["delete"]` refuses soft delete too.
+- **D63** `REMOVE_APP` is refused for an app that is not stopped. It is a guard against mistakes only.
+- **D64** Purging an environment deletes its key and every wrapped copy, the recovery copy included. Purge means gone. Keeping the recovery copy would keep old backups readable, but leaves key material for an environment that is gone.

@@ -1,6 +1,6 @@
 # One-click Postgres and Redis
 
-This is the behaviour spec for managed Postgres and Redis (ticket W6-1). They are ordinary services created through the normal deploy path (`docs/specs/release.md`), not a separate runtime. The owner approved the first version of this spec on 2026-11-18 and the decisions below on 2026-11-19 (week 6).
+This is the behaviour spec for managed Postgres and Redis (ticket W6-1). They are ordinary services created through the normal deploy path (`docs/specs/release.md`), not a separate runtime.
 
 ## Which ticket builds what
 
@@ -62,7 +62,7 @@ Sent as the `deploy` inputs of `docs/specs/registry.md` ("Service settings on `d
 
 ## Running, stopping and removing
 
-- A database mounts a named volume, so the agent never runs two of its releases at once and never rolls it back (`docs/specs/release.md`, "One release per volume"). A `deploy` to a running database is refused by the agent, so the MVP has no way to change a database's image or settings after it is created. `services.restore` is the one redeploy it gets, with the same image digest and settings, while it is stopped.
+- A database mounts a named volume, so the agent never runs two of its releases at once and never rolls it back (`docs/specs/release.md`, "One release per volume"). A `deploy` to a running database is refused by the agent, so a database's image and settings do not change after it is created. `services.restore` is the one redeploy it gets, with the same image digest and settings, while it is stopped.
 - `services.delete` stops it and keeps its volume; `services.restore` brings it back with its volume and settings; `services.purge` removes its containers and its volume (`docs/specs/delete.md`).
 - Changing the password is not supported: `POSTGRES_PASSWORD` is read only at first start, so a new secret value would not reach the data directory.
 

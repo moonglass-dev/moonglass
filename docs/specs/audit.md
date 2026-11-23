@@ -10,7 +10,7 @@ The registry writes one hash-chained event per call (`docs/specs/registry.md`, "
 |---|---|
 | W5-5c | `project_id` and `environment_id` on `audit_events`, and the `system` principal kind, with conformance |
 | W5-5 | The target ids in each event and in its hash; `audit.list`; `moonglass audit verify` |
-| W5-7 | The `/{org}/audit` page (`docs/specs/ui.md`) |
+| LN-8 | The Activity view at `/{org}/activity` (`docs/specs/ui.md`) |
 
 ## What an event records
 
@@ -69,9 +69,9 @@ A local command (`registry.LocalCommands`), not an operation. A check that the c
 
 `Registry.VerifyAudit(ctx, orgID)`, the server-side check, is deleted in W5-5: nothing calls it, and the CLI path is the one way to verify. The pure `VerifyAudit(events)` stays.
 
-## The audit page (W5-7)
+## The Activity view (LN-8)
 
-`/{org}/audit` is a page route (`docs/specs/ui.md` §3): one full-width table, no inspector.
+`/{org}/activity` is a collection route (`docs/specs/ui.md` §3): one full-width list, no runtime panel.
 
 - **Columns:** time; who (a person's user id, an agent identity's name, or "Moonglass" for `system`); operation; where (project and environment names); outcome, with the reason on denials and errors; `seq`.
 - **Filters:** outcome, principal kind, agent identity and operation, which map to the `audit.list` inputs. Pages load with "Load older", using `next_before`.
@@ -87,9 +87,9 @@ A local command (`registry.LocalCommands`), not an operation. A check that the c
 
 Each line is a choice no ADR or earlier spec fixed.
 
-- **D65** Events record the call's `project_id` and `environment_id`, in the hash. Recommended: yes; otherwise the trail cannot say where an agent acted.
-- **D66** `principal_kind` gains `system`, used only by the retention purge. Recommended: yes.
-- **D67** `audit.list` is viewer, org-level and callable by agents, pages newest first up to 200, and returns every hashed field. Recommended: yes.
-- **D68** `moonglass audit verify` is a local command over `audit.list`, with a pin in `pins.json` and exit codes 0, 1 and 2; the server-side `VerifyAudit` method is deleted. Recommended: yes.
-- **D69** The audit page shows no verification status and points to the CLI. Recommended: yes.
-- **D70** The UI part moves to W5-7, which depends on W2-S and W4-6; W5-5 becomes high risk because it reaches `internal/registry`. Recommended: yes.
+- **D65** Events record the call's `project_id` and `environment_id`, in the hash. Otherwise the trail cannot say where an agent acted.
+- **D66** `principal_kind` gains `system`, used only by the retention purge.
+- **D67** `audit.list` is viewer, org-level and callable by agents, pages newest first up to 200, and returns every hashed field.
+- **D68** `moonglass audit verify` is a local command over `audit.list`, with a pin in `pins.json` and exit codes 0, 1 and 2; the server-side `VerifyAudit` method is deleted.
+- **D69** The Activity view shows no verification status and points to the CLI.
+- **D70** The dashboard part is LN-8, which depends on W5-5 and W4-6; W5-5 is high risk because it reaches `internal/registry`.

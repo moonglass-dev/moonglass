@@ -1,6 +1,6 @@
 # Memory budget
 
-W1-7 enforces the G1 gate from stack §6 in CI: `moonglass agent` and `moonglass proxy` together stay at or under 100 MiB of idle resident memory. SPIKE-1 is deferred and ADR-0001 is unchanged; this spec adds no new public number.
+W1-7 enforces the G1 gate from stack §6 in CI: `moonglass agent` and `moonglass proxy` together stay at or under 100 MiB of idle resident memory. SPIKE-1 measures the budget over 48 hours before "under 100 MB" goes into any public copy (B§2, G0); this spec adds no new public number.
 
 ## Ceiling
 

@@ -63,7 +63,7 @@ Every capability and the flow that does it. Each flow is driven from the keyboar
 | **Auto-rollback** | Service Settings tab, Inbox | Triggers and thresholds; mark a shadow-mode report right or wrong | LN-2 |
 | **Notifications** | Settings → Notifications | Webhook, Slack, Discord, Telegram and email channels, their events, a test send | LN-1 |
 | **Delete and restore** | Settings tab of a service, environment or project | Delete with a typed confirmation, restore within 7 days, purge with step-up | W5-7 |
-| **Activity** | Activity | Filter by project, environment, person, coding agent and operation; the chain check | LN-8 |
+| **Activity** | Activity | Filter by project, environment, person, coding agent and operation; expand an event to its ids and hashes; the `moonglass audit verify` command, with no verified badge (`docs/specs/audit.md`) | LN-8 |
 | **Upgrade** | Settings → About | See a newer release on the channel; Update; see the revert if the self-check fails | AL-5 |
 | **Import and export** | Settings → Organisation | Import from Coolify; export the control plane | W7-3, W7-2 |
 | **Container terminal** | A service's screen | A terminal into a running container, with step-up | V1-10 |
