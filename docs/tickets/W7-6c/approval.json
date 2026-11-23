@@ -1,6 +1,0 @@
-{
-  "round": 2,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "Round 2's two blockers are fixed by the owner: copyRe now requires the cp destination to be dist/$ARCH or dist/$ARCH/ with optional quotes, tarRe requires the tar -cf operand to be ../moonglass-$VERSION-linux-$ARCH.tar with optional quotes, and the package step's run must hold exactly one cd, so no second cd can move sha256sum or tar out of the arch set. The nine tests still fail only because .github/workflows/release.yml does not exist yet."
-}

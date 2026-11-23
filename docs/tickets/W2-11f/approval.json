@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "All nine named tests are in package api in internal/api/inputs_test.go, call unexported mount as the ticket allows, and fail now because mount does not exist. They cover the acceptance criteria with httptest and t.TempDir(), change no existing test, and stay inside allowed_paths. GET type-error rows omit required name so they also miss a required query input; the flag=false row equals the zero value so it checks that false is accepted rather than that it was distinguished from absent; the explicit never-422 check is after a fatal on non-400 (422 still fails as not 400); missing required body field expects location body with name in the message, as the plan says, not body.name."
-}

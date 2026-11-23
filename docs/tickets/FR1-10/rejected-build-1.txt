@@ -1,8 +1,0 @@
-Rejected build round 1.
-
-Problems:
-- docs/tickets/FR1-10/bite-check.md is outside what the build step may write
-
-Changed files (discarded):
-- .golangci.yml
-- docs/tickets/FR1-10/bite-check.md

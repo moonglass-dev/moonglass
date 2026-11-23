@@ -142,10 +142,14 @@ volumes:
 		t.Fatalf("CheckCompose() error = %v, want nil", err)
 	}
 	want := map[string]Spec{
-		"a": {Kind: "compose", Project: "monitoring", Environment: "production", Service: "a", Image: imgA,
-			Mounts: []Mount{{Type: "volume", Source: "data", Target: "/data"}}},
-		"b": {Kind: "compose", Project: "monitoring", Environment: "production", Service: "b", Image: imgB,
-			Mounts: []Mount{{Type: "tmpfs", Target: "/tmp"}}},
+		"a": {
+			Kind: "compose", Project: "monitoring", Environment: "production", Service: "a", Image: imgA,
+			Mounts: []Mount{{Type: "volume", Source: "data", Target: "/data"}},
+		},
+		"b": {
+			Kind: "compose", Project: "monitoring", Environment: "production", Service: "b", Image: imgB,
+			Mounts: []Mount{{Type: "tmpfs", Target: "/tmp"}},
+		},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("CheckCompose() returned %d specs, want %d", len(got), len(want))

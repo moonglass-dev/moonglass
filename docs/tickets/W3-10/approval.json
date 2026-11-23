@@ -1,6 +1,0 @@
-{
-  "round": 2,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "Round 2 covers the round 1 gap: the IssueOwnerToken and Run tests capture the standard logger and assert the org has no audit events, and the empty-name test asserts the error text contains no mg_ token. The six named tests sit in the ticket's packages and assert a 55-character mg_ token, a local:owner membership with scope * * *, reuse of an existing owner, an empty name with no membership or token row, one stdout line from Run on 127.0.0.1:0 with a 90-day expiry window and a second distinct token that leaves a single owner membership, both empty flag spellings with no server.db, and [--print-owner-token NAME] on the server usage line. The diff adds only internal/server/owner_token_test.go and cmd/moonglass/server_test.go. Listeners use 127.0.0.1:0 and temp directories; the 10s deadlines bound the pipe read and do not sleep."
-}

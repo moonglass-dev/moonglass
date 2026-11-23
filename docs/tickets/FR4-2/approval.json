@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "All four named tests exist in ./internal/deploy (new issuer_test.go) and ./cmd/moonglass (appended to connect_test.go). TestCheckIssuerAcceptsTheThreeIssuers tables acme, acme-staging, internal for a nil CheckIssuer. TestCheckIssuerRefusesOtherValues tables empty, letsencrypt, ACME, leading-space acme, trailing-space acme-staging, and Internal, requiring a non-nil error that contains the %q form and each accepted name. TestCheckIssuerAgreesWithPush tables those three plus letsencrypt, ACME, and empty against NewProxy(...).Push on a fresh fake admin socket, requiring matching nil-ness, equal error text when refused, and requestCount 0. TestAgentConnectIssuerFollowsDeployCheck tables the three accepted values plus letsencrypt, ACME, leading-space internal, and empty through parseAgentConnect, requiring ok iff CheckIssuer is nil and proxy.Issuer == v when ok. No existing test line changed (TestAgentConnectProxyFlagDefaults, TestAgentConnectRejectsBadProxyFlags, TestProxyPushIssuers untouched). Sockets and DBs use unique temp paths. The tests do not compile yet (no CheckIssuer), and testdata/tests.txt is unchanged, which implement must fix with make test-list."
-}

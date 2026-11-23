@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "The four named tests are in package state and package deploy. TestDueStopsMarksRetiredRows deep-equals the retired row r1 (stop_after t0+90s, Retired true) and the previous row r2 (t0+11m, Retired false) from stopRecordSetup at t0+20m, including the stored app, release, container and stop_after. TestDueStopRetiredAfterSwitch runs three RecordSwitch calls and requires the old previous r1 retired at t0+2m30s and the old current r2 previous at t0+12m, in stop_after order. TestDueStopRetiredAfterRollback requires the rolled-from r2 retired at t0+2m30s and no restored r1. TestDeployDeclaresNoReleaseStatusText parses every non-test Go file in the package with go/parser and reports file and line for the six status literals; it fails while stop.go still declares retired. The only existing-test edit is the owner-allowed Status to Retired swap in TestDueStopsListsPreviousAndRetiredPastStopAfter, case for case, with DeepEqual unchanged, and the five existing deploy stop tests are untouched. The new state tests use openTemp and a fixed clock. A zero Status field left on the struct, and the CommandDeploy comment, are not locked by a test; a populated Status still fails DeepEqual."
-}

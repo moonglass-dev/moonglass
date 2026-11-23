@@ -1,6 +1,0 @@
-{
-  "round": 2,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "Round 1's blocker is fixed: existing AddServer callers still use two strings. The five named tests exist in ./internal/store and ./internal/server and cover the ticket ACs: recipient round trip on AddServer, ServerByPublicKey and Servers, two servers keeping distinct recipients, empty recipient refused with Servers unchanged and ErrNotFound, org isolation, SQLite 0001-0006 then 0007 defaulting to empty and refusing NULL, ACCEPTED enroll storing keys.AgreeRecipient(...).String() (age1…) through both reads, and a duplicate signing key leaving the first recipient. They fail now with compile errors (no AgeRecipient field, AddServer still two strings). Postgres uses newPGEnv (skip without MOONGLASS_TEST_POSTGRES, fail under CI). SQLite and enroll fixtures use t.TempDir and httptest :0."
-}

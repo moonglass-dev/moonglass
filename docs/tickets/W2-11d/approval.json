@@ -1,6 +1,0 @@
-{
-  "round": 2,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "The round 1 blocker is fixed: a missing server on POST /v1/services asserts location body and an error message that contains server, matching decodeBody and TestSchemaFailuresAre400. The six registry tests, the CLI command test, and the routes_test.go edit match the ticket, use a temp SQLite file and httptest, and leave every other existing assertion unchanged. Operations() order after servers.list is still not asserted, and the unmapped store-error case still does not require a context prefix on the wrapped error. environments.list and services.list are inserted already in name order; projects.list is the check that separates the two, creating web then api and expecting api then web."
-}

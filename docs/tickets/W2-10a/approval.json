@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "All eight named tests are in internal/agent/state/commands_test.go and internal/deploy/commands_test.go with the ticket's names and packages. The diff only adds those two files. They cover a null result and migration order, all six Record* writes on success and on each refusal, CommandResult equality with RFC 3339 Z times, the seven-day retain boundary with unchanged release rows and images, every executor result stored with its type and app id and a SUCCEEDED app state matching the stored state, rejections stored alone, a stored request id not run again, and an empty request id writing nothing. Docker cases use testEngine and testProject. testdata/tests.txt is unchanged, which this step leaves for the build. The does-not-follow subtest checks that request id's command row; the other refusal subtests snapshot every apps, releases and commands row."
-}

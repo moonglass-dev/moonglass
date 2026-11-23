@@ -1,6 +1,0 @@
-{
-  "round": 2,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "Round 1 is resolved: TestEngineCallDeadlines reads a 60-second deadline from call and a 15-minute deadline from pullCtx, and keeps a caller's earlier deadline, and the tag-and-digest case of TestResolveRefParsing expects repository acme/web. The ten named tests are in package deploy and the diff only adds files under internal/deploy. They follow the deploy suite: skip when no Engine answers unless CI is set, a per-run project label, a temp state database, an empty policy, labelled cleanup, and registry:2 on a random localhost port as the only image pulled from Docker Hub. Project names are t plus 24 hex digits, from 12 random bytes. testdata/tests.txt does not list these tests yet."
-}

@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "TestResolveTargetReportsKnownProjectSQLite and TestResolveTargetReportsKnownProjectPostgres in internal/store/resolve_target_conformance_test.go both call runResolveTargetConformance. It seeds org A with project web and environment prod and org B with project b-only, then checks all seven acceptance rows, including that web/nope returns the CreateProject id, an empty environment id and ErrNotFound, and that org A asking for b-only gets two empty ids. Each mismatch prints the expected and actual triple. The Postgres test uses newPGEnv, which skips when MOONGLASS_TEST_POSTGRES is empty and fails under CI. No existing test line was changed."
-}
