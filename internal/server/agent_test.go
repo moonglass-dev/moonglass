@@ -34,7 +34,10 @@ func startAgents(t *testing.T, f *fixture) string {
 	t.Cleanup(func() {
 		cancel()
 		select {
-		case <-done:
+		case err := <-done:
+			if err != nil {
+				t.Errorf("ServeAgents: expected it to return nil after ctx cancel, got %v", err)
+			}
 		case <-time.After(10 * time.Second):
 			t.Errorf("ServeAgents: expected it to return after ctx cancel, still running after 10s")
 		}

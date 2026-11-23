@@ -1,6 +1,0 @@
-{
-  "result": "ci-red",
-  "commit": "469422714d8fd2956b353bc3a6602ad1a96fcf07",
-  "detail": "deploy suite (Docker Engine 25) https://github.com/moonglass-dev/moonglass/actions/runs/45063861906/job/137335570088",
-  "handled": true
-}

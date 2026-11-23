@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "The six named tests and TestInvokeResolveStoreFailureIsNotARefusal in internal/registry/target_test.go lock role-before-resolve call counts, the spec not-found messages for an unknown project and an unknown environment under a covering scope, identical denial text and audit reason for an unknown name and a known out-of-scope target, Call ids from CreateProject and CreateEnvironment, the three refusal kinds and their audit reasons, and wrapped store sentinels staying outside those kinds. TestRoleAndScopeAreEnforced keeps all twelve cases; the owner-allowed registry_test.go edit names the target and rewrites p1 and e1 to the created ids. Run make test-list so testdata/tests.txt includes the new tests, and merge origin/main so ResolveTarget keeps the project id when only the environment is missing (W2-11h) before the missing-environment cases can pass."
-}

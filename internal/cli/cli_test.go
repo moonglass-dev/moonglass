@@ -53,7 +53,11 @@ func TestEverySubcommandIsGeneratedOrLocal(t *testing.T) {
 	}
 	for name, local := range map[string]map[string]func([]string) int{
 		"missing key": {"version": func([]string) int { return 0 }},
-		"extra key":   func() map[string]func([]string) int { m := localHandlers(); m["rogue"] = func([]string) int { return 0 }; return m }(),
+		"extra key": func() map[string]func([]string) int {
+			m := localHandlers()
+			m["rogue"] = func([]string) int { return 0 }
+			return m
+		}(),
 	} {
 		if code := cli.Run([]string{"version"}, env, &out, &errb, local); code != 2 {
 			t.Errorf("Run with local handlers (%s) exit = %d, want 2", name, code)

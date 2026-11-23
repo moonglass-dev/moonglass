@@ -1,6 +1,0 @@
-{
-  "round": 2,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "TestRecordAbortMarksCandidateAborted tests illegal transition before RecordAbort. All criteria met."
-}

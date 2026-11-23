@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "All eight tests are in package protocol and cover the ticket boundaries, rejections, protocol-abuse cases and fuzz seeds. Edits to deploy_test.go only add the required names and move the unknown type from 10 to 11, and no previous assertion is removed. The non-ASCII name case uses UTF-8 é so the byte reaches Open. The three-dot diff also contains the owner allowance test in tools/pipeline/lifecycle_test.go, already on origin/main; the W2-8 tests are under internal/protocol."
-}

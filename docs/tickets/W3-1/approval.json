@@ -1,6 +1,0 @@
-{
-  "round": 1,
-  "verdict": "approve",
-  "blockers": [],
-  "notes": "All nine named tests sit in the packages the ticket lists, and the diff only adds files under internal/keys and cmd/moonglass. They cover distinct environment keys, the agent agree key as an age recipient, X25519-only parsing, the strict key record, wrap and unwrap, stock age vectors, and keys init success and failure, including the ADR-0003 warning and that the identity stays off stdout and stderr. FuzzParseKeyRecord seeds both protected values and every malformed row. The vector test skips only when age is missing and CI is unset, as the ticket requires, and its checked-in files are written later with -update-vectors. recordsEqual failures print the environment id and protected flag only."
-}

@@ -3,8 +3,6 @@ coverage.*
 .DS_Store
 .idea/
 .vscode/
-# Pipeline stop file and scratch worktrees (docs/pipeline/README.md).
-.pipeline/
 
 .claude/settings.local.json
 
