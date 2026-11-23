@@ -5,7 +5,7 @@ _How Moonglass gets built, one ticket at a time. It builds on `stack.md` (S§n) 
 **Short version**
 
 - Every change is one ticket, one branch `p/<ID>`, one PR, squash-merged when CI is green and review passes.
-- Opus plans and briefs each ticket, a worker model writes the tests and code and runs `make ci`, Opus reviews the diff, and the PR auto-merges on green CI. You are involved only for a new dependency, a security decision, or a contract or ADR change: those open a `needs-owner` issue.
+- Opus plans and briefs each ticket, a worker model writes the tests and code and runs `make ci`, Opus reviews the diff, and the PR auto-merges on green CI. You are involved only for a new dependency, a security decision, or a contract or ADR change: those open a draft PR labelled `needs-owner`.
 - A gate at the end of every week, with a demo you run yourself and a rule for when to stop.
 - Clean from the first commit. No placeholders, no fallbacks, no code for later tickets. When a decision changes, the old code is deleted in the same change.
 
@@ -102,7 +102,7 @@ The weeks 2–3 preflight (2026-11-17) added W2-8 to W2-12 and moved W2-S to wee
 - [x] **W2-11g** Generated CLI inputs — `registry.Operations()` also returns each operation's `In` type; one flag per input field; required flags are checked before sending and missing ones exit 2; query or body follows the method; error detail and entries go to stderr; `make generate` refuses an input kind with no flag and skips local commands (`docs/specs/registry.md`) · depends_on: W2-11c · risk: high · paths: internal/registry/, internal/cli/, docs/specs/registry.md
 - [x] **W2-11d** Project, environment and service operations — the six create and list operations (`docs/specs/registry.md`) · depends_on: W2-11a, W2-11b, W2-11c, W2-11f, W2-11g · risk: high · paths: internal/registry/, internal/api/, internal/cli/, docs/specs/registry.md
 - [ ] **W2-5** Rollback and CLI operations — `moonglass deploy`, `rollback`, `releases list`; one deploy per service with newest winning; steps re-sent after a server restart; rollback under 5 s and audited (`docs/specs/registry.md`) · depends_on: W2-1, W2-4, W2-10, W2-11d, W2-11e · risk: high · paths: internal/server/, internal/registry/, internal/api/, internal/cli/
-- [x] **W2-7** Deploy-correctness suite and Docker matrix — load generator, the host-run `moonglass proxy` on a loopback port through `deploy.ProxyConfig.Listen`, `Executor.ScopeReconcile` so the suite's start-up reconcile touches only its own run, ten deploys and a rollback under 5 s from `Executor.Rollback` to SUCCEEDED, Engine 25–29 on ubuntu-22.04, `make test-deploy` (`docs/specs/deploy-suite.md`, `docs/specs/release.md` "Listen" and "Run"); after it merges the owner makes the Engine 29 job a required check · depends_on: W2-4 · risk: standard · paths: test/deploy/, internal/deploy/, .github/workflows/ci.yml, Makefile, .golangci.yml, docs/adr/0014-docker-client.md, docs/specs/deploy-suite.md, docs/specs/release.md
+- [x] **W2-7** Deploy-correctness suite and Docker matrix — load generator, the host-run `moonglass proxy` on a loopback port through `deploy.ProxyConfig.Listen`, `Executor.ScopeReconcile` so the suite's start-up reconcile touches only its own run, ten deploys and a rollback under 5 s from `Executor.Rollback` to SUCCEEDED, Engine 25–29 on ubuntu-22.04, `make test-deploy` (`docs/specs/deploy-suite.md`, `docs/specs/release.md` "Listen" and "Run") · depends_on: W2-4 · risk: standard · paths: test/deploy/, internal/deploy/, .github/workflows/ci.yml, Makefile, .golangci.yml, docs/adr/0014-docker-client.md, docs/specs/deploy-suite.md, docs/specs/release.md
 - [ ] **W2-E** Week 2 end-to-end — the G2 demo path as one CI test: ten deploys with zero failed requests, rollback under 5 s, a failing pre-deploy step leaves the old release serving · depends_on: W2-5, W2-6, W2-7 · risk: standard · paths: test/e2e/
 
 ### Week 3 — git push to live, secrets, disk
@@ -237,7 +237,7 @@ W7-6 was split into W7-6a to W7-6f (2026-11-18): it was over the size limit for 
 
 ## 4. Change control
 
-- Contracts: the `.proto` files, registry operations, the `agent.toml` schema, the storage schema and the ADRs. Changing one needs an ADR amendment you approve first: Opus opens a `needs-owner` issue with the proposal and a recommendation, and the ticket waits until you close it. The change then lands as one ticket that updates every user of the contract and **deletes the old form**.
+- Contracts: the `.proto` files, registry operations, the `agent.toml` schema, the storage schema and the ADRs. Changing one needs an ADR amendment you approve first: Opus opens a draft PR labelled `needs-owner` with the proposal and a recommendation, and the ticket waits until you remove the label. The change then lands as one ticket that updates every user of the contract and **deletes the old form**.
 - No compatibility code before launch. There are no users, so there is nothing to stay compatible with.
 - After launch, one narrow window. Because agents update in stages (S§3.14), the control plane speaks the current and the previous agent protocol version, and nothing older. ADR-0007 records this. It is the only compatibility code the product ever carries, and it is deleted one release later.
 - Spikes are never merged. Their output is a document and a decision.
