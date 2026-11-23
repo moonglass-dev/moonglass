@@ -1,12 +1,12 @@
 # Agent state
 
-The agent's own database on each server. W2-13 creates it with the release tables, W2-3 uses it, W2-10a adds the command records, and W4-3b the auto-rollback records. The dependency rule is the ADR-0010 amendment of 2026-11-17 (owner decision D2, weeks 2–3 preflight).
+The agent's own database on each server, holding release, command and auto-rollback records. W2-13 builds it with the release tables, W2-3 uses it, W2-10a adds the command records, and W4-3b the auto-rollback records. The dependency rule is ADR-0010.
 
 ## What it holds, and what it never holds
 
 - **Release, command and auto-rollback records only:** which apps run here, their releases and release state, the commands the agent has executed, and the auto-rollback events it has raised.
 - **No key material, ever:** no private key, no wrapped or unwrapped environment key, no agent X25519 or Ed25519 key, no deploy key, no token, no secret value or ciphertext, and no registry credential. Those stay under `internal/keys`, in its own files under the agent's data directory (`docs/specs/enrolment.md`, `docs/specs/secrets.md`, `docs/specs/build.md`).
-- If a later ticket needs key material in this database, that table moves into trusted core first, through an ADR-0010 amendment. It is never added here.
+- If a later ticket needs key material in this database, that table moves into trusted core first, by changing ADR-0010. It is never added here.
 - No environment variable value. An `error` column holds the same text as the command's `detail`, which never contains one (ADR-0004 decision 12).
 
 ## Package and file
@@ -39,7 +39,7 @@ One row per `app_id` that has ever been deployed here.
 | `app_id`, `release_id` | Primary key together. |
 | `image_ref` | The reference as sent in `Deploy`. |
 | `image_id` | The image ID the container runs. |
-| `repo_digest` | The registry digest the reference resolved to, or empty for an image built here. For a tag it is the digest the pull resolved to at deploy time (owner condition on D4). |
+| `repo_digest` | The registry digest the reference resolved to, or empty for an image built here. For a tag it is the digest the pull resolved to at deploy time. |
 | `port`, `health_path`, `domains` | As sent. `domains` is a JSON array. |
 | `command`, `volumes`, `labels`, `restart`, `healthcheck` | W6-1c. As sent (`docs/specs/protocol.md`, "Service settings"), in the JSON forms of `docs/specs/storage.md` ("Service settings on releases"), with the same defaults. The volume rule (`docs/specs/release.md`) and `REMOVE_APP` (`docs/specs/delete.md`) read `volumes`. |
 | `has_pre_deploy`, `pre_deploy_reversible` | As sent. `pre_deploy_reversible` is filled by `RunPreDeploy`. |

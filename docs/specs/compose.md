@@ -1,8 +1,6 @@
 # Compose import and reconcile
 
-This is the behaviour spec for Compose import and reconcile (W6-4, built as W6-4a, W6-4b, W6-4c and W6-4). It turns the supported field subset, change detection, the pre-confirm list and apply order into behaviour those tickets can name acceptance tests against. The owner approved the first version on 2026-11-18 and the decisions below on 2026-11-19 (week 6).
-
-**Deferred to v1** (the plan audit, `docs/review/plan-audit.md`, 2026-11-22). Before W6-4a is built, change three rules so real Compose files can pass: a changed service with a named volume stops and then starts, with the UI listing it before you confirm, instead of being refused; a `networks` key that only names the project's own networks is accepted and mapped onto the project network; and the bind-mount refusal names the `agent.toml` block that would allow the mount. Survey 30 popular files (W6-5) against the result before building.
+This is the behaviour spec for Compose import and reconcile (W6-4, built as W6-4a, W6-4b, W6-4c and W6-4). It turns the supported field subset, change detection, the pre-confirm list and apply order into behaviour those tickets can name acceptance tests against.
 
 ## Which ticket builds what
 
@@ -12,12 +10,19 @@ This is the behaviour spec for Compose import and reconcile (W6-4, built as W6-4
 | W6-4b | `releases.compose_hash`, the `deploy` input, `services.list` showing it (`docs/specs/storage.md`, `docs/specs/registry.md`) |
 | W6-4c | `internal/compose`: the hash, the list, the apply order, the refusals that need the environment's services |
 | W6-4 | `moonglass compose apply` |
+| LN-13 | The subset real files need, in this spec and `docs/specs/container-policy.md`, before W6-4a builds it |
+| LN-14 | The dashboard's Compose screen and resolution on the agent |
 
 The service settings on `Deploy` and their agent side are W6-1a to W6-1d (`docs/specs/managed-services.md`, "Which ticket builds what").
 
 ## Where it runs
 
-Import runs in the CLI. A Compose file's `environment` values are secrets, and the control plane may never hold one in plaintext (`docs/specs/secrets.md`), so the file never leaves the operator's machine. The CLI resolves it with `policy.ResolveCompose`, encrypts its environment values, and applies each service through the existing operations: `services.create`, `secrets.set`, `deploy` and `services.delete`. Each call is authorised and audited by the registry like any other (`docs/specs/registry.md`). The agent checks each service's container spec, as built from its `Deploy`, against its own `agent.toml` with `policy.Check`, like every other container (ADR-0004 decision 16).
+A Compose file's `environment` values are secrets, and the control plane may never hold one in plaintext (`docs/specs/secrets.md`), so a file is resolved only where its values can be read (ADR-0004 decision 16):
+
+- **In the CLI** (`moonglass compose apply`, below): the file never leaves the operator's machine.
+- **On an agent of the environment**, for the dashboard (LN-14): a file from the connected repository is read on the agent, and a pasted file is encrypted to the environment key in the browser first. The agent returns the resolved settings without any environment value, and the dashboard shows the list below from them.
+
+Either way the file is resolved with `policy.ResolveCompose`, its environment values are encrypted and set with `secrets.set`, and each service is applied through the existing operations: `services.create`, `deploy` and `services.delete`. Each call is authorised and audited by the registry like any other (`docs/specs/registry.md`). The agent checks each service's container spec, as built from its `Deploy`, against its own `agent.toml` with `policy.Check`, like every other container.
 
 ## The command
 
@@ -48,7 +53,7 @@ Only these service fields are supported. Anything else is refused before anythin
 - `labels`: user labels; one in the `dev.moonglass.` namespace is refused.
 - `healthcheck`: the Docker health mode of the switch (`docs/specs/release.md`, "Health").
 
-`networks` is refused: every service joins only its project's network, `mg-<project>`, and reaches the others by service name (ADR-0004 decision 15; `docs/specs/release.md`, "Service names"). Top-level keys other than `services`, `volumes` and `x-` extensions are refused.
+`networks` may name only networks the file declares, and every one maps onto the project's network, `mg-<project>`; services reach each other by service name (ADR-0004 decision 15; `docs/specs/release.md`, "Service names"). A network that is `external` or names another project's network is refused. Top-level keys other than `services`, `volumes`, `networks` and `x-` extensions are refused.
 
 ## Mapping
 
@@ -58,7 +63,7 @@ Only these service fields are supported. Anything else is refused before anythin
 
 ## Environment values
 
-Every Moonglass environment variable is an environment secret, delivered to every service of the environment (owner decision D15, `docs/specs/secrets.md`). So:
+Every Moonglass environment variable is an environment secret, delivered to every service of the environment (`docs/specs/secrets.md`). So:
 
 - Each `environment` entry is encrypted in the CLI to the environment's public key and set with `secrets.set`, kind `env`, exactly as `moonglass secrets set` does, including creating the environment key and checking the pins.
 - Two services that give one name different values stop the import: `environment variable <NAME> has different values in services <a> and <b>; Moonglass environment variables belong to the environment`. Values are compared in the CLI only and never printed.
@@ -96,7 +101,7 @@ secrets    set API_KEY, DATABASE_URL (replaces), LOG_LEVEL (replaces)
 
 Then it asks `Apply these changes? [y/N] ` on stderr and reads one line from stdin. Only `y` or `yes` applies. Anything else, or end of input, prints `nothing applied` and exits 1. `--yes` skips the question. The question is for the operator's benefit, not a security control: authorisation is each operation's, and a removal from an agent identity waits for a person's approval like any `services.delete` (W5-2).
 
-There is no Compose screen in the UI in the MVP. This list is the "tell people before" surface of `docs/specs/ui.md` for Compose.
+The dashboard's Compose screen (LN-14) shows the same list before anything changes; it is the "tell people before" surface of `docs/specs/ui.md` for Compose.
 
 ## Apply
 
@@ -111,6 +116,6 @@ A failure prints what was applied, what failed with its detail, and what was not
 ## Tests
 
 - W6-4a: the `ResolveCompose` tests in `docs/specs/container-policy.md`.
-- W6-4b `internal/store`, `internal/registry` and `internal/server`: `TestComposeHashConformanceSQLite`, `TestComposeHashConformancePostgres`, `TestDeployRecordsComposeHash`, `TestDeployRefusesMalformedComposeHash`, `TestServicesListShowsCurrentComposeHash`, `TestRestoreKeepsComposeHash`.
+- W6-4b `internal/store`, `internal/registry` and `internal/server`: `TestComposeHashConformanceSQLite`, `TestDeployRecordsComposeHash`, `TestDeployRefusesMalformedComposeHash`, `TestServicesListShowsCurrentComposeHash`, `TestRestoreKeepsComposeHash`.
 - W6-4c `internal/compose`: `TestServiceHashIsCanonical` (field order, sorting, a golden hash), `TestServiceHashIgnoresEnvironmentAndDependsOn`, `TestPlanMarksCreateUpdateUnchangedRemove`, `TestPlanRefusesServiceNotFromCompose`, `TestPlanRefusesChangedVolumeService`, `TestPlanRefusesConflictingEnvironmentValues`, `TestApplyOrderFollowsDependsOn`, `TestPlanListText`.
 - W6-4 `internal/cli`, against an `httptest` control plane: `TestComposeApplyShowsListBeforeAnyCall`, `TestComposeApplyNeedsConfirmation`, `TestComposeApplyNeverTouchesUnchanged`, `TestComposeApplyOrderAndStopsAtFirstFailure`, `TestComposeApplyRemovalIsSoftDelete`, `TestComposeApplySetsEncryptedSecrets`, `TestComposeApplyUpdateFlagRedeploys`, `TestComposeApplyReadsOnlyEnvFile`.

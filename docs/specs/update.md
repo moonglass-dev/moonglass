@@ -1,6 +1,6 @@
 # Agent self-update, release channels and staged rollout
 
-This is the behaviour spec for agent self-update. It turns ADR-0007 decisions 1 to 6, `docs/plan/stack.md` §3.14 and `docs/threat-model.md` §9 checklist items 6 and 7 into behaviour that W7-6c to W7-6f can name acceptance tests against: W7-6c builds the release workflow (§9), W7-6d the messages (§1, §6), W7-6e the agent side, the units and the install script (§2 to §7), which also sets `Heartbeat.update_channel` from `agent.toml` (§1), and W7-6f the channels and the rollout (§8). The owner approves this spec before it merges, because it fixes the shape of those changes. The signature verifier it names is W7-6a (`internal/update`).
+This is the behaviour spec for agent self-update. It turns ADR-0007 decisions 1 to 6, `docs/plan/stack.md` §3.14 and `docs/threat-model.md` §9 checklist items 6 and 7 into behaviour that W7-6c to W7-6f can name acceptance tests against: W7-6c builds the release workflow (§9), W7-6d the messages (§1, §6), W7-6e the agent side, the units and the install script (§2 to §7), which also sets `Heartbeat.update_channel` from `agent.toml` (§1), and W7-6f the channels and the rollout (§8). This spec fixes the shape of those changes. The signature verifier it names is W7-6a (`internal/update`).
 
 Where ADR-0007 fixes a name, a number or a rule, this spec repeats it. Where it does not, the choice is listed in §10.
 
@@ -31,10 +31,10 @@ Its maximum size is 1 KiB. Any other content, order, line, field or duplicate is
 
 ### Polling
 
-- **The control plane** (hosted and self-hosted) fetches and verifies both pointers at start and then every 10 minutes, with the W7-6a verifier. A pointer that does not verify is ignored: the control plane offers nothing for that channel until a later poll succeeds.
+- **The control plane** (Cloud and self-hosted) fetches and verifies both pointers at start and then every 10 minutes, with the W7-6a verifier. A pointer that does not verify is ignored: the control plane offers nothing for that channel until a later poll succeeds.
 - It learns each agent's channel from a new `Heartbeat` field, `update_channel`, which W7-6d added and validates and W7-6e sets from `update.channel` in `agent.toml` (`docs/specs/container-policy.md`; ADR-0004). The agent maps the file's lower-case value to the upper-case wire value: `update.channel = "stable"` reports `STABLE`, `update.channel = "canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE`. The field is empty only from an agent built before W7-6e, and an agent that reports empty is never sent an `UpdateOffer`. Any other non-empty value is rejected. The field carries no `UNSPECIFIED` value; the zero value is empty. The control plane cannot change that file (ADR-0004 d5).
 - It sends an `UpdateOffer` only to an agent whose `agent_version` is older than its channel pointer's version, at most one offer per server per version per hour, and none for a version after that server reports `PASSED` or `REVERTED` for it. An offer's only field is `version` (§6), so it can name no URL, path, channel or older version.
-- **A managed fleet (v1)** (the server is started with `--release-org ORG_ID`, §8): offers follow the rollout state of §8. W7-6f builds only the self-hosted path below; §8 waits for managed control planes (the plan audit, `docs/review/plan-audit.md`, 2026-11-22).
+- **Cloud** (the server is started with `--release-org ORG_ID`, §8): offers follow the rollout state of §8, which V1-3 builds. W7-6f builds the self-hosted path below.
 - **Self-hosted** (no `--release-org`): every connected agent on the channel is offered the pointer's version at once, with no percentage rollout, no rollout rows and no halt of ADR-0007 d3 (ADR-0007 d5). The criteria of §8 do not apply.
 - **The control plane never replaces itself** (ADR-0007 d5, TM §8). The operator updates `moonglass server` and the CLI by running the signed install (`docs/specs/install.md`).
 
@@ -295,9 +295,7 @@ This is the short, announced, drained restart of `docs/specs/proxy.md`. ADR-0001
 
 ## 8. Rollout state on the control plane
 
-_Deferred to v1, with managed control planes (the plan audit, `docs/review/plan-audit.md`, 2026-11-22)._
-
-This section is hosted only: it runs when `moonglass server` is started with `--release-org ORG_ID`. Every row carries `org_id` set to that org, under RLS (ADR-0002 d1; TM B2), so no lookup table is added. Without `--release-org` the server runs the self-hosted behaviour of §1 and stores no rollout rows.
+This section is for Cloud only: it runs when `moonglass server` is started with `--release-org ORG_ID`. Every row carries `org_id` set to that org (ADR-0002; TM B2), so no lookup table is added. Without `--release-org` the server runs the self-hosted behaviour of §1 and stores no rollout rows.
 
 ### Stage membership
 
@@ -311,7 +309,7 @@ where `‖` is concatenation of the `vX.Y.Z` bytes and the 32 hex characters of 
 
 ### Tables
 
-Named as `docs/specs/storage.md` names its tables; all three are row-level tables with `org_id`.
+Named as `docs/specs/storage.md` names its tables; all three are org-scoped tables with `org_id`.
 
 - `rollout_criteria` — `org_id`, `channel` (unique per org), `min_agents`, `min_percent`, `reconnect_window_seconds`, `check_window_seconds`, `stage_interval_seconds`, `canary_soak_seconds`, `stage_percents` (JSON array). At start the server inserts these rows for each channel that has none:
 
@@ -395,7 +393,7 @@ A `workflow_dispatch` job in the same file takes the inputs `version` and `chann
 
 The origin's upload credential is a repository secret. It is not a signing key.
 
-### Release origin (owner decision, 2026-11-18)
+### Release origin
 
 This closes §10 items 24 and 25.
 
@@ -438,18 +436,18 @@ A `latest` directory read during a promotion can mix two versions for up to 60 s
 
 ### Promotion to stable
 
-The owner signs a stable pointer and runs the same job with `channel=stable`. The hosted control plane still keeps the stable rollout in `waiting` until §8 allows it.
+The owner signs a stable pointer and runs the same job with `channel=stable`. A Cloud control plane still keeps the stable rollout in `waiting` until §8 allows it.
 
-## 10. Owner decisions
+## 10. Decisions
 
-Every choice below is one no ADR or existing spec already fixes. One line each, so each can be approved or changed before merge.
+Every choice below is one no ADR or existing spec already fixes.
 
-**Final, 2026-11-18.** The product name Moonglass, the signing namespace `moonglass-release` and the release origin host `moonglass.dev` are final. Nothing in W7-6c, W7-6d or W7-6e waits on a rename, and those tickets may proceed with the names this spec gives.
+The product name Moonglass, the signing namespace `moonglass-release` and the release origin host `moonglass.dev` are final. Nothing in W7-6c, W7-6d or W7-6e waits on a rename, and those tickets may proceed with the names this spec gives.
 
 1. Signed channel pointers with four lines, binding the version and the two binary SHA-256s.
 2. Agents refuse any version that is not strictly newer; there is no downgrade.
 3. Every control plane polls the pointers every 10 minutes; offers are limited to one per server per version per hour.
-4. `--release-org` selects hosted rollout, and its absence means self-hosted offers to every connected agent on the channel.
+4. `--release-org` selects the Cloud rollout, and its absence means self-hosted offers to every connected agent on the channel.
 5. `Heartbeat` gains `update_channel`, and `UPDATE_OFFER` and `UPDATE_REPORT` get the fields of §6.
 6. The per-arch URL layout, `latest` as a copy of stable, and the install default `--from` per arch.
 7. The artifact set grows by the two revert units.
@@ -469,11 +467,11 @@ Every choice below is one no ADR or existing spec already fixes. One line each, 
 21. The SBOM tool and format (syft, SPDX JSON).
 22. The draft GitHub release hand-off, with the tar names of §9.
 23. The publish job verifying with `scripts/install` and the upload order.
-24. The release origin behind `moonglass.dev/releases/` and its upload credential: decided 2026-11-18, the R2 bucket, the `aws s3 cp` upload and the secret pair of §9 "Release origin".
-25. Attestations on a private repository need GitHub Enterprise Cloud, or a public repository, before W7-6c can run: decided 2026-11-18, the repository is made public before the first release tag is pushed (§9 "Release origin").
+24. The release origin behind `moonglass.dev/releases/` and its upload credential: the R2 bucket, the `aws s3 cp` upload and the secret pair of §9 "Release origin".
+25. Attestations on a private repository need GitHub Enterprise Cloud, or a public repository, before W7-6c can run: the repository is made public before the first release tag is pushed (§9 "Release origin").
 26. W7-6e's paths need `cmd/moonglass/`, `internal/registry/` (`LocalCommands` gains `agent update-gate` and `agent revert-check`) and `internal/proxy/`.
 27. The offer checks run in the order of §1, so an older version is `NOT_NEWER` and another channel's version is `NOT_ON_CHANNEL`.
 28. `trial` is one JSON file with `"format": 1`, deleted at the first hour or on the next offer, and a re-sent offer is answered from it rather than from agent state.
 29. `NOT_CONNECTED` is recorded by the new agent when the pinned connection is still missing at the deadline; `DEADLINE` is the gate's reason when the new agent could not record one.
 30. An agent that finds no proxy running passes the proxy condition and pushes its config; no error is raised.
-31. `Heartbeat.update_channel` from `agent.toml` (FR5-2, decided 2026-11-20): absent means stable. `update.channel = "stable"` reports `STABLE`, `"canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE`, so `docs/specs/container-policy.md`, ADR-0004's schema and `internal/policy` stay as they are. W7-6e sets the field.
+31. `Heartbeat.update_channel` from `agent.toml` (FR5-2): absent means stable. `update.channel = "stable"` reports `STABLE`, `"canary"` reports `CANARY`, and an absent key or an absent file reports `STABLE`, so `docs/specs/container-policy.md`, ADR-0004's schema and `internal/policy` stay as they are. W7-6e sets the field.

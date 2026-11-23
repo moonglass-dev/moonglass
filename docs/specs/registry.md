@@ -103,17 +103,15 @@ Every input is a required string except `wrapped`, a required list. A list outpu
 
 ### Protected flag (W4-2)
 
-_Deferred to v1 with approvals (the plan audit, `docs/review/plan-audit.md`, 2026-11-22). When it is built, every environment starts unprotected (ADR-0006 decision 4 as amended); the first-environment rule below is withdrawn._
+W4-2 stores `environments.protected`; W5-2 makes a deploy or source change in a protected environment wait for an approval (`docs/specs/approvals.md`). There is no plan-cap check in the open build.
 
-W4-2 stores `environments.protected` and does not gate deploys. W5-2 adds that gate. Until then a deploy to a protected environment runs and is audited. There is no plan-cap check in the open build. Resource limits are deferred to v1.
+| Ticket | Name | Method, path | `MinRole` | Destructive | Step-up | Target |
+|---|---|---|---|---|---|---|
+| W4-2 | `environments.set-protected` | `POST /v1/environments/protected` | owner | no | yes | project, environment |
 
-| Ticket | Name | Method, path | `MinRole` | Destructive | Target |
-|---|---|---|---|---|---|
-| W4-2 | `environments.set-protected` | `POST /v1/environments/protected` | member | no | project, environment |
-
-- **`environments.set-protected`** takes `project`, `environment` and `protected` (bool).
-- **`environments.create`** sets `protected` false. The column is `NOT NULL` (`docs/specs/storage.md`).
-- **`deploy`** is not gated on `protected` until W5-2. Until then a deploy to a protected environment runs and is audited like every other call.
+- **`environments.set-protected`** takes `project`, `environment` and `protected` (bool). It is not callable by agent identities (ADR-0006 decision 3).
+- **`environments.create`** sets `protected` false. Every environment starts unprotected until an owner protects it (ADR-0006 decision 4). The column is `NOT NULL` (`docs/specs/storage.md`).
+- **`deploy`** to a protected environment returns the pending approval from W5-2 instead of running.
 
 ### Auto-rollback (W4-3)
 

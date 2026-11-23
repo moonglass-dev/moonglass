@@ -17,11 +17,11 @@ This file is the reviewer's whole brief. Read it, then the diff, and look for th
 | Asset | Where it lives | What protects it |
 |---|---|---|
 | **Host root** on the user's server | Behind the Docker socket, which only the agent holds (S§3.3) | No protocol message carries a shell string (S§3.1). Every container spec passes the sanitizer (S§3.2). `agent.toml` is local policy the control plane cannot change. Agent and proxy are systemd services, not containers |
-| **User secrets** | Ciphertext in the control-plane database. Plaintext only on the user's servers, at run time | Encrypted to the environment public key. The key pair is generated only in the owner's CLI; the private half is stored only wrapped (S§3.11, ADR-0003). Set only from the CLI at launch; browser entry is v1. One reveal path, through the CLI, in v1: owner-only, step-up, refused to agent identities, audited |
+| **User secrets** | Ciphertext in the control-plane database. Plaintext only on the user's servers, at run time | Encrypted to the environment public key. The key pair is generated on the owner's side, in the browser or the CLI; the private half is stored only wrapped (S§3.11, ADR-0003). Write-only in the dashboard and the CLI. One reveal path, to a one-time key in the browser or the CLI: owner-only, step-up, refused to agent identities, audited |
 | **Database backups** | The user's S3-compatible bucket | Dump → zstd → age to the environment key, with no temp files on disk (S§3.9). Readable only with the environment key or the owner recovery key. Bucket credentials are themselves an environment secret, so a restore needs only the recovery key |
 | **Tokens**: API and coding-agent tokens, enrolment tokens, sessions, the bootstrap token, login links, identity links and step-up confirmations | Control-plane database | Every one is 256 bits from `crypto/rand`, written `mg_…`, stored only as SHA-256 in a lookup table and shown once (ADR-0005). API and agent tokens carry scope rows, an expiry and an owner (S§3.10). One-time tokens are marked used in the accepting transaction and fail on replay (B W1-3). Sessions are server-side, listable, revocable, bound to `__Host-` cookies and last 14 days. Links and tokens expire: login link, identity link and step-up 10 min, enrolment and bootstrap tokens 1 h. A step-up approves one request and is single use (`docs/specs/auth.md`) |
-| **Release signing keys** | Two `ed25519-sk` keys, each on its own FIDO2 token, offline; PIN and touch per signature (S§3.14, ADR-0007) | Every artifact carries an OpenSSH `SSHSIG` signature, namespace `moonglass-release`. The install script (from W1-6) and the agent (from W7-6) verify against both pinned public keys before installing. Canary and automatic revert limit a bad release; a staged rollout joins them with a managed fleet (v1) |
-| **Audit trail** | Control-plane database | Hash-chained events written by the registry, never by handlers (B W2-1). From v1, `moonglass audit verify` recomputes the chain on the CLI and pins its newest event, so a later rewrite of history that machine has verified is caught (W5-5, `docs/specs/audit.md`). A running control plane under someone else's control can still serve a fully recomputed chain to a machine that has never verified it. Until then the chain is written but nothing outside the control plane checks it |
+| **Release signing keys** | Two `ed25519-sk` keys, each on its own FIDO2 token, offline; PIN and touch per signature (S§3.14, ADR-0007) | Every artifact carries an OpenSSH `SSHSIG` signature, namespace `moonglass-release`. The install script (from W1-6) and the agent (from W7-6) verify against both pinned public keys before installing. Canary, staged rollout and automatic revert limit a bad release |
+| **Audit trail** | Control-plane database | Hash-chained events written by the registry, never by handlers (B W2-1). `moonglass audit verify` recomputes the chain on the CLI and pins its newest event, so a later rewrite of history that machine has verified is caught (B W5-5, `docs/specs/audit.md`). A running control plane under someone else's control can still serve a fully recomputed chain to a machine that has never verified it. Free export to the user's bucket on every plan (V§5.1) |
 
 Also sensitive, and never held by the control plane: agent keys, the owner recovery key, certificate private keys (S§3.4) and the git deploy key (S§3.11). All are generated where they are used.
 
@@ -65,8 +65,8 @@ Also sensitive, and never held by the control plane: agent keys, the owner recov
 
 | Boundary | Rule when crossing it |
 |---|---|
-| **B1** client → control plane | Every call is a registry operation, or a route on the fixed non-operation list, with its authorisation declared beside it; authorisation and audit happen in the registry (S§3.12, ADR-0006). An operation declares its lowest role and `destructive`, with no default. **Separate things each require a sign-in fresher than ten minutes**, checked on the server at approval: changing secret recipients, minting a token, a purge, and from v1 approving a protected deploy or a destructive operation. A `destructive` flag is not a substitute for any of the others. `secrets reveal` also requires it (v1). The fresh sign-in is a new GitHub round trip or a fresh `server login-link`. A destructive call by an agent identity returns "pending approval", which nothing can approve until v1 |
-| **B2** control plane → database | Only the storage package writes SQL. The database is SQLite, one per control plane (ADR-0002 as amended 2026-11-22). Every row outside the lookup tables carries `org_id`, and every store method filters on it (S§3.7). Every org in one control plane belongs to one customer. Migrations are numbered SQL files applied by `internal/store`. The only tables without `org_id` are the listed lookup tables, which hold a lookup key, IDs, an expiry and a revoked marker, nothing else (ADR-0002). The database never holds a readable secret, an unwrapped key or a server credential (S§4) |
+| **B1** client → control plane | Every call is a registry operation, or a route on the fixed non-operation list, with its authorisation declared beside it; authorisation and audit happen in the registry (S§3.12, ADR-0006). An operation declares its lowest role and `destructive`, with no default. **Three separate things each require a sign-in fresher than ten minutes**, checked on the server at approval: approving a protected deploy, approving a destructive operation, and changing secret recipients. A `destructive` flag is not a substitute for either of the other two. `secrets reveal` also requires it. The fresh sign-in is a new round trip with any linked method, or a new `server login-link` on the box. A destructive call by an agent identity returns "pending approval" |
+| **B2** control plane → database | Only the storage package writes SQL. The database is SQLite, one per control plane, and every org in it belongs to one customer (ADR-0002). Every row outside the lookup tables carries `org_id`, and every store method filters on it (S§3.7); the conformance suite checks that a second org sees nothing. Migrations are numbered SQL files applied by `internal/store`. The only rows not scoped to one org are in the listed lookup tables, which hold a lookup key, IDs, an expiry and a revoked marker, nothing else (ADR-0002). The database never holds a readable secret, an unwrapped key or a server credential (S§4) |
 | **B3** control plane ↔ agent | Outbound only, TLS 1.3, the control plane's public key pinned at enrolment, one Ed25519 identity per agent (S§2, S§3.1). The agent treats the control plane as able to be hostile: it accepts typed messages only and applies local policy and the sanitizer to each one. Malformed, oversized and out-of-order messages are rejected (S§7) |
 | **B4** agent → proxy | Caddy's admin API on a Unix socket reachable only by the agent and the proxy, through the group `moonglass-proxy-admin` that only their units hold (ADR-0001 decision 3). A complete JSON config; no TCP admin port (S§3.3). The proxy has no Docker access |
 | **B5** agent → Docker Engine | The socket is root-equivalent. Nothing reaches it without passing the sanitizer (S§3.2) |
@@ -80,30 +80,30 @@ Release artifacts cross a ninth boundary: neither the install script nor the age
 
 From S§4. "Protected" means a protected environment.
 
-| If an attacker gets… | Moonglass MVP | v1, protected environments |
+| If an attacker gets… | An unprotected environment | A protected environment |
 |---|---|---|
 | A copy of the control-plane database or its backups | Ciphertext secrets, wrapped environment keys they cannot unwrap, no server credentials, hashed tokens | Same |
-| Full control of the running control plane | Can send any *typed* command: deploy an image or pre-deploy step to any environment (it runs in a sanitized container), stop services, soft-delete. There are no protected environments until v1. **Cannot** get a host shell, start a privileged or host-namespace container, mount the Docker socket or host paths, read host files, override `agent.toml`, or give an environment key to a new server, which only the owner's CLI with the recovery key can grant | Also cannot deploy, change sources, change secret recipients or delete in a protected environment without a signature from an approver's key, verified by the agent |
-| A leaked coding-agent or API token | Only that token's project, environment and operations; an agent token cannot run a destructive call, because nothing can approve it until v1 | Destructive calls wait for a human with step-up |
+| Full control of the running control plane | Can send any *typed* command: deploy an image or pre-deploy step to an unprotected environment (it runs in a sanitized container), stop services, soft-delete, enrol a rogue server into an unprotected environment through `RewrapEnvKey`, and serve altered JavaScript to the dashboard. **Cannot** get a host shell, start a privileged or host-namespace container, mount the Docker socket or host paths, read host files, override `agent.toml`, or obtain a protected environment's key | Also cannot give the environment key to a new server, because agents refuse `RewrapEnvKey` there. With agent-verified approvals (V1-9), cannot deploy there without an approver's passkey signature, verified by the agent |
+| A leaked coding-agent or API token | Only that token's project, environment and operations; destructive calls wait for a human with step-up | Its deploys wait for a human too |
 | A malicious image | Confined to its container by the default Docker sandbox plus sanitization; it can still use whatever that environment's secrets reach | Same |
 | A container or kernel escape | Host compromise. True of every product in the category | Same |
 
 ## 5. Honest limits
 
-Docs never claim more than this section allows (`AGENTS.md`), and never say "audited" before the external review in v1 (S§7).
+Docs never claim more than this section allows (`AGENTS.md`), and never say "audited" before the external review (V1-12, S§7).
 
-1. **A takeover of the running control plane can deploy its own image into an environment, and that image receives that environment's secrets.** The MVP defends against a stolen database plus a decryption credential and removes host root. v1 adds protected environments, whose keys agents never re-wrap, and closes their deploy gap with agent-verified approvals (S§4). Environments start unprotected until switched on (ADR-0006).
-2. **Browser-side encryption trusts the JavaScript we serve.** The CLI path does not: it is a signed binary that pins each environment's public key and the org's recovery recipients on first use and stops if they change (S§3.11, ADR-0003 decision 9). The first use on a new machine trusts what the control plane returns, and the CLI prints it for the owner to check.
+1. **A takeover of the running control plane can deploy its own image into an unprotected environment, and that image receives that environment's secrets.** Moonglass defends against a stolen database plus a decryption credential, removes host root and keeps protected environments' keys out of reach. Agent-verified approvals (V1-9) close the deploy gap for protected environments (S§4). Every environment starts unprotected until an owner protects it (ADR-0006).
+2. **Browser-side key handling trusts the JavaScript the control plane serves.** The dashboard generates, unwraps and uses keys in the browser, under a strict CSP and with the age module loaded only where keys are handled (ADR-0003 decision 14, ADR-0018); a taken-over control plane could serve altered JavaScript that captures a value, a key or a recovery key file read into the page. The CLI path does not trust it: it is a signed binary that pins each environment's public key and the org's recovery recipients on first use and stops if they change (S§3.11, ADR-0003 decision 9). The first use on a new machine trusts what the control plane returns, and the CLI prints it for the owner to check.
 3. **Lose every server and the recovery key, and the secrets and backups are gone.** Nobody can decrypt them, including us (S§3.11).
 4. **The install script is trusted through HTTPS from moonglass.dev.** Whoever controls that domain can serve a different script. Everything the script downloads is signature-checked; the script itself is only if the user verifies its `.sig` first (ADR-0007).
 5. **`[sources] repositories` limits which code is built, not what it builds from.** A Dockerfile's base images are pulled by BuildKit and are not checked against `registries` (`docs/specs/local-policy.md`).
 
-What browser-side encryption protects, and what it does not, once browser entry ships in v1 (S§3.11). At launch the CLI is the only way to set a value:
+What browser-side key handling protects, and what it does not (S§3.11):
 
 | Protects against | Does not protect against |
 |---|---|
-| A stolen copy of our database or its backups | A takeover of our **running** service, which can serve JavaScript that captures values as you type, or hand your browser a substitute environment key |
-| Our logs, anyone reading rows | The same takeover deploying its own image to an **unprotected** environment and receiving that environment's secrets |
+| A stolen copy of our database or its backups | A takeover of the **running** control plane, which can serve JavaScript that captures values as you type or a recovery key file you load, or hand your browser a substitute environment key |
+| Our storage on Cloud, our logs, anyone reading rows | The same takeover deploying its own image to an **unprotected** environment and receiving that environment's secrets |
 | Secrets appearing in our error reports or support tooling | A compromised user server, which must hold plaintext to run your app |
 | | An app that logs its own environment |
 
@@ -153,13 +153,13 @@ From `AGENTS.md`. Changes here get line-by-line review by the owner, and only on
 
 ## 8. Rules that hold everywhere
 
-- No host shell, ever. Container exec is not in the MVP (S§5.2).
+- No host shell, ever. The container terminal (V1-10) is human-only, with step-up, audited, never for agent identities, and refused when `agent.toml` forbids `exec` (S§5.2).
 - Local policy beats remote command (S§3.1).
 - Enforcement is on the server, never a flag the caller sets (S§3.12).
 - The recovery key is for granting, rotating and recovering, never for everyday reads (S§3.11).
 - No plan or licence check in the agent or in the open-source build (V§6).
 - A sign-in never attaches itself to an existing user by email address; linking two sign-in methods is explicit, with step-up, except the first owner's first identity linked on the box (ADR-0005).
-- The control plane never replaces itself. Self-hosted operators update `moonglass server` and the CLI by running the signed install (ADR-0007).
+- The control plane upgrades only when its operator clicks Update or runs `moonglass update`, through the same verified path and revert as the agent (ADR-0007 decision 5).
 
 ## 9. Reviewer checklist
 

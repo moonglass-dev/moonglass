@@ -1,8 +1,6 @@
 # Soft delete, restore and purge
 
-**Status: Approved** by the owner on 2026-11-18 (week 5 preflight). The registry operations, the protocol messages, the tables and the agent-state change below are contracts (ADR-0006 decision 9, ADR-0002, `docs/specs/protocol.md`). The owner decisions are listed at the end.
-
-**At launch** (the plan audit, `docs/review/plan-audit.md`, 2026-11-22): service delete, restore and purge (W5-5b to W5-5e, and W5-7 in the UI) are built. Environment and project deletion (W5-8a, W5-8 and the sections marked W5-8) is v1.
+The registry operations, the protocol messages, the tables and the agent-state change below are contracts (ADR-0006 decision 9, ADR-0002, `docs/specs/protocol.md`). The decisions are listed at the end.
 
 A deleted thing can be brought back for 7 days, then it is purged. Nobody, a coding agent included, removes data in one step: deleting needs admin and, for an agent, a person's approval (W5-2); purging early needs a person with step-up and is never an agent's. Sources: V§4 ("soft delete" is free everywhere), M§3 week 5, R§3 (Railway's 48-hour soft delete after an agent deleted a production volume).
 
@@ -27,7 +25,7 @@ Releases, rollbacks, secrets, servers, agent identities and audit events are not
 
 ## Retention
 
-Seven days, fixed. A deleted row records `deleted_at`; it is purged at `deleted_at` + 7 days by the retention purge, or earlier by a purge call. There is no setting for it in the MVP.
+Seven days, fixed. A deleted row records `deleted_at`; it is purged at `deleted_at` + 7 days by the retention purge, or earlier by a purge call. There is no setting for it.
 
 ## A deleted service
 
@@ -89,7 +87,7 @@ A server that is gone for good keeps its deleted services until it is re-enrolle
 
 ## Protocol (W5-5a)
 
-Two commands, server to agent. Each payload has one field, `app_id`, an identifier as for `Deploy`. No field is a host path or a shell string. Both are `delete` class (`docs/specs/local-policy.md`). The owner's approval of this file fixes the numbers: `STOP_APP` = 15, `StopApp.app_id` = 1; `REMOVE_APP` = 16, `RemoveApp.app_id` = 1. Later tickets that add messages (W4-8, W3-3, W4-9, W7-6d) take numbers after these.
+Two commands, server to agent. Each payload has one field, `app_id`, an identifier as for `Deploy`. No field is a host path or a shell string. Both are `delete` class (`docs/specs/local-policy.md`). The numbers are fixed: `STOP_APP` = 15, `StopApp.app_id` = 1; `REMOVE_APP` = 16, `RemoveApp.app_id` = 1. Later tickets that add messages (W4-8, W3-3, W4-9, W7-6d) take numbers after these.
 
 Each is answered with one `CommandResult` (`docs/specs/protocol.md`). Result timeouts (`docs/specs/connection.md`): `STOP_APP` 5 minutes, `REMOVE_APP` 10 minutes.
 
@@ -107,7 +105,7 @@ Each is answered with one `CommandResult` (`docs/specs/protocol.md`). Result tim
 - `REJECTED` with `app <id> is not stopped; stop it first` unless the app is stopped. A control plane able to send one command can send both, so this guards against mistakes, not against a hostile control plane; only `forbid = ["delete"]` stops that.
 - Removes every container of the app, the images no other app's kept release uses, and the app's agent-state rows and identity binding. Its command records age out after 7 days as usual (`docs/specs/connection.md`).
 - Does not remove `data_dirs`. From W6-1c it removes named volumes as below; until then it removes none.
-- **Named volumes** (W6-1c, owner decision of 2026-11-19). After the containers, it removes each volume `mg.<project>.<environment>.<name>` that a release row of the app names in `volumes`, unless a kept release of another app names it too: two services of one environment may share a volume ("Volumes" in `docs/specs/release.md`), and a shared one stays until the last of them is removed. A volume that is already gone is not an error. A volume the Engine refuses to remove, because a container outside Moonglass uses it, fails the command with `volume <name> is in use by a container Moonglass does not manage`, and the app's state rows are kept so a retried purge can finish. The volumes are read from agent state before its rows are deleted.
+- **Named volumes** (W6-1c). After the containers, it removes each volume `mg.<project>.<environment>.<name>` that a release row of the app names in `volumes`, unless a kept release of another app names it too: two services of one environment may share a volume ("Volumes" in `docs/specs/release.md`), and a shared one stays until the last of them is removed. A volume that is already gone is not an error. A volume the Engine refuses to remove, because a container outside Moonglass uses it, fails the command with `volume <name> is in use by a container Moonglass does not manage`, and the app's state rows are kept so a retried purge can finish. The volumes are read from agent state before its rows are deleted.
 - Answers `SUCCEEDED` with an empty app state. An app the agent does not know also answers `SUCCEEDED`, so a retried purge finishes.
 
 ## Environments and projects (W5-8)
@@ -135,7 +133,7 @@ The retention purge handles them the same way. A child is always deleted no late
 
 **W5-5c:**
 - `services` gains `deleted_at` (empty when live) and `purge_detail` (empty unless the last purge attempt failed).
-- `purge_due`, a lookup table (ADR-0002 decision 12): `id` (the deleted row's id, the lookup key), `org_id`, `expires_at`. It holds nothing else. It exists so the hourly purge can find due rows without knowing their orgs.
+- `purge_due`, a lookup table (ADR-0002 decision 9): `id` (the deleted row's id, the lookup key), `org_id`, `expires_at`. It holds nothing else. It exists so the hourly purge can find due rows without knowing their orgs.
 - Store methods: mark a service deleted and write `purge_due`; clear both; list deleted services; list due `purge_due` rows; delete a service with its releases, rollbacks and `purge_due` row in one transaction; set `purge_detail`. Every existing service lookup and list, and `ResolveTarget`, leave deleted services out.
 
 **W5-8a:**
@@ -148,7 +146,7 @@ Conformance covers: a deleted service is gone from every list and lookup and fro
 
 - W5-5a: `TestStopAndRemoveAppRoundTrip`, `TestStopAndRemoveAppRejectMalformed`, and a fuzz target for opening both payloads.
 - W5-5b: `TestStopAppStopsAndUnroutes`, `TestStopAppIsIdempotent`, `TestDeployRestoresStoppedApp`, `TestRemoveAppNeedsStoppedApp`, `TestRemoveAppRemovesContainersImagesAndState`, `TestStoppedAppIsLeftAloneByReconcileAndAutoRollback`, against a real Engine.
-- W5-5c: `TestSoftDeleteConformanceSQLite`, `TestSoftDeleteConformancePostgres`.
+- W5-5c: `TestSoftDeleteConformanceSQLite`.
 - W5-5d: `TestServiceDeleteStopsAndHides`, `TestServiceDeleteRefusedDuringDeploy`, `TestServiceRestoreRedeploysWithoutPreDeploy`, `TestDeletedServiceNameIsTaken`, `TestDeleteRejectedByAgentPolicyLeavesServiceLive`.
 - W5-5e: `TestServicePurgeNeedsStepUp`, `TestRetentionPurgeAfterSevenDays`, `TestRetentionPurgeSkipsOfflineServer`, `TestRetentionPurgeIsAuditedAsSystem`.
 - W5-8: `TestEnvironmentDeleteNeedsNoLiveServices`, `TestEnvironmentPurgeRemovesSecretsAndKeys`, `TestProjectRestoreDoesNotRestoreChildren`.
@@ -157,9 +155,9 @@ Conformance covers: a deleted service is gone from every list and lookup and fro
 
 Deleting servers, secrets, releases or agent identities. Removing named volumes (W6-1c). A configurable retention period. Deleting a service whose server is gone for good.
 
-## Owner decisions
+## Decisions
 
-Each line is a choice no ADR or earlier spec fixed. The owner approved every line as recommended on 2026-11-18.
+Each line is a choice no ADR or earlier spec fixed.
 
 - **D54** Services are soft-deleted in W5-5; environments and projects in W5-8, only when empty, with no cascade. Recommended: yes.
 - **D55** Retention is 7 days, fixed. Recommended: 7 days. Railway chose 48 hours; 7 covers a weekend and costs only disk for stopped containers.
@@ -171,4 +169,4 @@ Each line is a choice no ADR or earlier spec fixed. The owner approved every lin
 - **D61** The control plane purges due rows hourly as a `system` principal, skipping offline servers. Recommended: yes.
 - **D62** `STOP_APP` and `REMOVE_APP` are new protocol messages, numbers 15 and 16, both `delete` class, so `forbid = ["delete"]` refuses soft delete too. Recommended: yes.
 - **D63** `REMOVE_APP` is refused for an app that is not stopped. Recommended: yes, as a guard against mistakes only.
-- **D64** Purging an environment deletes its key and every wrapped copy, the recovery copy included. Recommended: yes; purge means gone. Keeping the recovery copy would keep old backups readable, but leaves key material for an environment that no longer exists.
+- **D64** Purging an environment deletes its key and every wrapped copy, the recovery copy included. Recommended: yes; purge means gone. Keeping the recovery copy would keep old backups readable, but leaves key material for an environment that is gone.

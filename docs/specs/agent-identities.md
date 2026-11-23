@@ -1,16 +1,14 @@
 # Agent identities and scoped tokens
 
-**Status: Approved** by the owner on 2026-11-18 (week 5 preflight). The registry operations, the `Spec` fields, the tables and the audit hash below are contracts (ADR-0006 decision 9, ADR-0002). The owner decisions are listed at the end.
+The registry operations, the `Spec` fields, the tables and the audit hash below are contracts (ADR-0006 decision 9, ADR-0002). The decisions are listed at the end.
 
-**At launch** (the plan audit, `docs/review/plan-audit.md`, 2026-11-22): W5-1a, W5-1b, W5-1c and W5-1 are built, as the way a token gets scopes and as the authz-matrix suite. Approvals (W5-2) and MCP (W5-4) are v1. Until W5-2, a destructive call by an agent identity gets `ErrPendingApproval`, and nothing can approve it, so it never runs.
-
-What W5-1a, W5-1b, W5-1c and W5-1 build, per ADR-0005 decision 8 and ADR-0006 decision 3 as amended by this preflight. It builds on `docs/specs/auth.md` (W4-1: sessions, `StepUp`, the `step_up_required` answer), which is why W5-1a depends on W4-1.
+What W5-1a, W5-1b, W5-1c and W5-1 build, per ADR-0005 decision 8 and ADR-0006 decision 3. It builds on `docs/specs/auth.md` (W4-1: sessions, `StepUp`, the `step_up_required` answer), which is why W5-1a depends on W4-1.
 
 ## Which ticket builds what
 
 | Ticket | Builds |
 |---|---|
-| W5-1a | The `agent_identities` table, `tokens.agent_id`, `audit_events.agent_id`, their store methods, on both backends with conformance |
+| W5-1a | The `agent_identities` table, `tokens.agent_id`, `audit_events.agent_id`, their store methods, with conformance |
 | W5-1b | `Spec.Level` and `Spec.AgentCallable` on every operation; `Principal.AgentID`; agent-token authentication and its role; the check order and its errors; `agent_id` in the audit hash |
 | W5-1c | `agents.create`, `agents.list`, `agents.revoke` |
 | W5-1 | `agents.tokens.create`, `agents.tokens.list`, `agents.tokens.revoke`; the new `MintToken` rules; the authz matrix; the build-in-CI template's agent token |
@@ -33,7 +31,7 @@ An agent identity is a named principal for a coding agent, a CI job or a script.
 
 ### Role
 
-An agent token acts with its owner's role in the org, read at each request, capped at admin (ADR-0006 decision 3, amended):
+An agent token acts with its owner's role in the org, read at each request, capped at admin (ADR-0006 decision 3):
 
 | Owner's role | Agent acts as |
 |---|---|
@@ -143,16 +141,16 @@ Each is org-level, `AgentCallable: No`, and not destructive. Revoking a credenti
 - **`agents.list`** returns every identity in the org, by name: `id`, `name`, `owner`, `created_at`, `revoked_at` (empty when live), and `live_tokens`.
 - **`agents.revoke`** takes `agent` (a name). Any member may revoke any identity in the org: revoking fails closed, and a leaked token must be easy to stop. It returns `revoked_at`. An unknown name is 404; a revoked identity is 409.
 - **`agents.tokens.create`** takes `agent` (a name), `name` (a token name in the name format), `expires_in_hours` and `scopes` (repeated row strings). Only the identity's owner may mint for it: another person's identity is 404, like `sessions.revoke`. A revoked identity is 409. It returns `token` (the `mg_` text, once), `id`, `name`, `last4`, `expires_at` and `scopes`. The text is never logged, stored or put in an audit event.
-- **`agents.tokens.list`** takes `agent` and returns its tokens, newest first: `id`, `name`, `last4`, `created_at`, `expires_at`, `revoked` and `scopes`. Each scope is `project`, `environment` and `operation` as names (or `*`), with `project_id` and `environment_id`; a name is empty when its resource no longer exists.
+- **`agents.tokens.list`** takes `agent` and returns its tokens, newest first: `id`, `name`, `last4`, `created_at`, `expires_at`, `revoked` and `scopes`. Each scope is `project`, `environment` and `operation` as names (or `*`), with `project_id` and `environment_id`; a name is empty when its resource is gone.
 - **`agents.tokens.revoke`** takes `agent` and `token` (the token id). Any member may revoke any agent token in the org. An unknown or another identity's token is 404; a revoked one is 409.
 
 The CLI is generated: `moonglass agents tokens create --agent ci --name deploy --expires-in-hours 720 --scope web/staging/deploy --scope 'web/staging/releases.list'`. With step-up it prints the step-up line of `docs/specs/auth.md` and exits 1; the same command with `--step-up <id>` then mints.
 
-**The build-in-CI template** (`examples/ci/github-actions.yml`, `docs/specs/build.md`) changes in W5-1: its comment says to create an identity such as `ci` and mint it a token scoped to `<project>/<environment>/deploy`, and no longer suggests an owner token.
+**The build-in-CI template** (`examples/ci/github-actions.yml`, `docs/specs/build.md`) changes in W5-1: its comment says to create an identity such as `ci` and mint it a token scoped to `<project>/<environment>/deploy`.
 
 ## Storage (W5-1a)
 
-**Row-level table:**
+**Org-scoped table:**
 - `agent_identities`: `org_id`, `id`, `name`, `owner_user_id`, `created_at`, `revoked_at` (empty when live); unique `(org_id, name)`.
 
 **Changes:**
@@ -213,7 +211,7 @@ agents.create      agent/admin   H H H H H H H H H
 The matrix is one of the permanent suites (ADR-0006, Consequences). Every later ticket that adds an operation adds its 8 lines.
 
 **Other named tests:**
-- W5-1a: `TestAgentIdentitiesConformanceSQLite`, `TestAgentIdentitiesConformancePostgres`.
+- W5-1a: `TestAgentIdentitiesConformanceSQLite`.
 - W5-1b: `TestRegisterRejectsUnsetLevelAndAgentCallable`, `TestRegisterRejectsStepUpForAgents`, `TestAgentTokenRoleIsCappedAtAdmin`, `TestAgentTokenFollowsOwnerRole`, `TestAuditRecordsAgentIdentity`.
 - W5-1: `TestMintTokenScopeRules` (a table of every rule above), `TestAgentTokenExpiryLimits`, `TestAgentTokenTextShownOnce`.
 
@@ -228,11 +226,11 @@ The matrix is one of the permanent suites (ADR-0006, Consequences). Every later 
 
 ## Not in W5-1
 
-Approvals for an agent's pending call (W5-2). MCP sign-in for agents (W5-4). Scoped tokens for people. Moving an identity to another owner. Plan caps on identities (the commercial module, W7-4).
+Approvals for an agent's pending call (W5-2). MCP sign-in for agents (W5-4). Scoped tokens for people. Moving an identity to another owner.
 
-## Owner decisions
+## Decisions
 
-Each line is a choice no ADR or earlier spec fixed. The owner approved every line as recommended on 2026-11-18.
+Each line is a choice no ADR or earlier spec fixed.
 
 - **D28** An agent identity is owned by the person who creates it, and its tokens act with that person's current role. Recommended: yes. The alternative, an identity with a role of its own, survives its owner leaving but needs a second role model and an ADR-0006 rewrite.
 - **D29** The agent role is capped at admin, so owner-only operations are never reachable by agents. Recommended: yes.

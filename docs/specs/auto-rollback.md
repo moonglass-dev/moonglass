@@ -1,6 +1,6 @@
 # Auto-rollback
 
-What the agent watches after a switch, when it rolls a release back on its own, what it reports, and what the control plane stores and lets people change. Stack §5.4 gives the intent; this spec turns it into rules. Owner decision of 2026-11-20 (the W4-3 blocker): the owner approved every rule, field, number, table and operation below. W4-3 was split into W4-3a to W4-3f and W4-3 (`docs/plan/build-plan.md`, week 4).
+What the agent watches after a switch, when it rolls a release back on its own, what it reports, and what the control plane stores and lets people change. Stack §5.4 gives the intent; this spec turns it into rules. W4-3a to W4-3f build it (`docs/plan/build-plan.md`, week 4).
 
 Auto-rollback runs on the server and keeps working while the control plane is unreachable (stack rule 2). The control plane only receives reports, stores them, and holds the per-service settings it sends with each `Deploy`.
 
@@ -82,4 +82,4 @@ Every fired trigger, with any action, is one **event**, written in agent state (
 ## Tests
 
 - `internal/rollback` holds the trigger logic as plain functions over observations (container state and restart count, probe results, counter samples, the clock), with no Docker, no socket and no timers, so every rule above is unit-tested with table-driven tests.
-- The watcher's wiring runs against a real Engine (`docs/specs/deploy-suite.md`): a release that crash-loops is rolled back within 2 minutes of its switch (gate G4).
+- The watcher's wiring runs against a real Engine (`docs/specs/deploy-suite.md`): a release that crash-loops is rolled back within 2 minutes of its switch (gate G5).

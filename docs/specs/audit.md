@@ -1,8 +1,6 @@
 # The audit view and `moonglass audit verify`
 
-**Status: Approved** by the owner on 2026-11-18 (week 5 preflight). The registry operation, the table columns, the audit hash and the local command below are contracts (ADR-0006 decisions 7 and 9, ADR-0002). The owner decisions are listed at the end.
-
-**Deferred to v1** (the plan audit, `docs/review/plan-audit.md`, 2026-11-22): W5-5 (`audit.list`, the target ids in the hash and `moonglass audit verify`) and the audit page are not built at launch. W5-5c's columns and the `system` principal are built, because deletion writes them. The hash chain of W2-1 is written from launch.
+The registry operation, the table columns, the audit hash and the local command below are contracts (ADR-0006 decisions 7 and 9, ADR-0002). The decisions are listed at the end.
 
 The registry writes one hash-chained event per call (`docs/specs/registry.md`, "Audit"). This spec adds a way to read the chain, a way to check it that does not take the control plane's word for it, and the page that shows it.
 
@@ -10,7 +8,7 @@ The registry writes one hash-chained event per call (`docs/specs/registry.md`, "
 
 | Ticket | Builds |
 |---|---|
-| W5-5c | `project_id` and `environment_id` on `audit_events`, and the `system` principal kind, on both backends with conformance |
+| W5-5c | `project_id` and `environment_id` on `audit_events`, and the `system` principal kind, with conformance |
 | W5-5 | The target ids in each event and in its hash; `audit.list`; `moonglass audit verify` |
 | W5-7 | The `/{org}/audit` page (`docs/specs/ui.md`) |
 
@@ -82,12 +80,12 @@ A local command (`registry.LocalCommands`), not an operation. A check that the c
 
 ## Named tests
 
-- W5-5c: `TestAuditTargetColumnsConformanceSQLite`, `TestAuditTargetColumnsConformancePostgres`.
+- W5-5c: `TestAuditTargetColumnsConformanceSQLite`.
 - W5-5: `TestAuditHashCoversTarget`, `TestAuditListPagesNewestFirst`, `TestAuditListFilters`, `TestAuditListOmitsOwnEvent`, `TestAuditVerifyExitCodes` (0, 1 for a changed, a removed and a reordered event, 1 for a pin mismatch, 2 for a server error), `TestAuditVerifyMovesPinOnlyOnSuccess`.
 
-## Owner decisions
+## Decisions
 
-Each line is a choice no ADR or earlier spec fixed. The owner approved every line as recommended on 2026-11-18.
+Each line is a choice no ADR or earlier spec fixed.
 
 - **D65** Events record the call's `project_id` and `environment_id`, in the hash. Recommended: yes; otherwise the trail cannot say where an agent acted.
 - **D66** `principal_kind` gains `system`, used only by the retention purge. Recommended: yes.

@@ -2,7 +2,6 @@
 
 - Status: accepted
 - Date: 2026-11-17
-- Amended: 2026-11-17, decision 5 (owner decision D24, week 3 planning)
 
 ## Context
 

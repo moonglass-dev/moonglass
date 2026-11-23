@@ -1,15 +1,13 @@
 # Sign-in, sessions and step-up
 
-What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005 as amended on 2026-11-18. The owner approved this spec on 2026-11-18, including the registry operations, the tables and the step-up rules below, which are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1.
-
-**At launch** (ADR-0005 as amended by the plan audit, `docs/review/plan-audit.md`, 2026-11-22): sign-in is GitHub on the user's own box, with `server login-link` for the first sign-in and emergencies. Google (W4-1b) is v1. Until it lands, every place below that names Google shows or accepts GitHub only, and the Google variables are not read.
+What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005. The registry operations, the tables and the step-up rules below are contracts (ADR-0006 decision 9, ADR-0002). The self-hosted path (bootstrap token, `server login-link`) is W7-1. Invitations are LN-3, passkeys and TOTP V1-6, OpenID Connect V1-7, and SAML and SCIM the Business module (V1-5); each adds its own section here when it is planned.
 
 ## Which ticket builds what
 
 | Ticket | Builds |
 |---|---|
-| W4-1a | The tables: `session_hashes`, and the two new `audit_events` columns, on both backends with conformance |
-| W4-1d | The tables: `link_token_hashes` and `step_ups`, on both backends with conformance |
+| W4-1a | The tables: `session_hashes`, and the two new `audit_events` columns, with conformance tests |
+| W4-1d | The tables: `link_token_hashes` and `step_ups`, with conformance tests |
 | W4-1e | Session authentication in the registry: `Registry.Authenticate` with the `__Host-mg_session` cookie and `Moonglass-Org`, or a bearer, never both; `Principal.SessionID`; the audit hash and event with `session_id` and `step_up_id`; `http.CrossOriginProtection` on every route of the HTTP listener |
 | W4-1f | `internal/auth` with GitHub: the operator variables with the pairing and public-URL rules, `state`, PKCE and the `__Host-mg_oauth` cookie, the GitHub exchange and `/user`, sign-in sessions, sign-out, the failure page and its CSP, the routes on `registry.NonOperationRoutes` mounted under `/auth`, and the read-only `Store.UserByIdentity` |
 | W4-1b | Google: the provider and its `nonce`, the ID-token `iss`, `aud`, `exp` and `nonce` checks, and the Google variables |
@@ -18,8 +16,8 @@ What W4-1a, W4-1d, W4-1e, W4-1f, W4-1b, W4-1c and W4-1 build, per ADR-0005 as am
 
 ## Decisions in short
 
-- **Sign-in is GitHub** (Google in v1). There are no passwords and no email links in the MVP, so there is no email provider (ADR-0005 decisions 1 and 5).
-- **No sign-up in W4-1.** An identity that is not linked to a user is refused. A user gets their first identity from `moonglass server --print-owner-link` on the box, or from `identities.link`. There is no open sign-up (ADR-0005 open question 2, closed 2026-11-22); members are added through the commercial module.
+- **Sign-in is GitHub or Google** on every control plane, through OAuth apps the operator configures. There are no passwords, and email is never a sign-in method (ADR-0005 decisions 1 and 5).
+- **No open sign-up.** An identity that is not linked to a user is refused. A user gets their first identity from `moonglass server --print-owner-link` on the box, from `identities.link`, or by accepting an invitation (LN-3). On Cloud the Cloud service creates the first owner at sign-up (`docs/specs/billing.md`).
 - **A step-up approves one exact request.** It is not a "recently signed in" flag on the user. The person does a fresh provider round trip, then presses Approve on a page that shows the request. The approval is single use, lasts 10 minutes, and is bound to one user, one credential, one operation, one target and one digest of the inputs.
 - **The control plane keeps no provider token.** The provider's access token is used once to learn the subject and then dropped.
 - **Standard library only.** OAuth 2.0 with PKCE over `net/http`, and `http.CrossOriginProtection` for cross-site requests. Nothing here needs a new module.
@@ -222,4 +220,4 @@ W4-1d conformance covers:
 
 ## Not in W4-1
 
-Sign-up and org creation on first sign-in. Inviting members. Removing an identity. Email of any kind. Self-hosted sign-in (W7-1). Approvals of agent requests (W5-2). The `/sign-in` screen (W2-S).
+Org creation on first sign-in. Invitations (LN-3). Removing an identity. Email (LN-5). Self-hosted sign-in (W7-1). Approvals of agent requests (W5-2). The `/sign-in` screen (W2-S).

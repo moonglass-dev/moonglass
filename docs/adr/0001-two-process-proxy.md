@@ -2,11 +2,10 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
-- **Amended:** 2026-11-17, decision 3: who can reach the admin socket (owner decision D10, weeks 2–3 preflight)
 
 ## Context
 
-The server side is authoritative for runtime: routing and certificates must keep working when the control plane is unreachable and when the agent is restarting or upgrading (S rule 2). The agent ships often; the proxy changes only when Caddy or our counter module changes (S§3.3). Revision 2 of the stack embedded Caddy in the agent and relied on a socket handover that had to be proven in week 1.
+The server side is authoritative for runtime: routing and certificates must keep working when the control plane is unreachable and when the agent is restarting or upgrading (S rule 2). The agent ships often; the proxy changes only when Caddy or our counter module changes (S§3.3). Embedding Caddy in the agent would make every agent upgrade touch traffic.
 
 ## Decision
 
@@ -31,14 +30,14 @@ The server side is authoritative for runtime: routing and certificates must keep
 
 ## Alternatives rejected
 
-- **Caddy embedded in the agent with a socket handover** (revision 2): every agent upgrade would touch traffic.
+- **Caddy embedded in the agent with a socket handover:** every agent upgrade would touch traffic.
 - **Traefik:** CPU complaints, and label-driven config (S§3.3).
 - **Pingora:** the best footprint, but a framework to assemble and own.
 - **kamal-proxy:** built for switching, without Caddy's certificate engine.
 
 ## Open questions
 
-Left open on purpose. SPIKE-1 closes all three by amending this ADR (B§6, M§2.2); nothing else decides them.
+Left open on purpose. SPIKE-1 closes all three in this ADR (B§6, M§2.2); nothing else decides them.
 
 1. **Proxy upgrade mechanism:** systemd socket activation or `SO_REUSEPORT`. Whether Caddy 2.11.9 accepts inherited listeners cleanly is unverified (S§3.3). The spike picks exactly one and the other is never built. If neither upgrades under load with zero failed requests, a proxy upgrade is a short, announced, drained restart, and the docs say so.
 2. **Measured memory** of each process, replacing the estimates above.
