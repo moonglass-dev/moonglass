@@ -1,11 +1,11 @@
 ---
 name: request
-description: Turn a plain-words request ("Request: <description>") into a Moonglass ticket and run it through the normal brief, worker, review and auto-merge path. Use for any feature, bug or behaviour change that is not already a build-plan ticket.
+description: Turn a plain-words request ("Request: <description>") into a Moonglass ticket and an implementation brief. The dispatcher delegates this to Opus (claudeAgent / claude-opus-5-5). Use for any feature, bug or behaviour change that is not already a build-plan ticket.
 ---
 
 # Intake a request
 
-The owner writes `Request: <description>`. Turn it into a ticket, check it against the sources of truth, and run it like any other ticket (`.agents/skills/dispatch/SKILL.md`). Do not ask questions.
+The owner writes `Request: <description>` to the dispatcher. The dispatcher delegates this skill to Opus (`claudeAgent` / `claude-opus-5-5`). Turn it into a ticket, check it against the sources of truth, and write the worker brief. Return those to the dispatcher. Do not start a worker, review a PR, or turn on auto-merge. Do not ask questions.
 
 ## 1. Write the ticket
 
@@ -25,6 +25,6 @@ Read only the parts that apply, through the docs map in `AGENTS.md`: `docs/plan/
 - **Already covered** by an open build-plan ticket: run that ticket instead, and widen its brief if needed.
 - **Too big for one PR:** the first PR adds `FQ-<n>` ticket lines to `docs/plan/build-plan.md` §6 (low risk, reviewed and auto-merged like any PR). Then those tickets run through the normal loop.
 
-## 3. Run it
+## 3. Write the brief
 
-Write the brief (`dispatch`, "The brief"), and add `--title "<title>" --risk <risk>` to it so the worker can open the PR: `scripts/plan` finds plan tickets by ID, but a request is not in the plan. A request takes a slot like any ticket, so it waits when three tickets are in flight. Then review it and turn on auto-merge as usual.
+Write the brief (`dispatch`, "The brief"), and add `--title "<title>" --risk <risk>` to it so the worker can open the PR: `scripts/plan` finds plan tickets by ID, but a request is not in the plan. Return the ID, title, risk, brief, and any `needs-owner` recommendation to the dispatcher. The dispatcher starts the worker with that brief and later delegates review. A request takes a slot like any ticket, so it waits when three tickets are in flight.

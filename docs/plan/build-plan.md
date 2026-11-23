@@ -5,7 +5,7 @@ _How Moonglass gets built, one ticket at a time. It builds on `stack.md` (S§n) 
 **Short version**
 
 - Every change is one ticket, one branch `p/<ID>`, one PR, squash-merged when CI is green and review passes.
-- Opus plans and briefs each ticket, a worker model writes the tests and code and runs `make ci`, Opus reviews the diff, and the PR auto-merges on green CI. You are involved only for a new dependency, a security decision, or a contract or ADR change: those open a draft PR labelled `needs-owner`.
+- The dispatcher (Grok 4.6, Gemini fallback) routes each ticket: it delegates planning and the brief to Opus, a worker model writes the tests and code and runs `make ci`, the dispatcher delegates review of the diff to Opus, and the PR auto-merges on green CI. You are involved only for a new dependency, a security decision, or a contract or ADR change: those open a draft PR labelled `needs-owner`.
 - A gate at the end of every week, with a demo you run yourself and a rule for when to stop.
 - Clean from the first commit. No placeholders, no fallbacks, no code for later tickets. When a decision changes, the old code is deleted in the same change.
 
@@ -237,7 +237,7 @@ W7-6 was split into W7-6a to W7-6f (2026-11-18): it was over the size limit for 
 
 ## 4. Change control
 
-- Contracts: the `.proto` files, registry operations, the `agent.toml` schema, the storage schema and the ADRs. Changing one needs an ADR amendment you approve first: Opus opens a draft PR labelled `needs-owner` with the proposal and a recommendation, and the ticket waits until you remove the label. The change then lands as one ticket that updates every user of the contract and **deletes the old form**.
+- Contracts: the `.proto` files, registry operations, the `agent.toml` schema, the storage schema and the ADRs. Changing one needs an ADR amendment you approve first: the dispatcher, on Opus's recommendation, opens a draft PR labelled `needs-owner` with the proposal and a recommendation, and the ticket waits until you remove the label. The change then lands as one ticket that updates every user of the contract and **deletes the old form**.
 - No compatibility code before launch. There are no users, so there is nothing to stay compatible with.
 - After launch, one narrow window. Because agents update in stages (S§3.14), the control plane speaks the current and the previous agent protocol version, and nothing older. ADR-0007 records this. It is the only compatibility code the product ever carries, and it is deleted one release later.
 - Spikes are never merged. Their output is a document and a decision.
