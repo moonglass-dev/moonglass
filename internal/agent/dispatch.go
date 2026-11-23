@@ -70,17 +70,23 @@ func openCommand(env *agentv1.Envelope, x Executor) (command, error) {
 	return command{}, fmt.Errorf("connect: control plane sent %v, which the agent does not accept: closing the connection", env.GetType())
 }
 
+// liveConn is one control-plane connection. answered holds the request ids
+// whose result was written on it, so a re-send that crossed that result on the
+// same connection is not answered twice.
 type liveConn struct {
-	c      *websocket.Conn
-	failed chan<- error
+	c        *websocket.Conn
+	failed   chan<- error
+	answered map[string]bool
 }
 
 // dispatcher runs commands for the whole Connect call: one FIFO per app.
+// pending maps each queued or running request id to the connection that last
+// re-sent it while it was pending, or nil.
 type dispatcher struct {
 	ctx     context.Context
 	onError func(error)
 	live    *liveConn
-	pending map[string]bool
+	pending map[string]*liveConn
 	queues  map[string][]command
 	wg      sync.WaitGroup
 	mu      sync.Mutex
@@ -90,7 +96,7 @@ func newDispatcher(ctx context.Context, onError func(error)) *dispatcher {
 	return &dispatcher{
 		ctx:     ctx,
 		onError: onError,
-		pending: map[string]bool{},
+		pending: map[string]*liveConn{},
 		queues:  map[string][]command{},
 	}
 }
@@ -98,7 +104,7 @@ func newDispatcher(ctx context.Context, onError func(error)) *dispatcher {
 func (d *dispatcher) attach(c *websocket.Conn, failed chan<- error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.live = &liveConn{c: c, failed: failed}
+	d.live = &liveConn{c: c, failed: failed, answered: map[string]bool{}}
 }
 
 func (d *dispatcher) detach(c *websocket.Conn) {
@@ -109,14 +115,20 @@ func (d *dispatcher) detach(c *websocket.Conn) {
 	}
 }
 
-// submit queues cmd behind its app's running command; a pending id is ignored.
+// submit queues cmd behind its app's running command. A pending id is not
+// queued again: the connection that re-sent it is noted, so it gets the result.
+// An id already answered on the live connection is ignored.
 func (d *dispatcher) submit(cmd command) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.pending[cmd.id] {
+	if _, ok := d.pending[cmd.id]; ok {
+		d.pending[cmd.id] = d.live
 		return
 	}
-	d.pending[cmd.id] = true
+	if d.live != nil && d.live.answered[cmd.id] {
+		return
+	}
+	d.pending[cmd.id] = nil
 	d.queues[cmd.appID] = append(d.queues[cmd.appID], cmd)
 	if len(d.queues[cmd.appID]) == 1 {
 		d.wg.Add(1)
@@ -133,12 +145,23 @@ func (d *dispatcher) drain(appID string) {
 
 		res := cmd.run(d.ctx)
 
-		// The id leaves pending before its result goes out, so a re-send that
-		// arrives after the result is answered by the executor's stored record.
+		// The result goes to the connection live now, and the id leaves pending
+		// only after that write, so a re-send on that connection is never
+		// answered twice. A connection that re-sent the id meanwhile and is
+		// live now, but was not written to, gets the result too. With no live
+		// connection the stored record answers the next re-send (rule 2).
 		d.mu.Lock()
-		delete(d.pending, cmd.id)
+		target := d.live
 		d.mu.Unlock()
-		d.send(cmd.id, res)
+		d.send(target, cmd.id, res)
+		d.mu.Lock()
+		resent := d.pending[cmd.id]
+		delete(d.pending, cmd.id)
+		again := resent != nil && resent != target && resent == d.live
+		d.mu.Unlock()
+		if again {
+			d.send(resent, cmd.id, res)
+		}
 
 		d.mu.Lock()
 		d.queues[appID] = d.queues[appID][1:]
@@ -151,9 +174,9 @@ func (d *dispatcher) drain(appID string) {
 	}
 }
 
-// send writes res as the COMMAND_RESULT of id on the live connection, or drops
-// it; the stored record answers a re-send (rule 2).
-func (d *dispatcher) send(id string, res *agentv1.CommandResult) {
+// send writes res as the COMMAND_RESULT of id on live and records it there, or
+// drops it when live is nil; the stored record answers a re-send (rule 2).
+func (d *dispatcher) send(live *liveConn, id string, res *agentv1.CommandResult) {
 	env, err := protocol.Wrap(agentv1.MessageType_COMMAND_RESULT, id, res)
 	if err != nil {
 		d.report(fmt.Errorf("connect: encode result of request %s: %w", id, err))
@@ -164,9 +187,6 @@ func (d *dispatcher) send(id string, res *agentv1.CommandResult) {
 		d.report(fmt.Errorf("connect: encode result of request %s: %w", id, err))
 		return
 	}
-	d.mu.Lock()
-	live := d.live
-	d.mu.Unlock()
 	if live == nil {
 		return
 	}
@@ -177,7 +197,11 @@ func (d *dispatcher) send(id string, res *agentv1.CommandResult) {
 		case live.failed <- fmt.Errorf("connect: send result of request %s: %w", id, err):
 		default:
 		}
+		return
 	}
+	d.mu.Lock()
+	live.answered[id] = true
+	d.mu.Unlock()
 }
 
 func (d *dispatcher) report(err error) {

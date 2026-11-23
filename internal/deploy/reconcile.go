@@ -40,24 +40,30 @@ func (x *Executor) reconcile(ctx context.Context, scope ...string) error {
 	}
 	var errs []error
 	for _, c := range res.Items {
-		app := c.Labels[labelApp]
-		st := release.State{}
-		if app != "" {
-			_, read, _, readErr := x.db.App(ctx, app)
-			if readErr != nil {
-				errs = append(errs, fmt.Errorf("container %s: read app %s: %w", c.ID, app, readErr))
-				continue
-			}
-			st = read
-		}
-		if keepContainer(c.Labels, st) {
-			continue
-		}
-		if err := x.engine.remove(ctx, c.ID); err != nil {
+		if err := x.reconcileOne(ctx, c.ID, c.Labels); err != nil {
 			errs = append(errs, fmt.Errorf("container %s: %w", c.ID, err))
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// reconcileOne removes one listed container unless its app's state references
+// its release. It decides under the app's lock, reading the state afterwards,
+// so a container that a running deploy created and then recorded is kept.
+func (x *Executor) reconcileOne(ctx context.Context, id string, labels map[string]string) error {
+	st := release.State{}
+	if app := labels[labelApp]; app != "" {
+		defer x.lockApp(app)()
+		_, read, _, err := x.db.App(ctx, app)
+		if err != nil {
+			return fmt.Errorf("read app %s: %w", app, err)
+		}
+		st = read
+	}
+	if keepContainer(labels, st) {
+		return nil
+	}
+	return x.engine.remove(ctx, id)
 }
 
 func keepContainer(labels map[string]string, s release.State) bool {

@@ -39,6 +39,7 @@ moonglass.dev/moonglass/internal/agent TestHeartbeatSentOnInterval
 moonglass.dev/moonglass/internal/agent TestHeartbeatsContinueWhileCommandRuns
 moonglass.dev/moonglass/internal/agent TestReconnectBackoffWithJitter
 moonglass.dev/moonglass/internal/agent TestRejectsControlPlanePinMismatch
+moonglass.dev/moonglass/internal/agent TestResendCrossingItsResultIsNotAnsweredTwice
 moonglass.dev/moonglass/internal/agent TestResentCommandReturnsStoredResult
 moonglass.dev/moonglass/internal/agent TestRunningRequestIDIsNotStartedTwice
 moonglass.dev/moonglass/internal/agent TestServerOfflineThenRecovers
@@ -138,6 +139,7 @@ moonglass.dev/moonglass/internal/deploy TestProxyRunPushesAgainWhenRunningConfig
 moonglass.dev/moonglass/internal/deploy TestReconcileCarriesOutDueStops
 moonglass.dev/moonglass/internal/deploy TestReconcileKeepsReferencedReleases
 moonglass.dev/moonglass/internal/deploy TestReconcileRemovesUnreferencedContainers
+moonglass.dev/moonglass/internal/deploy TestReconcileWaitsForTheAppLock
 moonglass.dev/moonglass/internal/deploy TestRemoveImageInUseIsNotAnError
 moonglass.dev/moonglass/internal/deploy TestRemoveImageReportsOtherFailures
 moonglass.dev/moonglass/internal/deploy TestResolveRefParsing

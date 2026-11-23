@@ -51,7 +51,7 @@ Specified by the weeks 2–3 preflight (owner decision D7). The owner split the 
 ### Agent (built in W2-10b)
 
 - The agent accepts `HEARTBEAT_ACK`, the command types above and, from W4-4, `LOG_REQUEST`, and sends `HEARTBEAT`, `COMMAND_RESULT` and, from W4-4, `LOG_CHUNK` and `USAGE`. Anything else closes the connection, as before.
-- A request id that is queued or running is not queued or started again. A finished one is answered from its stored record (rule 2).
+- A request id that is queued or running is not queued or started again. A finished one is answered from its stored record (rule 2), except on a connection that already carried its result: a re-send that crossed that result is ignored, so one connection never gets two results for one id.
 - Commands for different apps run concurrently. Commands for one app run one at a time, in the order they arrived.
 - Commands run under the agent's lifetime, not the connection's, so a dropped connection never cancels a running command. `Connect` returns only after every command it started has returned.
 - `Connect` refuses a nil executor before it dials. An empty `--policy` prints the usage and exits 2.
@@ -68,7 +68,7 @@ Owner condition on D7: a command re-sent after a reconnect must never run twice.
 
 1. The agent records every executed command's request id in agent state (`commands`, `docs/specs/agent-state.md`, W2-10a), together with the `CommandResult` it produced. The record and the release-state change it made are written in one transaction, before the result is sent.
 2. A command whose request id has a stored record is not run again. The agent sends the stored `CommandResult` unchanged.
-3. A command whose request id is still running (re-sent after a reconnect, while the first run continues) is not started again. Its one result is sent on whichever connection is live when it finishes; with none live, the stored result is sent when the command is re-sent (rule 2). (built in W2-10b)
+3. A command whose request id is still running (re-sent after a reconnect, while the first run continues) is not started again. Its one result is sent on whichever connection is live when it finishes, and also on the connection that re-sent it if that one is live and was not written to; with none live, the stored result is sent when the command is re-sent (rule 2). The id stays running until that write, and a re-send of it on a connection that already carried its result is ignored. (built in W2-10b)
 4. Records are kept for 7 days, longer than any re-send can arrive.
 
 W2-10b must name a test that sends a `DEPLOY`, drops the connection after the agent has acted, reconnects, re-sends the same envelope, and asserts that the stored result comes back and that the Engine saw exactly one container create. `TestResentCommandReturnsStoredResult` is that test's name. It runs in `internal/agent` against a fake control plane in the test and a real Engine.

@@ -101,7 +101,7 @@ One bridge network per project (stack §3.6), named `mg-<project>` and labelled 
 - Nothing that fails before step 7 creates anything, except the project network and a named volume, which are kept. A container created in step 7 is force-removed when step 7, 8 or 9 fails.
 - A pulled image is left in the store; the disk guard prunes it (`docs/specs/disk.md`).
 - On `FAILED` or `REJECTED` after step 2, a `releases` row is written with status `failed` and the `detail` as `error`, so the history shows it. The release state is unchanged, so the old release keeps serving.
-- **Start-up reconcile.** When the agent starts, every container labelled `dev.moonglass.managed=true` whose release is not the current, previous or candidate release of its app is removed, and the stops due by `stop_after` are carried out.
+- **Start-up reconcile.** When the agent starts, every container labelled `dev.moonglass.managed=true` whose release is not the current, previous or candidate release of its app is removed, and the stops due by `stop_after` are carried out. Each container is decided under its app's lock, with the app's state read after the lock is taken. Deploy, the pre-deploy step, switch, rollback and stop hold that lock for their whole run, so a candidate a deploy has created but not yet recorded is never removed, even when a command arrives while the reconcile runs.
 - The Engine API version check and the Engine socket are ADR-0014.
 
 ## Executor: Switch, drain and rollback (W2-4)

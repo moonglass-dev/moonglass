@@ -479,6 +479,43 @@ func TestRunningRequestIDIsNotStartedTwice(t *testing.T) {
 	})
 }
 
+// TestResendCrossingItsResultIsNotAnsweredTwice covers a re-send that the
+// control plane wrote before it read the result: the agent has already written
+// the result on that connection when the re-send arrives, so it must neither
+// run the command again nor send a second COMMAND_RESULT on that connection.
+func TestResendCrossingItsResultIsNotAnsweredTwice(t *testing.T) {
+	cp, dir := newCmdCP(t)
+	exec := newFakeExec()
+
+	_, stop := runConnect(t, dir, "https://"+cp.cp.addr, ConnectOptions{
+		Executor: exec, AgentVersion: testVersion, HeartbeatInterval: 20 * time.Millisecond, Sleep: fastSleep,
+	})
+	cp.waitConn(t, 1)
+
+	frame := mustMarshal(t, agentv1.MessageType_DEPLOY, "c1", deployMessage("app-a", "r1"))
+	if err := cp.send(frame); err != nil {
+		t.Fatalf("send c1: unexpected error %v", err)
+	}
+	if r := cp.nextResult(t); r.ID != "c1" || r.Conn != 1 {
+		t.Fatalf("first result = %q on connection %d, want %q on connection 1", r.ID, r.Conn, "c1")
+	}
+
+	if err := cp.send(frame); err != nil {
+		t.Fatalf("re-send c1 on the same connection: unexpected error %v", err)
+	}
+	if err := cp.send(mustMarshal(t, agentv1.MessageType_DEPLOY, "c3", deployMessage("app-b", "r1"))); err != nil {
+		t.Fatalf("send the sentinel command for app-b: unexpected error %v", err)
+	}
+	if r := cp.nextResult(t); r.ID != "c3" {
+		t.Fatalf("result after the re-send = %q, want only the sentinel %q: c1 was answered twice on connection 1", r.ID, "c3")
+	}
+	cp.expectNoResult(t, 300*time.Millisecond, "c1 was already answered on this connection")
+	if got := exec.callCount("c1"); got != 1 {
+		t.Errorf("c1 executor calls = %d, want 1", got)
+	}
+	_ = stop()
+}
+
 func TestAgentClosesOnMessageItDoesNotAccept(t *testing.T) {
 	badDeploy, err := proto.Marshal(&agentv1.Deploy{AppId: "Bad Id"})
 	if err != nil {

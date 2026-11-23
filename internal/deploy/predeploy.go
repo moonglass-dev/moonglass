@@ -55,6 +55,7 @@ func (x *Executor) RunPreDeploy(ctx context.Context, requestID string, r *agentv
 func (x *Executor) runPreDeploy(ctx context.Context, cmd state.Command, r *agentv1.RunPreDeploy) (*agentv1.CommandResult, bool) {
 	appID := r.GetAppId()
 	releaseID := r.GetReleaseId()
+	defer x.lockApp(appID)()
 
 	b, st, known, err := x.db.App(ctx, appID)
 	if err != nil {

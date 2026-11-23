@@ -24,8 +24,10 @@ const (
 	retainInterval = time.Hour
 )
 
-// lockApp holds the app's lock until the returned function runs, so a stop and
-// a switch or rollback of one app never run at the same time.
+// lockApp holds the app's lock until the returned function runs, so a deploy,
+// a pre-deploy step, a switch, a rollback, a stop and the reconcile of one app
+// never run at the same time. A deploy creates its candidate container before
+// it records the candidate, so a reconcile in between would remove it.
 func (x *Executor) lockApp(appID string) func() {
 	x.locksMu.Lock()
 	mu, known := x.locks[appID]
